@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  useIsDesktopLayout,
   useIsLargeScreen,
   pageStackManager,
 } from '@/lib/navigation/pageTransition';
@@ -22,6 +23,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
   className = '',
   bottomHint,
 }) => {
+  const isDesktopLayout = useIsDesktopLayout();
   const isLargeScreen = useIsLargeScreen();
   const [hasDetailPanel, setHasDetailPanel] = useState(false);
 
@@ -34,7 +36,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
     <div
       className={`fixed bottom-0 left-0 transition-[right,left] duration-350 ease-[cubic-bezier(0.4,0,0.2,1)] ${className}`}
       style={{
-        left: isLargeScreen ? 'var(--nav-panel-width, 144px)' : 0,
+        left: isDesktopLayout ? 'var(--nav-panel-width, 144px)' : 0,
         right:
           isLargeScreen && hasDetailPanel
             ? 'var(--detail-panel-width, 384px)'

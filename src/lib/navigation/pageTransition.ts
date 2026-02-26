@@ -69,9 +69,17 @@ class PageStackManager {
 export const pageStackManager = new PageStackManager();
 
 /**
- * Tailwind lg 断点的像素值 (1024px)
+ * 应用唯一响应式断点（768px）
+ * <768: 移动态
+ * >=768: 桌面侧栏态
  */
-export const LG_BREAKPOINT = 1024;
+export const APP_LAYOUT_BREAKPOINT = 768;
+
+/**
+ * 兼容旧命名：统一映射为同一断点，避免出现多断点行为分叉
+ */
+export const MD_BREAKPOINT = APP_LAYOUT_BREAKPOINT;
+export const LG_BREAKPOINT = APP_LAYOUT_BREAKPOINT;
 
 /**
  * 检查当前是否为大屏幕 (lg 断点及以上)
@@ -107,6 +115,14 @@ export function useIsLargeScreen(): boolean {
   }, []);
 
   return isLarge;
+}
+
+/**
+ * Hook: 监听是否为桌面侧栏布局（md 断点及以上）
+ */
+export function useIsDesktopLayout(): boolean {
+  // 与 useIsLargeScreen 保持完全一致，确保应用只有一条断点逻辑
+  return useIsLargeScreen();
 }
 
 /**

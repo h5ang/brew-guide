@@ -16,18 +16,16 @@ import { isBeanEmpty } from '../preferences';
 import { parseDateToTimestamp } from '@/lib/utils/dateUtils';
 import {
   calculateFlavorInfo,
-  getFlavorPeriodSettings,
-  getDefaultFlavorPeriodByRoastLevelSync,
 } from '@/lib/utils/flavorPeriodUtils';
 import {
   getRoasterLogoSync,
   useSettingsStore,
 } from '@/lib/stores/settingsStore';
 import {
-  extractRoasterFromName,
   formatBeanDisplayName,
   getRoasterName,
 } from '@/lib/utils/beanVarietyUtils';
+import FlavorStatusRing from './FlavorStatusRing';
 
 // 表格列配置
 export type TableColumnKey =
@@ -181,158 +179,6 @@ const getPricePerGram = (price: string, capacity: string): number => {
   const capacityNum = parseFloat(capacity.replace('g', ''));
   if (isNaN(priceNum) || isNaN(capacityNum) || capacityNum === 0) return 0;
   return priceNum / capacityNum;
-};
-
-const FlavorStatusRing: React.FC<{ bean: ExtendedCoffeeBean }> = ({ bean }) => {
-  // 1. Handle special states
-  if (bean.isInTransit) {
-    return (
-      <svg
-        className="mr-1.5 inline-block h-[1em] w-[1em] align-text-bottom text-neutral-400 dark:text-neutral-400/60"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="9"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeDasharray="4 4"
-        />
-      </svg>
-    );
-  }
-
-  if (bean.isFrozen) {
-    return (
-      <svg
-        className="mr-1.5 inline-block h-[1em] w-[1em] align-text-bottom text-blue-400 dark:text-blue-400/80"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="9"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-    );
-  }
-
-  if (!bean.roastDate) {
-    return (
-      <svg
-        className="mr-1.5 inline-block h-[1em] w-[1em] align-text-bottom text-neutral-300 dark:text-neutral-300/60"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="9"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeOpacity="0.3"
-        />
-      </svg>
-    );
-  }
-
-  // 2. Calculate days and period
-  const today = new Date();
-  const roastDate = new Date(bean.roastDate);
-  const todayDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate()
-  );
-  const roastDateOnly = new Date(
-    roastDate.getFullYear(),
-    roastDate.getMonth(),
-    roastDate.getDate()
-  );
-  const daysSinceRoast = Math.ceil(
-    (todayDate.getTime() - roastDateOnly.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  let startDay = bean.startDay || 0;
-  let endDay = bean.endDay || 0;
-
-  if (startDay === 0 && endDay === 0) {
-    const { customFlavorPeriod } = getFlavorPeriodSettings();
-    const roasterName = extractRoasterFromName(bean.name) ?? undefined;
-    const defaultPeriod = getDefaultFlavorPeriodByRoastLevelSync(
-      bean.roastLevel || '',
-      customFlavorPeriod,
-      roasterName
-    );
-    startDay = defaultPeriod.startDay;
-    endDay = defaultPeriod.endDay;
-  }
-
-  // 3. Determine phase and progress
-  const radius = 9;
-  const circumference = 2 * Math.PI * radius;
-  let progress = 0;
-  let colorClass = 'text-neutral-500 dark:text-neutral-500/60';
-  let isDashed = false;
-
-  if (daysSinceRoast < startDay) {
-    // Resting (养豆期)
-    // Progress: 0 -> 100% (fills up)
-    progress =
-      startDay > 0 ? Math.max(0, Math.min(1, daysSinceRoast / startDay)) : 1;
-    colorClass = 'text-amber-500 dark:text-amber-500/60';
-  } else if (daysSinceRoast <= endDay) {
-    // Drinking (赏味期)
-    // Progress: 100% -> 0% (empties)
-    const duration = endDay - startDay;
-    const remaining = endDay - daysSinceRoast;
-    progress =
-      duration > 0 ? Math.max(0, Math.min(1, remaining / duration)) : 0;
-    colorClass = 'text-green-500 dark:text-green-500/60';
-  } else {
-    // Decline (衰退期)
-    progress = 0; // Empty
-    colorClass = 'text-neutral-300 dark:text-neutral-300/60';
-    isDashed = true;
-  }
-
-  const strokeDashoffset = circumference * (1 - progress);
-
-  return (
-    <svg
-      className={`mr-1.5 inline-block h-[1em] w-[1em] align-text-bottom ${colorClass}`}
-      viewBox="0 0 24 24"
-    >
-      {/* Background track */}
-      <circle
-        cx="12"
-        cy="12"
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        opacity="0.2"
-      />
-      {/* Progress */}
-      <circle
-        cx="12"
-        cy="12"
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeDasharray={isDashed ? '2 2' : `${circumference} ${circumference}`}
-        strokeDashoffset={isDashed ? 0 : strokeDashoffset}
-        strokeLinecap="round"
-        transform="rotate(-90 12 12)"
-      />
-    </svg>
-  );
 };
 
 // 获取赏味期状态的排序值
@@ -551,7 +397,7 @@ const TableView: React.FC<TableViewProps> = ({
 
             return (
               <span className="inline-flex items-center">
-                <FlavorStatusRing bean={bean} />
+                <FlavorStatusRing bean={bean} className="mr-1.5" />
                 {content}
               </span>
             );

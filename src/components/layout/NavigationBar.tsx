@@ -18,6 +18,7 @@ import {
   useScrollToSelected,
   useScrollBorder,
 } from '@/lib/equipment/useScrollToSelected';
+import DesktopGlobalSearch from '@/components/layout/DesktopGlobalSearch';
 
 import { Equal, ArrowLeft, ChevronsUpDown, Upload } from 'lucide-react';
 
@@ -596,6 +597,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
     pointerEvents: !(canGoBack() && onBackClick) ? 'auto' : 'none',
     visibility: !(canGoBack() && onBackClick) ? 'visible' : 'hidden',
   } as const;
+  const showDesktopBottomSettingsEntry = !(canGoBack() && onBackClick);
 
   const handlePinnedViewClick = (view: ViewOption) => {
     if (activeMainTab !== '咖啡豆') {
@@ -1154,6 +1156,57 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         }}
       />
 
+      <AnimatePresence initial={false}>
+        {activeMainTab !== '冲煮' && (
+          <motion.div
+            key="desktop-global-search"
+            className="hidden overflow-hidden md:block"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              height: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+              opacity: { duration: 0.16 },
+            }}
+          >
+            <DesktopGlobalSearch
+              enabled={true}
+              settings={settings}
+              customEquipments={customEquipments}
+              onSelectBean={(bean, searchQuery) => {
+                handleMainTabClick('咖啡豆');
+                window.dispatchEvent(
+                  new CustomEvent('beanDetailOpened', {
+                    detail: {
+                      bean,
+                      searchQuery,
+                    },
+                  })
+                );
+              }}
+              onSelectNote={({
+                note,
+                equipmentName,
+                beanUnitPrice,
+                beanInfo,
+              }) => {
+                handleMainTabClick('笔记');
+                window.dispatchEvent(
+                  new CustomEvent('noteDetailOpened', {
+                    detail: {
+                      note,
+                      equipmentName,
+                      beanUnitPrice,
+                      beanInfo,
+                    },
+                  })
+                );
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 修改：创建一个固定高度的容器，用于包含默认头部和替代头部 */}
       {/* 移动端使用 min-h 和绝对定位实现切换动画，桌面端使用常规流式布局 */}
       <div className="relative min-h-[30px] w-full md:static md:min-h-0">
@@ -1186,7 +1239,9 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
                 {/* 设置入口按钮图标 - 扩大触碰区域 */}
                 <div
                   onClick={handleTitleClick}
-                  className="-mt-3 -ml-3 flex cursor-pointer items-center pt-3 pr-4 pb-3 pl-3 text-[12px] tracking-widest text-neutral-500 dark:text-neutral-400"
+                  className={`-mt-3 -ml-3 flex cursor-pointer items-center pt-3 pr-4 pb-3 pl-3 text-[12px] tracking-widest text-neutral-500 dark:text-neutral-400 ${
+                    canGoBack() && onBackClick ? 'md:flex' : 'md:hidden'
+                  }`}
                 >
                   <div className="relative flex h-4 w-4 items-center justify-center">
                     <AnimatePresence mode="popLayout" initial={false}>
@@ -1774,15 +1829,30 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         </AnimatePresence>
       )}
 
-      {/* 桌面端同步指示器 - 固定在导航栏底部 */}
-      {syncProvider === 'supabase' && isSyncing && (
-        <div className="mt-auto hidden px-6 pb-6 md:block">
-          <div className="flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
+      {/* 桌面端底部入口与同步指示 */}
+      <div
+        className={`mt-auto hidden px-6 md:block ${
+          syncProvider === 'supabase' && isSyncing ? 'pb-5' : 'pb-3'
+        }`}
+      >
+        {showDesktopBottomSettingsEntry && (
+          <button
+            type="button"
+            onClick={handleTitleClick}
+            className="-ml-2 flex items-center p-2 text-[12px] tracking-widest text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
+            aria-label="打开设置"
+          >
+            <Equal className="h-4 w-4" />
+          </button>
+        )}
+
+        {syncProvider === 'supabase' && isSyncing && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
             <AppleSpinner className="h-3 w-3" />
             <span>同步中</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </motion.div>
   );
 };

@@ -82,6 +82,7 @@ import {
 import {
   pageStackManager,
   getParentPageStyle,
+  useIsDesktopLayout,
   useIsLargeScreen,
 } from '@/lib/navigation/pageTransition';
 import BeanDetailModal from '@/components/coffee-bean/Detail/BeanDetailModal';
@@ -222,6 +223,8 @@ const AppContainer = () => {
 const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
   // 检测是否为大屏幕（lg 断点）- 用于三栏布局
   const isLargeScreen = useIsLargeScreen();
+  // 检测是否启用桌面侧栏布局（md 断点）
+  const isDesktopLayout = useIsDesktopLayout();
 
   // 使用设置相关状态
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -3237,7 +3240,9 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
               isLargeScreen ? hasOverlayModalOpen : hasModalOpen
             ),
             // CSS 变量用于 BottomActionBar 等组件
-            '--nav-panel-width': isLargeScreen ? `${navPanelWidth}px` : '0px',
+            '--nav-panel-width': isDesktopLayout
+              ? `${navPanelWidth}px`
+              : '0px',
             '--detail-panel-width':
               isLargeScreen && (beanDetailOpen || noteDetailOpen)
                 ? `${detailPanelWidth}px`
@@ -3306,12 +3311,12 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
           }
           cloudSyncEnabled={isCloudSyncEnabled()}
           onPullToSync={handlePullToSync}
-          width={isLargeScreen ? navPanelWidth : undefined}
+          width={isDesktopLayout ? navPanelWidth : undefined}
           isResizing={isNavResizing}
           />
 
-        {/* 导航栏拖动条 - 大屏幕时显示，放在 NavigationBar 和 main 之间避免被裁切 */}
-        {isLargeScreen && (
+        {/* 导航栏拖动条 - 侧边导航布局（md 及以上）显示，放在 NavigationBar 和 main 之间避免被裁切 */}
+        {isDesktopLayout && (
           <div
             className="group relative z-10 hidden h-full w-0 cursor-col-resize select-none md:block"
             onMouseDown={handleNavResizeStart}
