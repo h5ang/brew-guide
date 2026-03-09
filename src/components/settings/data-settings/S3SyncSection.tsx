@@ -231,26 +231,19 @@ export const S3SyncSection: React.FC<S3SyncSectionProps> = ({
       }
 
       if (result.success) {
-        if (result.uploadedFiles > 0 && result.downloadedFiles > 0) {
-          showToast({
-            type: 'success',
-            title: `同步完成：上传 ${result.uploadedFiles} 项，下载 ${result.downloadedFiles} 项，即将重启...`,
-            duration: 3000,
-          });
-          setTimeout(() => window.location.reload(), 3000);
-        } else if (result.uploadedFiles > 0) {
+        if (result.downloadedFiles > 0) {
+          triggerHaptic('medium');
+          onSyncComplete?.();
+          window.location.reload();
+          return;
+        }
+
+        if (result.uploadedFiles > 0) {
           showToast({
             type: 'success',
             title: `已上传 ${result.uploadedFiles} 项到云端`,
             duration: 2500,
           });
-        } else if (result.downloadedFiles > 0) {
-          showToast({
-            type: 'success',
-            title: `已从云端下载 ${result.downloadedFiles} 项，即将重启...`,
-            duration: 2500,
-          });
-          setTimeout(() => window.location.reload(), 2500);
         } else {
           if (result.debugLogs && result.debugLogs.length > 0) {
             setDebugLogs(result.debugLogs);

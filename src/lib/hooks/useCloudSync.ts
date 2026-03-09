@@ -45,16 +45,17 @@ export function useCloudSyncConnection(
               ? result.uploadedCount
               : result.downloadedCount;
           if (n > 0) {
+            if (direction === 'download') {
+              if (settings.hapticFeedback) hapticsUtils.medium();
+              window.location.reload();
+              return;
+            }
+
             showToast({
               type: 'success',
-              title:
-                direction === 'upload'
-                  ? `已上传 ${n} 项`
-                  : `已下载 ${n} 项，即将重启...`,
+              title: `已上传 ${n} 项`,
               duration: 2500,
             });
-            if (direction === 'download')
-              setTimeout(() => window.location.reload(), 2500);
           } else {
             showToast({ type: 'info', title: '数据已是最新', duration: 2000 });
           }
