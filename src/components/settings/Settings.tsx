@@ -13,7 +13,11 @@ import {
   canAutoCheck,
   postponeUpdateCheck,
 } from '@/lib/utils/versionCheck';
-import { isBundledNativeApp } from '@/lib/app/capacitor';
+import { getPlatform, isBundledNativeApp } from '@/lib/app/capacitor';
+import {
+  getOfflineAndroidDownloadUrl,
+  getOfflineIosDownloadUrl,
+} from '@/lib/utils/downloadUrls';
 import UpdateDrawer from './UpdateDrawer';
 import SettingGroup from './SettingItem';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
@@ -308,6 +312,20 @@ const Settings: React.FC<SettingsProps> = ({
   const bundledNativeApp =
     typeof window !== 'undefined' ? isBundledNativeApp() : false;
 
+  const getNativeUpdateDownloadUrl = useCallback((version: string) => {
+    const platform = getPlatform();
+
+    if (platform === 'ios') {
+      return getOfflineIosDownloadUrl(version);
+    }
+
+    if (platform === 'android') {
+      return getOfflineAndroidDownloadUrl(version);
+    }
+
+    return null;
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     requestPWAUpdateCheck();
@@ -326,10 +344,13 @@ const Settings: React.FC<SettingsProps> = ({
         const result = await checkForUpdates();
         await saveCheckTime(); // 保存检测时间
 
-        if (result.hasUpdate && result.latestVersion && result.downloadUrl) {
+        if (result.hasUpdate && result.latestVersion) {
+          const downloadUrl = getNativeUpdateDownloadUrl(result.latestVersion);
+          if (!downloadUrl) return;
+
           setUpdateInfo({
             latestVersion: result.latestVersion,
-            downloadUrl: result.downloadUrl,
+            downloadUrl,
             releaseNotes: result.releaseNotes ?? '',
           });
           setIsAutoCheckUpdate(true); // 标记为自动检测
@@ -342,7 +363,7 @@ const Settings: React.FC<SettingsProps> = ({
     };
 
     autoCheckUpdate();
-  }, [isOpen, bundledNativeApp]);
+  }, [isOpen, bundledNativeApp, getNativeUpdateDownloadUrl]);
 
   // 点击外部关闭同步菜单
   useEffect(() => {

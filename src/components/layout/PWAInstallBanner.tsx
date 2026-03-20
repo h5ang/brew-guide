@@ -5,6 +5,11 @@ import { Capacitor } from '@capacitor/core';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import PWAInstallGuideDrawer from '@/components/layout/PWAInstallGuideDrawer';
+import { APP_VERSION } from '@/lib/core/config';
+import {
+  getDesktopDownloadUrl,
+  getOnlineAndroidDownloadUrl,
+} from '@/lib/utils/downloadUrls';
 
 const DISMISS_KEY = 'pwa_install_banner_dismissed_v1';
 
@@ -58,6 +63,7 @@ const getOnboardingOpen = () => {
 export default function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [latestVersion, setLatestVersion] = useState(APP_VERSION);
   const [isVisible, setIsVisible] = useState(() => {
     if (typeof window === 'undefined') return false;
     if (Capacitor.isNativePlatform?.() === true) return false;
@@ -81,6 +87,32 @@ export default function PWAInstallBanner() {
     if (typeof window === 'undefined') return 'unknown';
     return getOnboardingOpen() ? 'open' : 'closed';
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLatestVersion = async () => {
+      try {
+        const response = await fetch('/version.json', {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+
+        const versionInfo = (await response.json()) as { version?: string };
+        if (!cancelled && typeof versionInfo.version === 'string') {
+          setLatestVersion(versionInfo.version);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    void loadLatestVersion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -166,6 +198,8 @@ export default function PWAInstallBanner() {
   const showPwaInstallButton = !isWeChat && (isIOS || Boolean(deferredPrompt));
   const showDesktopDownloads = isDesktop && !isWeChat;
   const showAndroidDownload = isAndroid && !isWeChat;
+  const desktopDownloadUrl = getDesktopDownloadUrl();
+  const androidOnlineDownloadUrl = getOnlineAndroidDownloadUrl();
 
   return (
     <div className="relative z-50 mx-auto w-full max-w-6xl border-b border-neutral-200/50 bg-neutral-50 px-6 py-3 dark:border-neutral-800/50 dark:bg-neutral-900">
@@ -198,19 +232,19 @@ export default function PWAInstallBanner() {
           {showDesktopDownloads && (
             <div className="flex items-center gap-1">
               <a
-                href="https://gitee.com/chu3/brew-guide/releases/download/v1.5.13/BrewGuide_1.5.13_windows_x64_setup.exe"
+                href={desktopDownloadUrl}
                 className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-800 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
               >
                 Windows
               </a>
               <a
-                href="https://gitee.com/chu3/brew-guide/releases/download/v1.5.13/BrewGuide_1.5.13_macos_arm64.dmg"
+                href={desktopDownloadUrl}
                 className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-800 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
               >
                 macOS
               </a>
               <a
-                href="https://gitee.com/chu3/brew-guide/releases/download/v1.5.13/BrewGuide_1.5.13_linux_x64.AppImage"
+                href={desktopDownloadUrl}
                 className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-800 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
               >
                 Linux
@@ -219,7 +253,7 @@ export default function PWAInstallBanner() {
           )}
           {showAndroidDownload && (
             <a
-              href="https://github.com/chuthree/brew-guide/releases/download/v1.0.0-online/BrewGuide-OL_1.0.0_android.apk"
+              href={androidOnlineDownloadUrl}
               className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-800 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
             >
               Android APK
