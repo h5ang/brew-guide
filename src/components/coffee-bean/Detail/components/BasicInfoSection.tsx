@@ -82,6 +82,12 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
     : currentBean?.roastDate;
   const priceNumber = parseFloat(currentBean?.price || '');
   const capacityNumber = parseFloat(currentBean?.capacity || '');
+  const remainingText = currentBean?.remaining?.trim();
+  const remainingNumber =
+    remainingText && !Number.isNaN(parseFloat(remainingText))
+      ? parseFloat(remainingText)
+      : null;
+  const isOutOfStock = remainingNumber !== null && remainingNumber <= 0;
   const hasValidUnitPrice =
     !isNaN(priceNumber) && !isNaN(capacityNumber) && capacityNumber > 0;
 
@@ -348,6 +354,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
 
         {/* 赏味期（仅熟豆且有烘焙日期时显示，添加模式下不显示因为下面有设置） */}
         {!isGreenBeanType &&
+          !isOutOfStock &&
           flavorInfo &&
           flavorInfo.phase !== '未知' &&
           !isAddMode && (
