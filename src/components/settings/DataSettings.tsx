@@ -113,6 +113,16 @@ const SelectionDropdown: React.FC<SelectionDropdownProps> = ({
   );
 };
 
+function canUsePullToSync(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const hasTouchPoints =
+    typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
+  const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
+  return hasTouchPoints || hasCoarsePointer;
+}
+
 const DataSettings: React.FC<DataSettingsProps> = ({
   settings: _settings,
   onClose,
@@ -165,6 +175,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
   const [isNativePlatform, setIsNativePlatform] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
   const [showStorageDetails, setShowStorageDetails] = useState(false);
+  const [supportsPullToSync, setSupportsPullToSync] = useState(false);
 
   // 云同步类型选择
   const [showSyncTypeDropdown, setShowSyncTypeDropdown] = useState(false);
@@ -217,6 +228,23 @@ const DataSettings: React.FC<DataSettingsProps> = ({
     if (!isNative) {
       setIsPWA(isPWAMode());
     }
+  }, []);
+
+  useEffect(() => {
+    const updatePullToSyncSupport = () => {
+      setSupportsPullToSync(canUsePullToSync());
+    };
+
+    updatePullToSyncSupport();
+
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(pointer: coarse)');
+    mediaQuery.addEventListener('change', updatePullToSyncSupport);
+
+    return () => {
+      mediaQuery.removeEventListener('change', updatePullToSyncSupport);
+    };
   }, []);
 
   // 加载持久化存储状态
@@ -645,7 +673,9 @@ const DataSettings: React.FC<DataSettingsProps> = ({
             </button>
           )}
 
-          {syncType !== 'supabase' && isManualSyncConnected && (
+          {syncType !== 'supabase' &&
+            supportsPullToSync &&
+            isManualSyncConnected && (
             <div className="flex items-center justify-between rounded bg-neutral-100 px-4 py-3 dark:bg-neutral-800">
               <div>
                 <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
@@ -706,7 +736,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
               </button>
             )}
 
-            {isManualSyncConnected && (
+            {supportsPullToSync && isManualSyncConnected && (
               <div className="flex items-center justify-between rounded bg-neutral-100 px-4 py-3 dark:bg-neutral-800">
                 <div>
                   <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
