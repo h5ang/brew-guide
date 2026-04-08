@@ -548,6 +548,9 @@ const Settings: React.FC<SettingsProps> = ({
   );
   const shouldDimSubSettingEntries = isLargeScreen && !!activeSubSettingId;
   const masterGroupPaddingClass = isLargeScreen ? 'pl-6 pr-3' : 'px-6';
+  const masterColumnClass = isLargeScreen
+    ? 'flex min-h-0 w-96 shrink-0 flex-col'
+    : 'flex min-h-0 flex-1 flex-col';
 
   return (
     <div
@@ -557,20 +560,13 @@ const Settings: React.FC<SettingsProps> = ({
       {!isLargeScreen && headerContent}
 
       {/* 滚动内容区域 - 新的简洁设计 */}
-      <div className={isLargeScreen ? 'flex min-h-0 flex-1' : 'flex-1'}>
-        <div
-          className={
-            isLargeScreen ? 'flex h-full w-96 shrink-0 flex-col' : 'flex-1'
-          }
-        >
+      <div className="flex min-h-0 flex-1">
+        <div className={masterColumnClass}>
           {isLargeScreen && headerContent}
 
           <div
-            className={
-              isLargeScreen
-                ? 'pb-safe-bottom relative min-h-0 flex-1 overflow-y-auto'
-                : 'pb-safe-bottom relative flex-1 overflow-y-auto'
-            }
+            className="pb-safe-bottom relative min-h-0 flex-1 overflow-y-auto"
+            style={{ WebkitOverflowScrolling: 'touch' }}
           >
             {/* 顶部渐变阴影（随滚动粘附）*/}
             <div className="pointer-events-none sticky top-0 z-10 h-12 w-full bg-linear-to-b from-neutral-50 to-transparent first:border-b-0 dark:from-neutral-900"></div>
