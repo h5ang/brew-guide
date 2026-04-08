@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import {
   useReactTable,
   getCoreRowModel,
@@ -14,9 +15,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { ExtendedCoffeeBean } from '../types';
 import { isBeanEmpty } from '../preferences';
 import { parseDateToTimestamp } from '@/lib/utils/dateUtils';
-import {
-  calculateFlavorInfo,
-} from '@/lib/utils/flavorPeriodUtils';
+import { calculateFlavorInfo } from '@/lib/utils/flavorPeriodUtils';
 import {
   getRoasterLogoSync,
   useSettingsStore,
@@ -26,6 +25,7 @@ import {
   getRoasterName,
 } from '@/lib/utils/beanVarietyUtils';
 import FlavorStatusRing from './FlavorStatusRing';
+import TableHoverPreview, { type HoverPreviewBean } from './TableHoverPreview';
 
 // 表格列配置
 export type TableColumnKey =
@@ -78,6 +78,8 @@ export const getDefaultVisibleColumns = (): TableColumnKey[] =>
 // 默认排序状态（空数组，跟随列表排序）
 const DEFAULT_SORTING: SortingState = [];
 const SORTING_STORAGE_KEY = 'brew-guide:coffee-beans:tableSorting';
+const HOVER_PREVIEW_OFFSET_X = 24;
+const HOVER_PREVIEW_OFFSET_Y = 20;
 
 // 从 localStorage 读取排序状态
 const loadSorting = (): SortingState => {
@@ -259,6 +261,23 @@ const TableView: React.FC<TableViewProps> = ({
     }),
     [roasterFieldEnabled, roasterSeparator]
   );
+  const prefersReducedMotion = useReducedMotion();
+  const isReducedMotion = Boolean(prefersReducedMotion);
+  const previewX = useMotionValue(0);
+  const previewY = useMotionValue(0);
+  const previewSpringX = useSpring(previewX, {
+    stiffness: isReducedMotion ? 900 : 420,
+    damping: isReducedMotion ? 120 : 36,
+    mass: isReducedMotion ? 1 : 0.45,
+  });
+  const previewSpringY = useSpring(previewY, {
+    stiffness: isReducedMotion ? 900 : 420,
+    damping: isReducedMotion ? 120 : 36,
+    mass: isReducedMotion ? 1 : 0.45,
+  });
+  const [supportsHoverPreview, setSupportsHoverPreview] = useState(false);
+  const [hoverPreviewBean, setHoverPreviewBean] =
+    useState<HoverPreviewBean | null>(null);
 
   // 多重排序状态（持久化）
   const [sorting, setSorting] = useState<SortingState>(loadSorting);
@@ -288,6 +307,31 @@ const TableView: React.FC<TableViewProps> = ({
     }
   }, [visibleColumns, sorting]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const updateSupportState = () => {
+      setSupportsHoverPreview(mediaQuery.matches);
+    };
+
+    updateSupportState();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', updateSupportState);
+      return () => mediaQuery.removeEventListener('change', updateSupportState);
+    }
+
+    mediaQuery.addListener(updateSupportState);
+    return () => mediaQuery.removeListener(updateSupportState);
+  }, []);
+
+  useEffect(() => {
+    if (!supportsHoverPreview) {
+      setHoverPreviewBean(null);
+    }
+  }, [supportsHoverPreview]);
+
   const [roasterLogos, setRoasterLogos] = useState<
     Record<string, string | null>
   >({});
@@ -312,6 +356,48 @@ const TableView: React.FC<TableViewProps> = ({
     });
     setRoasterLogos(logos);
   }, [allBeans, roasterSettings]);
+
+  const buildHoverPreviewBean = useCallback(
+    (bean: ExtendedCoffeeBean): HoverPreviewBean | null => {
+      const imageSrc = bean.image || roasterLogos[bean.id] || '';
+      if (!imageSrc) return null;
+
+      return {
+        id: bean.id,
+        imageSrc,
+      };
+    },
+    [roasterLogos]
+  );
+
+  const updatePreviewPosition = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      previewX.set(event.clientX + HOVER_PREVIEW_OFFSET_X);
+      previewY.set(event.clientY + HOVER_PREVIEW_OFFSET_Y);
+    },
+    [previewX, previewY]
+  );
+
+  const handleNameCellMouseEnter = useCallback(
+    (bean: ExtendedCoffeeBean, event: React.MouseEvent<HTMLElement>) => {
+      if (!supportsHoverPreview) return;
+      updatePreviewPosition(event);
+      setHoverPreviewBean(buildHoverPreviewBean(bean));
+    },
+    [buildHoverPreviewBean, supportsHoverPreview, updatePreviewPosition]
+  );
+
+  const handleNameCellMouseMove = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      if (!supportsHoverPreview) return;
+      updatePreviewPosition(event);
+    },
+    [supportsHoverPreview, updatePreviewPosition]
+  );
+
+  const clearHoverPreview = useCallback(() => {
+    setHoverPreviewBean(null);
+  }, []);
 
   // 检查是否有生豆
   const hasGreenBeans = useMemo(
@@ -562,6 +648,7 @@ const TableView: React.FC<TableViewProps> = ({
       <div
         className="scroll-with-bottom-bar h-full overflow-x-auto overflow-y-auto overscroll-none pb-20"
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+        onScroll={clearHoverPreview}
       >
         <table className="w-full min-w-max border-separate border-spacing-0">
           {/* 表头 - 使用 border-separate 解决 sticky 边框问题 */}
@@ -613,6 +700,7 @@ const TableView: React.FC<TableViewProps> = ({
                     const isFirst = index === 0;
                     const isLast = index === row.getVisibleCells().length - 1;
                     const isCapacity = cell.column.id === 'capacity';
+                    const isName = cell.column.id === 'name';
 
                     const cellClass =
                       'text-xs leading-relaxed font-medium text-neutral-600 dark:text-neutral-400';
@@ -637,6 +725,15 @@ const TableView: React.FC<TableViewProps> = ({
                               }
                             : undefined
                         }
+                        onMouseEnter={
+                          isName
+                            ? e => handleNameCellMouseEnter(bean, e)
+                            : undefined
+                        }
+                        onMouseMove={
+                          isName ? handleNameCellMouseMove : undefined
+                        }
+                        onMouseLeave={isName ? clearHoverPreview : undefined}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -651,6 +748,14 @@ const TableView: React.FC<TableViewProps> = ({
           </tbody>
         </table>
       </div>
+      {supportsHoverPreview && (
+        <TableHoverPreview
+          previewBean={hoverPreviewBean}
+          x={previewSpringX}
+          y={previewSpringY}
+          reducedMotion={isReducedMotion}
+        />
+      )}
     </div>
   );
 };
