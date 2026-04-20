@@ -135,6 +135,12 @@ export interface AppModalsProps {
   setBeanDetailAddMode: (mode: boolean) => void;
   beanDetailAddBeanState: 'green' | 'roasted';
   onCreateNoteFromBean: (bean: CoffeeBean) => void;
+  onOpenNoteDetailFromBean: (detail: {
+    note: BrewingNote;
+    equipmentName: string;
+    beanUnitPrice: number;
+    beanInfo?: CoffeeBean | null;
+  }) => void;
 
   // 咖啡豆导入
   showImportBeanForm: boolean;
@@ -159,6 +165,7 @@ export interface AppModalsProps {
     beanUnitPrice: number;
     beanInfo?: CoffeeBean | null;
   } | null;
+  onOpenBeanDetailFromNote: (bean: CoffeeBean) => void;
   setNoteDetailData: (
     data: {
       note: BrewingNote;
@@ -319,6 +326,7 @@ const AppModals: React.FC<AppModalsProps> = ({
   setBeanDetailAddMode,
   beanDetailAddBeanState,
   onCreateNoteFromBean,
+  onOpenNoteDetailFromBean,
 
   // 咖啡豆导入
   showImportBeanForm,
@@ -338,6 +346,7 @@ const AppModals: React.FC<AppModalsProps> = ({
   noteDetailOpen,
   setNoteDetailOpen,
   noteDetailData,
+  onOpenBeanDetailFromNote,
   setNoteDetailData,
 
   // 器具相关
@@ -843,6 +852,7 @@ const AppModals: React.FC<AppModalsProps> = ({
             setBeanDetailAddMode(false);
           }}
           onCreateNoteFromBean={onCreateNoteFromBean}
+          onOpenRelatedNote={onOpenNoteDetailFromBean}
           searchQuery={beanDetailSearchQuery}
           mode={beanDetailAddMode ? 'add' : 'view'}
           initialBeanState={beanDetailAddBeanState}
@@ -1020,6 +1030,7 @@ const AppModals: React.FC<AppModalsProps> = ({
           equipmentName={noteDetailData.equipmentName}
           beanUnitPrice={noteDetailData.beanUnitPrice}
           beanInfo={noteDetailData.beanInfo}
+          onOpenBeanDetail={onOpenBeanDetailFromNote}
           onEdit={async note => {
             const { Storage } = await import('@/lib/core/storage');
             const notesStr = await Storage.get('brewingNotes');

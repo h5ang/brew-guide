@@ -89,6 +89,7 @@ import {
   useIsDesktopLayout,
   useIsLargeScreen,
 } from '@/lib/navigation/pageTransition';
+import { COFFEE_BEAN_NAVIGATION_EVENTS } from '@/lib/navigation/coffeeBeanNavigation';
 import BeanDetailModal from '@/components/coffee-bean/Detail/BeanDetailModal';
 import NoteDetailModal from '@/components/notes/Detail/NoteDetailModal';
 import type { ConvertToGreenPreview } from '@/components/coffee-bean/ConvertToGreenDrawer';
@@ -137,6 +138,8 @@ const EMPTY_NOTE_TASTE = {
   bitterness: 0,
   body: 0,
 };
+
+const DETAIL_NAVIGATION_DELAY_MS = 320;
 
 const createBlankBrewingNoteDraft = (): Partial<BrewingNoteData> => ({
   coffeeBeanInfo: {
@@ -1178,6 +1181,101 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       hapticsUtils.light();
     }
   };
+
+  const openBeanDetailInInventory = useCallback(
+    (bean: CoffeeBean) => {
+      saveMainTabPreference('咖啡豆');
+      setActiveMainTab('咖啡豆');
+
+      if (currentBeanView !== VIEW_OPTIONS.INVENTORY) {
+        setCurrentBeanView(VIEW_OPTIONS.INVENTORY);
+        saveStringState('coffee-beans', 'viewMode', VIEW_OPTIONS.INVENTORY);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent(COFFEE_BEAN_NAVIGATION_EVENTS.SYNC_INVENTORY_CONTEXT, {
+          detail: {
+            beanState: bean.beanState === 'green' ? 'green' : 'roasted',
+            clearSearch: true,
+          },
+        })
+      );
+
+      requestAnimationFrame(() => {
+        setBeanDetailAddMode(false);
+        setBeanDetailSearchQuery('');
+        setBeanDetailData(bean as ExtendedCoffeeBean);
+        setBeanDetailOpen(true);
+      });
+    },
+    [currentBeanView, setActiveMainTab]
+  );
+
+  const handleOpenBeanDetailFromNote = useCallback(
+    (bean: CoffeeBean) => {
+      const navigateToBeanDetail = () => openBeanDetailInInventory(bean);
+
+      if (noteDetailOpen && modalHistory.isTop('note-detail')) {
+        modalHistory.back();
+        window.setTimeout(navigateToBeanDetail, DETAIL_NAVIGATION_DELAY_MS);
+        return;
+      }
+
+      if (noteDetailOpen) {
+        setNoteDetailOpen(false);
+        window.setTimeout(navigateToBeanDetail, DETAIL_NAVIGATION_DELAY_MS);
+        return;
+      }
+
+      navigateToBeanDetail();
+    },
+    [noteDetailOpen, openBeanDetailInInventory]
+  );
+
+  const openNoteDetailInNotes = useCallback(
+    (detail: {
+      note: BrewingNote;
+      equipmentName: string;
+      beanUnitPrice: number;
+      beanInfo?: CoffeeBean | null;
+    }) => {
+      saveMainTabPreference('笔记');
+      setActiveMainTab('笔记');
+      setNoteDetailData(detail);
+
+      requestAnimationFrame(() => {
+        setNoteDetailOpen(true);
+      });
+    },
+    [setActiveMainTab]
+  );
+
+  const handleOpenNoteDetailFromBean = useCallback(
+    (detail: {
+      note: BrewingNote;
+      equipmentName: string;
+      beanUnitPrice: number;
+      beanInfo?: CoffeeBean | null;
+    }) => {
+      const navigateToNoteDetail = () => openNoteDetailInNotes(detail);
+
+      if (beanDetailOpen && modalHistory.isTop('bean-detail')) {
+        modalHistory.back();
+        window.setTimeout(navigateToNoteDetail, DETAIL_NAVIGATION_DELAY_MS);
+        return;
+      }
+
+      if (beanDetailOpen) {
+        setBeanDetailOpen(false);
+        setBeanDetailAddMode(false);
+        window.setTimeout(navigateToNoteDetail, DETAIL_NAVIGATION_DELAY_MS);
+        return;
+      }
+
+      navigateToNoteDetail();
+    },
+    [beanDetailOpen, openNoteDetailInNotes]
+  );
 
   // 点击外部关闭视图下拉菜单
   useEffect(() => {
@@ -2413,9 +2511,8 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       if (!beanId && !beanName) return;
 
       try {
-        const { getCoffeeBeanStore, getBeanByName } = await import(
-          '@/lib/stores/coffeeBeanStore'
-        );
+        const { getCoffeeBeanStore, getBeanByName } =
+          await import('@/lib/stores/coffeeBeanStore');
 
         const bean =
           (beanId ? getCoffeeBeanStore().getBeanById(beanId) : null) ||
@@ -2674,7 +2771,9 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         equipment: overrides?.equipment ?? note.equipment,
         method: overrides?.method ?? note.method,
       });
-      const params = normalizeBrewingNoteParams(overrides?.params ?? note.params);
+      const params = normalizeBrewingNoteParams(
+        overrides?.params ?? note.params
+      );
       const totalTime =
         typeof (overrides?.totalTime ?? note.totalTime) === 'number' &&
         (overrides?.totalTime ?? note.totalTime)! > 0
@@ -3203,9 +3302,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
               isLargeScreen ? hasOverlayModalOpen : hasModalOpen
             ),
             // CSS 变量用于 BottomActionBar 等组件
-            '--nav-panel-width': isDesktopLayout
-              ? `${navPanelWidth}px`
-              : '0px',
+            '--nav-panel-width': isDesktopLayout ? `${navPanelWidth}px` : '0px',
             '--detail-panel-width':
               isLargeScreen && (beanDetailOpen || noteDetailOpen)
                 ? `${detailPanelWidth}px`
@@ -3216,88 +3313,88 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         <PWAInstallBanner />
         <div className="flex h-full flex-col md:flex-row">
           <NavigationBar
-          activeMainTab={activeMainTab}
-          setActiveMainTab={handleMainTabClick}
-          activeBrewingStep={activeBrewingStep}
-          parameterInfo={parameterInfo}
-          setParameterInfo={setParameterInfo}
-          editableParams={editableParams}
-          setEditableParams={setEditableParams}
-          isTimerRunning={isTimerRunning}
-          showComplete={showComplete}
-          selectedEquipment={selectedEquipment}
-          selectedMethod={
-            currentBrewingMethod
-              ? {
-                  name: currentBrewingMethod.name,
-                  params: {
-                    coffee: currentBrewingMethod.params.coffee,
-                    water: currentBrewingMethod.params.water,
-                    ratio: currentBrewingMethod.params.ratio,
-                    grindSize: currentBrewingMethod.params.grindSize,
-                    temp: currentBrewingMethod.params.temp,
-                    stages: currentBrewingMethod.params.stages.map(stage => ({
-                      label: stage.label,
-                      duration: stage.duration,
-                      water: stage.water,
-                      detail: stage.detail,
-                      pourType: stage.pourType,
-                    })),
-                  },
-                }
-              : null
-          }
-          handleParamChange={handleParamChangeWrapper}
-          handleExtractionTimeChange={handleExtractionTimeChange}
-          setShowHistory={setShowHistory}
-          onTitleDoubleClick={() => setIsSettingsOpen(true)}
-          settings={settings}
-          hasCoffeeBeans={hasCoffeeBeans}
-          alternativeHeader={alternativeHeaderContent}
-          showAlternativeHeader={showAlternativeHeader}
-          currentBeanView={currentBeanView}
-          showViewDropdown={showViewDropdown}
-          onToggleViewDropdown={handleToggleViewDropdown}
-          onBeanViewChange={handleBeanViewChange}
-          customEquipments={customEquipments}
-          onEquipmentSelect={handleEquipmentSelectWithName}
-          onAddEquipment={() => setShowEquipmentForm(true)}
-          onEditEquipment={equipment => {
-            setEditingEquipment(equipment);
-            setShowEquipmentForm(true);
-          }}
-          onDeleteEquipment={handleDeleteEquipment}
-          onShareEquipment={handleShareEquipment}
-          onBackClick={handleBackClick}
-          onToggleEquipmentManagement={() =>
-            setShowEquipmentManagement(!showEquipmentManagement)
-          }
-          cloudSyncEnabled={isCloudSyncEnabled()}
-          onPullToSync={handlePullToSync}
-          width={isDesktopLayout ? navPanelWidth : undefined}
-          isResizing={isNavResizing}
-          isDesktopLayout={isDesktopLayout}
+            activeMainTab={activeMainTab}
+            setActiveMainTab={handleMainTabClick}
+            activeBrewingStep={activeBrewingStep}
+            parameterInfo={parameterInfo}
+            setParameterInfo={setParameterInfo}
+            editableParams={editableParams}
+            setEditableParams={setEditableParams}
+            isTimerRunning={isTimerRunning}
+            showComplete={showComplete}
+            selectedEquipment={selectedEquipment}
+            selectedMethod={
+              currentBrewingMethod
+                ? {
+                    name: currentBrewingMethod.name,
+                    params: {
+                      coffee: currentBrewingMethod.params.coffee,
+                      water: currentBrewingMethod.params.water,
+                      ratio: currentBrewingMethod.params.ratio,
+                      grindSize: currentBrewingMethod.params.grindSize,
+                      temp: currentBrewingMethod.params.temp,
+                      stages: currentBrewingMethod.params.stages.map(stage => ({
+                        label: stage.label,
+                        duration: stage.duration,
+                        water: stage.water,
+                        detail: stage.detail,
+                        pourType: stage.pourType,
+                      })),
+                    },
+                  }
+                : null
+            }
+            handleParamChange={handleParamChangeWrapper}
+            handleExtractionTimeChange={handleExtractionTimeChange}
+            setShowHistory={setShowHistory}
+            onTitleDoubleClick={() => setIsSettingsOpen(true)}
+            settings={settings}
+            hasCoffeeBeans={hasCoffeeBeans}
+            alternativeHeader={alternativeHeaderContent}
+            showAlternativeHeader={showAlternativeHeader}
+            currentBeanView={currentBeanView}
+            showViewDropdown={showViewDropdown}
+            onToggleViewDropdown={handleToggleViewDropdown}
+            onBeanViewChange={handleBeanViewChange}
+            customEquipments={customEquipments}
+            onEquipmentSelect={handleEquipmentSelectWithName}
+            onAddEquipment={() => setShowEquipmentForm(true)}
+            onEditEquipment={equipment => {
+              setEditingEquipment(equipment);
+              setShowEquipmentForm(true);
+            }}
+            onDeleteEquipment={handleDeleteEquipment}
+            onShareEquipment={handleShareEquipment}
+            onBackClick={handleBackClick}
+            onToggleEquipmentManagement={() =>
+              setShowEquipmentManagement(!showEquipmentManagement)
+            }
+            cloudSyncEnabled={isCloudSyncEnabled()}
+            onPullToSync={handlePullToSync}
+            width={isDesktopLayout ? navPanelWidth : undefined}
+            isResizing={isNavResizing}
+            isDesktopLayout={isDesktopLayout}
           />
 
-        {/* 导航栏拖动条 - 侧边导航布局（md 及以上）显示，放在 NavigationBar 和 main 之间避免被裁切 */}
-        {isDesktopLayout && (
-          <div
-            className="group relative z-10 hidden h-full w-0 cursor-col-resize select-none md:block"
-            onMouseDown={handleNavResizeStart}
-            onTouchStart={handleNavResizeStart}
-          >
-            {/* 可视化拖动指示器 - 居中显示 */}
+          {/* 导航栏拖动条 - 侧边导航布局（md 及以上）显示，放在 NavigationBar 和 main 之间避免被裁切 */}
+          {isDesktopLayout && (
             <div
-              className={`absolute top-1/2 left-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ${
-                isNavResizing
-                  ? 'scale-y-150 bg-neutral-400 dark:bg-neutral-500'
-                  : 'bg-transparent group-hover:bg-neutral-300 dark:group-hover:bg-neutral-600'
-              }`}
-            />
-            {/* 扩大触摸区域 - 左右各扩展8px */}
-            <div className="absolute inset-y-0 -right-2 -left-2" />
-          </div>
-        )}
+              className="group relative z-10 hidden h-full w-0 cursor-col-resize select-none md:block"
+              onMouseDown={handleNavResizeStart}
+              onTouchStart={handleNavResizeStart}
+            >
+              {/* 可视化拖动指示器 - 居中显示 */}
+              <div
+                className={`absolute top-1/2 left-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ${
+                  isNavResizing
+                    ? 'scale-y-150 bg-neutral-400 dark:bg-neutral-500'
+                    : 'bg-transparent group-hover:bg-neutral-300 dark:group-hover:bg-neutral-600'
+                }`}
+              />
+              {/* 扩大触摸区域 - 左右各扩展8px */}
+              <div className="absolute inset-y-0 -right-2 -left-2" />
+            </div>
+          )}
 
           {/* 主内容区域 - 桌面端独立滚动 */}
           <main
@@ -3310,583 +3407,593 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                 : 'overflow-y-auto md:overflow-y-scroll'
             }`}
           >
-          <div
-            className={
-              isBrewingMainTab
-                ? `relative ${
-                    shouldShowBrewingTimer ? 'flex h-full flex-col' : 'h-full'
-                  }`
-                : 'hidden'
-            }
-            aria-hidden={!isBrewingMainTab}
-            data-main-tab="brewing"
-          >
             <div
               className={
-                shouldShowBrewingTimer
-                  ? 'min-h-0 flex-1 overflow-y-auto'
-                  : 'h-full space-y-5 overflow-y-auto'
+                isBrewingMainTab
+                  ? `relative ${
+                      shouldShowBrewingTimer ? 'flex h-full flex-col' : 'h-full'
+                    }`
+                  : 'hidden'
               }
-              style={
-                shouldShowBrewingTimer && brewingTimerHeight > 0
-                  ? { paddingBottom: `${brewingTimerHeight}px` }
-                  : undefined
-              }
+              aria-hidden={!isBrewingMainTab}
+              data-main-tab="brewing"
             >
-              <TabContent
-                activeTab={activeTab}
-                content={content}
-                selectedMethod={selectedMethod as Method}
-                currentBrewingMethod={currentBrewingMethod as Method}
-                isTimerRunning={isTimerRunning}
-                showComplete={showComplete}
-                currentStage={currentStage}
-                isWaiting={isStageWaiting}
-                selectedEquipment={selectedEquipment}
-                selectedCoffeeBean={selectedCoffeeBean}
-                selectedCoffeeBeanData={selectedCoffeeBeanData}
-                countdownTime={countdownTime}
-                customMethods={customMethods}
-                actionMenuStates={actionMenuStates}
-                setActionMenuStates={setActionMenuStates}
-                setShowCustomForm={setShowCustomForm}
-                setShowImportForm={setShowImportForm}
-                settings={settings}
-                onMethodSelect={handleMethodSelectWrapper}
-                onCoffeeBeanSelect={handleCoffeeBeanSelect}
-                onEditMethod={handleEditCustomMethod}
-                onDeleteMethod={handleDeleteCustomMethod}
-                onHideMethod={handleHideMethod}
-                setActiveMainTab={setActiveMainTab}
-                resetBrewingState={resetBrewingState}
-                customEquipments={customEquipments}
-                expandedStages={expandedStagesRef.current}
-                setShowEquipmentForm={setShowEquipmentForm}
-                setEditingEquipment={setEditingEquipment}
-                handleDeleteEquipment={handleDeleteEquipment}
-              />
-            </div>
-
-            {shouldShowBrewingTimer && (
               <div
-                ref={brewingTimerRef}
-                className="pointer-events-auto absolute right-0 bottom-0 left-0 z-10"
+                className={
+                  shouldShowBrewingTimer
+                    ? 'min-h-0 flex-1 overflow-y-auto'
+                    : 'h-full space-y-5 overflow-y-auto'
+                }
+                style={
+                  shouldShowBrewingTimer && brewingTimerHeight > 0
+                    ? { paddingBottom: `${brewingTimerHeight}px` }
+                    : undefined
+                }
               >
-                <BrewingTimer
+                <TabContent
+                  activeTab={activeTab}
+                  content={content}
+                  selectedMethod={selectedMethod as Method}
                   currentBrewingMethod={currentBrewingMethod as Method}
-                  onStatusChange={({ isRunning }) => {
-                    const event = new CustomEvent('brewing:timerStatus', {
-                      detail: {
-                        isRunning,
-                        status: isRunning ? 'running' : 'stopped',
-                      },
-                    });
-                    window.dispatchEvent(event);
-                  }}
-                  onStageChange={({ currentStage, progress, isWaiting }) => {
-                    const event = new CustomEvent('brewing:stageChange', {
-                      detail: {
-                        currentStage,
-                        stage: currentStage,
-                        progress,
-                        isWaiting,
-                      },
-                    });
-                    window.dispatchEvent(event);
-                  }}
-                  onCountdownChange={time => {
-                    setTimeout(() => {
-                      const event = new CustomEvent('brewing:countdownChange', {
-                        detail: { remainingTime: time },
+                  isTimerRunning={isTimerRunning}
+                  showComplete={showComplete}
+                  currentStage={currentStage}
+                  isWaiting={isStageWaiting}
+                  selectedEquipment={selectedEquipment}
+                  selectedCoffeeBean={selectedCoffeeBean}
+                  selectedCoffeeBeanData={selectedCoffeeBeanData}
+                  countdownTime={countdownTime}
+                  customMethods={customMethods}
+                  actionMenuStates={actionMenuStates}
+                  setActionMenuStates={setActionMenuStates}
+                  setShowCustomForm={setShowCustomForm}
+                  setShowImportForm={setShowImportForm}
+                  settings={settings}
+                  onMethodSelect={handleMethodSelectWrapper}
+                  onCoffeeBeanSelect={handleCoffeeBeanSelect}
+                  onEditMethod={handleEditCustomMethod}
+                  onDeleteMethod={handleDeleteCustomMethod}
+                  onHideMethod={handleHideMethod}
+                  setActiveMainTab={setActiveMainTab}
+                  resetBrewingState={resetBrewingState}
+                  customEquipments={customEquipments}
+                  expandedStages={expandedStagesRef.current}
+                  setShowEquipmentForm={setShowEquipmentForm}
+                  setEditingEquipment={setEditingEquipment}
+                  handleDeleteEquipment={handleDeleteEquipment}
+                />
+              </div>
+
+              {shouldShowBrewingTimer && (
+                <div
+                  ref={brewingTimerRef}
+                  className="pointer-events-auto absolute right-0 bottom-0 left-0 z-10"
+                >
+                  <BrewingTimer
+                    currentBrewingMethod={currentBrewingMethod as Method}
+                    onStatusChange={({ isRunning }) => {
+                      const event = new CustomEvent('brewing:timerStatus', {
+                        detail: {
+                          isRunning,
+                          status: isRunning ? 'running' : 'stopped',
+                        },
                       });
                       window.dispatchEvent(event);
-                    }, 0);
-                  }}
-                  onComplete={isComplete => {
-                    if (isComplete) {
-                      const event = new CustomEvent('brewing:complete');
+                    }}
+                    onStageChange={({ currentStage, progress, isWaiting }) => {
+                      const event = new CustomEvent('brewing:stageChange', {
+                        detail: {
+                          currentStage,
+                          stage: currentStage,
+                          progress,
+                          isWaiting,
+                        },
+                      });
                       window.dispatchEvent(event);
-                    }
-                  }}
-                  onTimerComplete={() => {
-                    // 冲煮完成后的处理，确保显示笔记表单
-                    // 这里不需要额外设置，因为BrewingTimer组件内部已经处理了显示笔记表单的逻辑
-                  }}
-                  onExpandedStagesChange={stages => {
-                    expandedStagesRef.current = stages;
-                  }}
-                  settings={settings}
-                  selectedEquipment={selectedEquipment}
-                  isCoffeeBrewed={isCoffeeBrewed}
-                  layoutSettings={settings.layoutSettings}
-                />
-              </div>
-            )}
-
-            {activeBrewingStep === 'method' && selectedEquipment && (
-              <MethodTypeSelector
-                methodType={methodType}
-                settings={settings}
-                onSelectMethodType={handleMethodTypeChange}
-                hideSelector={customEquipments.some(
-                  e =>
-                    (e.id === selectedEquipment ||
-                      e.name === selectedEquipment) &&
-                    e.animationType === 'custom'
-                )}
-              />
-            )}
-          </div>
-
-          <div
-            className={isNotesMainTab ? 'h-full' : 'hidden'}
-            aria-hidden={!isNotesMainTab}
-            data-main-tab="notes"
-          >
-            <BrewingHistory
-              isOpen={isNotesMainTab}
-              onClose={() => {
-                saveMainTabPreference('冲煮');
-                setActiveMainTab('冲煮');
-                setShowHistory(false);
-              }}
-              onAddNote={handleAddNote}
-              setAlternativeHeaderContent={setAlternativeHeaderContent}
-              setShowAlternativeHeader={setShowAlternativeHeader}
-              settings={settings}
-            />
-          </div>
-
-          <div
-            className={isBeansMainTab ? 'h-full' : 'hidden'}
-            aria-hidden={!isBeansMainTab}
-            data-main-tab="coffee-beans"
-          >
-            <CoffeeBeans
-              key={beanListKey}
-              isOpen={isBeansMainTab}
-              showBeanForm={handleBeanForm}
-              onShowImport={beanState => {
-                window.dispatchEvent(
-                  new CustomEvent('beanImportOpened', {
-                    detail: { beanState },
-                  })
-                );
-              }}
-              externalViewMode={currentBeanView}
-              onExternalViewChange={handleBeanViewChange}
-              settings={{
-                dateDisplayMode: settings.dateDisplayMode,
-                showFlavorInfo: settings.showFlavorInfo,
-                showBeanNotes: settings.showBeanNotes,
-                showNoteContent: settings.showNoteContent,
-                limitNotesLines: settings.limitNotesLines,
-                notesMaxLines: settings.notesMaxLines,
-                showPrice: settings.showPrice,
-                showTotalPrice: settings.showTotalPrice,
-                showStatusDots: settings.showStatusDots,
-                immersiveAdd: settings.immersiveAdd,
-              }}
-            />
-          </div>
-
-          <CustomMethodFormModal
-            showCustomForm={showCustomForm}
-            showImportForm={showImportForm}
-            editingMethod={editingMethod}
-            selectedEquipment={selectedEquipment}
-            customMethods={customMethods}
-            onSaveCustomMethod={method => {
-              handleSaveCustomMethod(method);
-            }}
-            onCloseCustomForm={() => {
-              setShowCustomForm(false);
-              setEditingMethod(undefined);
-            }}
-            onCloseImportForm={() => {
-              setShowImportForm(false);
-            }}
-            grinderDefaultSyncEnabled={
-              settings.grinderDefaultSync?.methodForm ?? false
-            }
-          />
-
-          {migrationData && (
-            <DataMigrationModal
-              isOpen={showDataMigration}
-              onClose={() => setShowDataMigration(false)}
-              legacyCount={migrationData.legacyCount}
-              onMigrationComplete={handleMigrationComplete}
-            />
-          )}
-
-          {showOnboarding && (
-            <Onboarding
-              onSettingsChange={handleSettingsChange}
-              onComplete={handleOnboardingComplete}
-            />
-          )}
-        </main>
-
-        {/* 大屏幕详情面板区域 - 三栏布局的右侧，支持拖动调整宽度 */}
-        {isLargeScreen && (
-          <aside
-            className={`relative h-full shrink-0 ${
-              isResizing
-                ? ''
-                : 'transition-[width,border-color] duration-350 ease-[cubic-bezier(0.4,0,0.2,1)]'
-            } ${
-              beanDetailOpen || noteDetailOpen
-                ? 'border-l border-neutral-200/50 dark:border-neutral-800/50'
-                : 'w-0 border-l border-transparent'
-            }`}
-            style={{
-              width:
-                beanDetailOpen || noteDetailOpen ? `${detailPanelWidth}px` : 0,
-            }}
-          >
-            {/* 拖动条 - 居中跨越左边界 */}
-            {(beanDetailOpen || noteDetailOpen) && (
-              <div
-                className="group absolute top-0 left-0 z-10 h-full w-0 -translate-x-1/2 cursor-col-resize select-none"
-                onMouseDown={handleResizeStart}
-                onTouchStart={handleResizeStart}
-              >
-                {/* 可视化拖动指示器 - 居中显示 */}
-                <div
-                  className={`absolute top-1/2 left-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ${
-                    isResizing
-                      ? 'scale-y-150 bg-neutral-400 dark:bg-neutral-500'
-                      : 'bg-transparent group-hover:bg-neutral-300 dark:group-hover:bg-neutral-600'
-                  }`}
-                />
-                {/* 扩大触摸区域 - 左右各扩展8px */}
-                <div className="absolute inset-y-0 -right-2 -left-2" />
-              </div>
-            )}
-            {/* 内部容器使用动态宽度 */}
-            <div
-              className={`h-full overflow-hidden ${
-                isResizing
-                  ? ''
-                  : 'transition-opacity duration-350 ease-[cubic-bezier(0.4,0,0.2,1)]'
-              } ${
-                beanDetailOpen || noteDetailOpen ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                width: `${detailPanelWidth}px`,
-              }}
-            >
-              {/* 咖啡豆详情 */}
-              {beanDetailOpen && (
-                <BeanDetailModal
-                  isOpen={beanDetailOpen}
-                  bean={beanDetailData}
-                  onClose={() => {
-                    setBeanDetailOpen(false);
-                    setBeanDetailAddMode(false);
-                  }}
-                  onCreateNoteFromBean={handleCreateNoteFromBean}
-                  searchQuery={beanDetailSearchQuery}
-                  mode={beanDetailAddMode ? 'add' : 'view'}
-                  initialBeanState={beanDetailAddBeanState}
-                  onSaveNew={async newBean => {
-                    try {
-                      const { getCoffeeBeanStore } =
-                        await import('@/lib/stores/coffeeBeanStore');
-                      await getCoffeeBeanStore().addBean(newBean);
-                      handleBeanListChange();
-                      setBeanDetailAddMode(false);
-                    } catch (error) {
-                      console.error('添加咖啡豆失败:', error);
-                    }
-                  }}
-                  onEdit={bean => {
-                    setEditingBean(bean);
-                    setShowBeanForm(true);
-                  }}
-                  onDelete={async bean => {
-                    setBeanDetailOpen(false);
-                    try {
-                      const { getCoffeeBeanStore } =
-                        await import('@/lib/stores/coffeeBeanStore');
-                      await getCoffeeBeanStore().deleteBean(bean.id);
-                      handleBeanListChange();
-                    } catch (error) {
-                      console.error('删除咖啡豆失败:', error);
-                    }
-                  }}
-                  onShare={async bean => {
-                    try {
-                      const { beanToReadableText } =
-                        await import('@/lib/utils/jsonUtils');
-                      const { copyToClipboard } =
-                        await import('@/lib/utils/exportUtils');
-                      const { showToast } =
-                        await import('@/components/common/feedback/LightToast');
-
-                      const text = beanToReadableText(bean);
-                      const result = await copyToClipboard(text);
-
-                      if (result.success) {
-                        showToast({
-                          type: 'success',
-                          title: '已复制到剪贴板',
-                          duration: 2000,
-                        });
-
-                        if (settings.hapticFeedback) {
-                          hapticsUtils.light();
-                        }
-                      } else {
-                        showToast({
-                          type: 'error',
-                          title: '复制失败',
-                          duration: 2000,
-                        });
-                      }
-                    } catch (error) {
-                      console.error('复制失败:', error);
-                    }
-                  }}
-                  onRepurchase={async bean => {
-                    setBeanDetailOpen(false);
-                    try {
-                      const { createRepurchaseBean } =
-                        await import('@/lib/utils/beanRepurchaseUtils');
-                      const newBeanData = await createRepurchaseBean(bean);
-                      setEditingBean(newBeanData as ExtendedCoffeeBean);
-                      setShowBeanForm(true);
-                    } catch (error) {
-                      console.error('续购失败:', error);
-                    }
-                  }}
-                  onRoast={(greenBean, roastedBeanTemplate) => {
-                    setRoastingSourceBeanId(greenBean.id);
-                    setEditingBean(roastedBeanTemplate as ExtendedCoffeeBean);
-                    setShowBeanForm(true);
-                  }}
-                  onConvertToGreen={
-                    settings.enableGreenBeanInventory &&
-                    settings.enableConvertToGreen
-                      ? async bean => {
-                          try {
-                            const { RoastingManager } =
-                              await import('@/lib/managers/roastingManager');
-
-                            const preview =
-                              await RoastingManager.previewConvertRoastedToGreen(
-                                bean.id
-                              );
-
-                            if (!preview.success || !preview.preview) {
-                              showToast({
-                                type: 'error',
-                                title: preview.error || '无法转换',
-                                duration: 3000,
-                              });
-                              return;
-                            }
-
-                            const p = preview.preview;
-
-                            setConvertToGreenPreview({
-                              beanId: bean.id,
-                              beanName: formatBeanDisplayName(bean, {
-                                roasterFieldEnabled:
-                                  settings.roasterFieldEnabled,
-                                roasterSeparator: settings.roasterSeparator,
-                              }),
-                              originalBean: {
-                                capacity: p.originalBean.capacity,
-                                remaining: p.originalBean.remaining,
-                              },
-                              greenBean: {
-                                capacity: p.greenBean.capacity,
-                                remaining: p.greenBean.remaining,
-                              },
-                              roastingAmount: p.roastingAmount,
-                              newRoastedBean: {
-                                capacity: p.newRoastedBean.capacity,
-                                remaining: p.newRoastedBean.remaining,
-                              },
-                              brewingNotesCount: p.brewingNotesCount,
-                              noteUsageTotal: p.noteUsageTotal,
-                              recordsToDeleteCount: p.recordsToDeleteCount,
-                              directConvert: p.directConvert,
-                            });
-                            setShowConvertToGreenDrawer(true);
-                          } catch (error) {
-                            console.error('预览转换失败:', error);
-                            showToast({
-                              type: 'error',
-                              title: '转换失败',
-                              duration: 2000,
-                            });
+                    }}
+                    onCountdownChange={time => {
+                      setTimeout(() => {
+                        const event = new CustomEvent(
+                          'brewing:countdownChange',
+                          {
+                            detail: { remainingTime: time },
                           }
-                        }
-                      : undefined
-                  }
-                />
+                        );
+                        window.dispatchEvent(event);
+                      }, 0);
+                    }}
+                    onComplete={isComplete => {
+                      if (isComplete) {
+                        const event = new CustomEvent('brewing:complete');
+                        window.dispatchEvent(event);
+                      }
+                    }}
+                    onTimerComplete={() => {
+                      // 冲煮完成后的处理，确保显示笔记表单
+                      // 这里不需要额外设置，因为BrewingTimer组件内部已经处理了显示笔记表单的逻辑
+                    }}
+                    onExpandedStagesChange={stages => {
+                      expandedStagesRef.current = stages;
+                    }}
+                    settings={settings}
+                    selectedEquipment={selectedEquipment}
+                    isCoffeeBrewed={isCoffeeBrewed}
+                    layoutSettings={settings.layoutSettings}
+                  />
+                </div>
               )}
-              {/* 笔记详情 */}
-              {noteDetailOpen && noteDetailData && (
-                <NoteDetailModal
-                  isOpen={noteDetailOpen}
-                  note={noteDetailData.note}
-                  onClose={() => setNoteDetailOpen(false)}
-                  equipmentName={noteDetailData.equipmentName}
-                  beanUnitPrice={noteDetailData.beanUnitPrice}
-                  beanInfo={noteDetailData.beanInfo}
-                  onEdit={async note => {
-                    const { Storage } = await import('@/lib/core/storage');
-                    const notesStr = await Storage.get('brewingNotes');
-                    if (notesStr) {
-                      const allNotes: BrewingNote[] = JSON.parse(notesStr);
-                      const fullNote = allNotes.find(n => n.id === note.id);
-                      if (fullNote) {
-                        setBrewingNoteEditData(fullNote as BrewingNoteData);
-                        setBrewingNoteEditOpen(true);
-                      }
-                    }
-                  }}
-                  onDelete={async noteId => {
-                    setNoteDetailOpen(false);
-                    try {
-                      const { Storage } = await import('@/lib/core/storage');
-                      const savedNotes = await Storage.get('brewingNotes');
-                      if (!savedNotes) return;
 
-                      const notes: BrewingNote[] = JSON.parse(savedNotes);
-                      const noteToDelete = notes.find(
-                        note => note.id === noteId
-                      );
-                      if (!noteToDelete) {
-                        console.warn('未找到要删除的笔记:', noteId);
-                        return;
-                      }
-
-                      try {
-                        if (noteToDelete.source === 'roasting') {
-                          const { RoastingManager } =
-                            await import('@/lib/managers/roastingManager');
-                          const result =
-                            await RoastingManager.deleteRoastingRecord(noteId);
-                          if (!result.success) {
-                            console.error('删除烘焙记录失败:', result.error);
-                          }
-                          return;
-                        } else if (
-                          noteToDelete.source === 'capacity-adjustment'
-                        ) {
-                          const beanId = noteToDelete.beanId;
-                          const capacityAdjustment =
-                            noteToDelete.changeRecord?.capacityAdjustment;
-
-                          if (beanId && capacityAdjustment) {
-                            const changeAmount =
-                              capacityAdjustment.changeAmount;
-                            if (
-                              typeof changeAmount === 'number' &&
-                              !isNaN(changeAmount) &&
-                              changeAmount !== 0
-                            ) {
-                              const { getCoffeeBeanStore } =
-                                await import('@/lib/stores/coffeeBeanStore');
-                              const store = getCoffeeBeanStore();
-                              const currentBean = store.getBeanById(beanId);
-                              if (currentBean) {
-                                const currentRemaining = parseFloat(
-                                  currentBean.remaining || '0'
-                                );
-                                const restoredRemaining =
-                                  currentRemaining - changeAmount;
-                                let finalRemaining = Math.max(
-                                  0,
-                                  restoredRemaining
-                                );
-
-                                if (currentBean.capacity) {
-                                  const totalCapacity = parseFloat(
-                                    currentBean.capacity
-                                  );
-                                  if (
-                                    !isNaN(totalCapacity) &&
-                                    totalCapacity > 0
-                                  ) {
-                                    finalRemaining = Math.min(
-                                      finalRemaining,
-                                      totalCapacity
-                                    );
-                                  }
-                                }
-
-                                const formattedRemaining = Number.isInteger(
-                                  finalRemaining
-                                )
-                                  ? finalRemaining.toString()
-                                  : finalRemaining.toFixed(1);
-                                await store.updateBean(beanId, {
-                                  remaining: formattedRemaining,
-                                });
-                              }
-                            }
-                          }
-                        } else {
-                          const {
-                            extractCoffeeAmountFromNote,
-                            getNoteAssociatedBeanId,
-                          } = await import('@/components/notes/utils');
-                          const coffeeAmount =
-                            extractCoffeeAmountFromNote(noteToDelete);
-                          const beanId = getNoteAssociatedBeanId(noteToDelete);
-
-                          if (beanId && coffeeAmount > 0) {
-                            const { increaseBeanRemaining } =
-                              await import('@/lib/stores/coffeeBeanStore');
-                            await increaseBeanRemaining(beanId, coffeeAmount);
-                          }
-                        }
-                      } catch (error) {
-                        console.error('恢复咖啡豆容量失败:', error);
-                      }
-
-                      const { useBrewingNoteStore } =
-                        await import('@/lib/stores/brewingNoteStore');
-                      const deleteNote =
-                        useBrewingNoteStore.getState().deleteNote;
-                      await deleteNote(noteId);
-                    } catch (error) {
-                      console.error('删除笔记失败:', error);
-                    }
-                  }}
-                  onCopy={async noteId => {
-                    setNoteDetailOpen(false);
-                    const { Storage } = await import('@/lib/core/storage');
-                    const notesStr = await Storage.get('brewingNotes');
-                    if (notesStr) {
-                      const allNotes: BrewingNote[] = JSON.parse(notesStr);
-                      const fullNote = allNotes.find(n => n.id === noteId);
-                      if (fullNote) {
-                        setBrewingNoteEditData(fullNote as BrewingNoteData);
-                        setIsBrewingNoteCopy(true);
-                        setBrewingNoteEditOpen(true);
-                      }
-                    }
-                  }}
-                  onShare={noteId => {
-                    setNoteDetailOpen(false);
-                    window.dispatchEvent(
-                      new CustomEvent('noteShareTriggered', {
-                        detail: { noteId },
-                      })
-                    );
-                  }}
+              {activeBrewingStep === 'method' && selectedEquipment && (
+                <MethodTypeSelector
+                  methodType={methodType}
+                  settings={settings}
+                  onSelectMethodType={handleMethodTypeChange}
+                  hideSelector={customEquipments.some(
+                    e =>
+                      (e.id === selectedEquipment ||
+                        e.name === selectedEquipment) &&
+                      e.animationType === 'custom'
+                  )}
                 />
               )}
             </div>
-          </aside>
-        )}
+
+            <div
+              className={isNotesMainTab ? 'h-full' : 'hidden'}
+              aria-hidden={!isNotesMainTab}
+              data-main-tab="notes"
+            >
+              <BrewingHistory
+                isOpen={isNotesMainTab}
+                onClose={() => {
+                  saveMainTabPreference('冲煮');
+                  setActiveMainTab('冲煮');
+                  setShowHistory(false);
+                }}
+                onAddNote={handleAddNote}
+                setAlternativeHeaderContent={setAlternativeHeaderContent}
+                setShowAlternativeHeader={setShowAlternativeHeader}
+                settings={settings}
+              />
+            </div>
+
+            <div
+              className={isBeansMainTab ? 'h-full' : 'hidden'}
+              aria-hidden={!isBeansMainTab}
+              data-main-tab="coffee-beans"
+            >
+              <CoffeeBeans
+                key={beanListKey}
+                isOpen={isBeansMainTab}
+                showBeanForm={handleBeanForm}
+                onShowImport={beanState => {
+                  window.dispatchEvent(
+                    new CustomEvent('beanImportOpened', {
+                      detail: { beanState },
+                    })
+                  );
+                }}
+                externalViewMode={currentBeanView}
+                onExternalViewChange={handleBeanViewChange}
+                settings={{
+                  dateDisplayMode: settings.dateDisplayMode,
+                  showFlavorInfo: settings.showFlavorInfo,
+                  showBeanNotes: settings.showBeanNotes,
+                  showNoteContent: settings.showNoteContent,
+                  limitNotesLines: settings.limitNotesLines,
+                  notesMaxLines: settings.notesMaxLines,
+                  showPrice: settings.showPrice,
+                  showTotalPrice: settings.showTotalPrice,
+                  showStatusDots: settings.showStatusDots,
+                  immersiveAdd: settings.immersiveAdd,
+                }}
+              />
+            </div>
+
+            <CustomMethodFormModal
+              showCustomForm={showCustomForm}
+              showImportForm={showImportForm}
+              editingMethod={editingMethod}
+              selectedEquipment={selectedEquipment}
+              customMethods={customMethods}
+              onSaveCustomMethod={method => {
+                handleSaveCustomMethod(method);
+              }}
+              onCloseCustomForm={() => {
+                setShowCustomForm(false);
+                setEditingMethod(undefined);
+              }}
+              onCloseImportForm={() => {
+                setShowImportForm(false);
+              }}
+              grinderDefaultSyncEnabled={
+                settings.grinderDefaultSync?.methodForm ?? false
+              }
+            />
+
+            {migrationData && (
+              <DataMigrationModal
+                isOpen={showDataMigration}
+                onClose={() => setShowDataMigration(false)}
+                legacyCount={migrationData.legacyCount}
+                onMigrationComplete={handleMigrationComplete}
+              />
+            )}
+
+            {showOnboarding && (
+              <Onboarding
+                onSettingsChange={handleSettingsChange}
+                onComplete={handleOnboardingComplete}
+              />
+            )}
+          </main>
+
+          {/* 大屏幕详情面板区域 - 三栏布局的右侧，支持拖动调整宽度 */}
+          {isLargeScreen && (
+            <aside
+              className={`relative h-full shrink-0 ${
+                isResizing
+                  ? ''
+                  : 'transition-[width,border-color] duration-350 ease-[cubic-bezier(0.4,0,0.2,1)]'
+              } ${
+                beanDetailOpen || noteDetailOpen
+                  ? 'border-l border-neutral-200/50 dark:border-neutral-800/50'
+                  : 'w-0 border-l border-transparent'
+              }`}
+              style={{
+                width:
+                  beanDetailOpen || noteDetailOpen
+                    ? `${detailPanelWidth}px`
+                    : 0,
+              }}
+            >
+              {/* 拖动条 - 居中跨越左边界 */}
+              {(beanDetailOpen || noteDetailOpen) && (
+                <div
+                  className="group absolute top-0 left-0 z-10 h-full w-0 -translate-x-1/2 cursor-col-resize select-none"
+                  onMouseDown={handleResizeStart}
+                  onTouchStart={handleResizeStart}
+                >
+                  {/* 可视化拖动指示器 - 居中显示 */}
+                  <div
+                    className={`absolute top-1/2 left-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ${
+                      isResizing
+                        ? 'scale-y-150 bg-neutral-400 dark:bg-neutral-500'
+                        : 'bg-transparent group-hover:bg-neutral-300 dark:group-hover:bg-neutral-600'
+                    }`}
+                  />
+                  {/* 扩大触摸区域 - 左右各扩展8px */}
+                  <div className="absolute inset-y-0 -right-2 -left-2" />
+                </div>
+              )}
+              {/* 内部容器使用动态宽度 */}
+              <div
+                className={`h-full overflow-hidden ${
+                  isResizing
+                    ? ''
+                    : 'transition-opacity duration-350 ease-[cubic-bezier(0.4,0,0.2,1)]'
+                } ${
+                  beanDetailOpen || noteDetailOpen ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{
+                  width: `${detailPanelWidth}px`,
+                }}
+              >
+                {/* 咖啡豆详情 */}
+                {beanDetailOpen && (
+                  <BeanDetailModal
+                    isOpen={beanDetailOpen}
+                    bean={beanDetailData}
+                    onClose={() => {
+                      setBeanDetailOpen(false);
+                      setBeanDetailAddMode(false);
+                    }}
+                    onCreateNoteFromBean={handleCreateNoteFromBean}
+                    onOpenRelatedNote={handleOpenNoteDetailFromBean}
+                    searchQuery={beanDetailSearchQuery}
+                    mode={beanDetailAddMode ? 'add' : 'view'}
+                    initialBeanState={beanDetailAddBeanState}
+                    onSaveNew={async newBean => {
+                      try {
+                        const { getCoffeeBeanStore } =
+                          await import('@/lib/stores/coffeeBeanStore');
+                        await getCoffeeBeanStore().addBean(newBean);
+                        handleBeanListChange();
+                        setBeanDetailAddMode(false);
+                      } catch (error) {
+                        console.error('添加咖啡豆失败:', error);
+                      }
+                    }}
+                    onEdit={bean => {
+                      setEditingBean(bean);
+                      setShowBeanForm(true);
+                    }}
+                    onDelete={async bean => {
+                      setBeanDetailOpen(false);
+                      try {
+                        const { getCoffeeBeanStore } =
+                          await import('@/lib/stores/coffeeBeanStore');
+                        await getCoffeeBeanStore().deleteBean(bean.id);
+                        handleBeanListChange();
+                      } catch (error) {
+                        console.error('删除咖啡豆失败:', error);
+                      }
+                    }}
+                    onShare={async bean => {
+                      try {
+                        const { beanToReadableText } =
+                          await import('@/lib/utils/jsonUtils');
+                        const { copyToClipboard } =
+                          await import('@/lib/utils/exportUtils');
+                        const { showToast } =
+                          await import('@/components/common/feedback/LightToast');
+
+                        const text = beanToReadableText(bean);
+                        const result = await copyToClipboard(text);
+
+                        if (result.success) {
+                          showToast({
+                            type: 'success',
+                            title: '已复制到剪贴板',
+                            duration: 2000,
+                          });
+
+                          if (settings.hapticFeedback) {
+                            hapticsUtils.light();
+                          }
+                        } else {
+                          showToast({
+                            type: 'error',
+                            title: '复制失败',
+                            duration: 2000,
+                          });
+                        }
+                      } catch (error) {
+                        console.error('复制失败:', error);
+                      }
+                    }}
+                    onRepurchase={async bean => {
+                      setBeanDetailOpen(false);
+                      try {
+                        const { createRepurchaseBean } =
+                          await import('@/lib/utils/beanRepurchaseUtils');
+                        const newBeanData = await createRepurchaseBean(bean);
+                        setEditingBean(newBeanData as ExtendedCoffeeBean);
+                        setShowBeanForm(true);
+                      } catch (error) {
+                        console.error('续购失败:', error);
+                      }
+                    }}
+                    onRoast={(greenBean, roastedBeanTemplate) => {
+                      setRoastingSourceBeanId(greenBean.id);
+                      setEditingBean(roastedBeanTemplate as ExtendedCoffeeBean);
+                      setShowBeanForm(true);
+                    }}
+                    onConvertToGreen={
+                      settings.enableGreenBeanInventory &&
+                      settings.enableConvertToGreen
+                        ? async bean => {
+                            try {
+                              const { RoastingManager } =
+                                await import('@/lib/managers/roastingManager');
+
+                              const preview =
+                                await RoastingManager.previewConvertRoastedToGreen(
+                                  bean.id
+                                );
+
+                              if (!preview.success || !preview.preview) {
+                                showToast({
+                                  type: 'error',
+                                  title: preview.error || '无法转换',
+                                  duration: 3000,
+                                });
+                                return;
+                              }
+
+                              const p = preview.preview;
+
+                              setConvertToGreenPreview({
+                                beanId: bean.id,
+                                beanName: formatBeanDisplayName(bean, {
+                                  roasterFieldEnabled:
+                                    settings.roasterFieldEnabled,
+                                  roasterSeparator: settings.roasterSeparator,
+                                }),
+                                originalBean: {
+                                  capacity: p.originalBean.capacity,
+                                  remaining: p.originalBean.remaining,
+                                },
+                                greenBean: {
+                                  capacity: p.greenBean.capacity,
+                                  remaining: p.greenBean.remaining,
+                                },
+                                roastingAmount: p.roastingAmount,
+                                newRoastedBean: {
+                                  capacity: p.newRoastedBean.capacity,
+                                  remaining: p.newRoastedBean.remaining,
+                                },
+                                brewingNotesCount: p.brewingNotesCount,
+                                noteUsageTotal: p.noteUsageTotal,
+                                recordsToDeleteCount: p.recordsToDeleteCount,
+                                directConvert: p.directConvert,
+                              });
+                              setShowConvertToGreenDrawer(true);
+                            } catch (error) {
+                              console.error('预览转换失败:', error);
+                              showToast({
+                                type: 'error',
+                                title: '转换失败',
+                                duration: 2000,
+                              });
+                            }
+                          }
+                        : undefined
+                    }
+                  />
+                )}
+                {/* 笔记详情 */}
+                {noteDetailOpen && noteDetailData && (
+                  <NoteDetailModal
+                    isOpen={noteDetailOpen}
+                    note={noteDetailData.note}
+                    onClose={() => setNoteDetailOpen(false)}
+                    equipmentName={noteDetailData.equipmentName}
+                    beanUnitPrice={noteDetailData.beanUnitPrice}
+                    beanInfo={noteDetailData.beanInfo}
+                    onOpenBeanDetail={handleOpenBeanDetailFromNote}
+                    onEdit={async note => {
+                      const { Storage } = await import('@/lib/core/storage');
+                      const notesStr = await Storage.get('brewingNotes');
+                      if (notesStr) {
+                        const allNotes: BrewingNote[] = JSON.parse(notesStr);
+                        const fullNote = allNotes.find(n => n.id === note.id);
+                        if (fullNote) {
+                          setBrewingNoteEditData(fullNote as BrewingNoteData);
+                          setBrewingNoteEditOpen(true);
+                        }
+                      }
+                    }}
+                    onDelete={async noteId => {
+                      setNoteDetailOpen(false);
+                      try {
+                        const { Storage } = await import('@/lib/core/storage');
+                        const savedNotes = await Storage.get('brewingNotes');
+                        if (!savedNotes) return;
+
+                        const notes: BrewingNote[] = JSON.parse(savedNotes);
+                        const noteToDelete = notes.find(
+                          note => note.id === noteId
+                        );
+                        if (!noteToDelete) {
+                          console.warn('未找到要删除的笔记:', noteId);
+                          return;
+                        }
+
+                        try {
+                          if (noteToDelete.source === 'roasting') {
+                            const { RoastingManager } =
+                              await import('@/lib/managers/roastingManager');
+                            const result =
+                              await RoastingManager.deleteRoastingRecord(
+                                noteId
+                              );
+                            if (!result.success) {
+                              console.error('删除烘焙记录失败:', result.error);
+                            }
+                            return;
+                          } else if (
+                            noteToDelete.source === 'capacity-adjustment'
+                          ) {
+                            const beanId = noteToDelete.beanId;
+                            const capacityAdjustment =
+                              noteToDelete.changeRecord?.capacityAdjustment;
+
+                            if (beanId && capacityAdjustment) {
+                              const changeAmount =
+                                capacityAdjustment.changeAmount;
+                              if (
+                                typeof changeAmount === 'number' &&
+                                !isNaN(changeAmount) &&
+                                changeAmount !== 0
+                              ) {
+                                const { getCoffeeBeanStore } =
+                                  await import('@/lib/stores/coffeeBeanStore');
+                                const store = getCoffeeBeanStore();
+                                const currentBean = store.getBeanById(beanId);
+                                if (currentBean) {
+                                  const currentRemaining = parseFloat(
+                                    currentBean.remaining || '0'
+                                  );
+                                  const restoredRemaining =
+                                    currentRemaining - changeAmount;
+                                  let finalRemaining = Math.max(
+                                    0,
+                                    restoredRemaining
+                                  );
+
+                                  if (currentBean.capacity) {
+                                    const totalCapacity = parseFloat(
+                                      currentBean.capacity
+                                    );
+                                    if (
+                                      !isNaN(totalCapacity) &&
+                                      totalCapacity > 0
+                                    ) {
+                                      finalRemaining = Math.min(
+                                        finalRemaining,
+                                        totalCapacity
+                                      );
+                                    }
+                                  }
+
+                                  const formattedRemaining = Number.isInteger(
+                                    finalRemaining
+                                  )
+                                    ? finalRemaining.toString()
+                                    : finalRemaining.toFixed(1);
+                                  await store.updateBean(beanId, {
+                                    remaining: formattedRemaining,
+                                  });
+                                }
+                              }
+                            }
+                          } else {
+                            const {
+                              extractCoffeeAmountFromNote,
+                              getNoteAssociatedBeanId,
+                            } = await import('@/components/notes/utils');
+                            const coffeeAmount =
+                              extractCoffeeAmountFromNote(noteToDelete);
+                            const beanId =
+                              getNoteAssociatedBeanId(noteToDelete);
+
+                            if (beanId && coffeeAmount > 0) {
+                              const { increaseBeanRemaining } =
+                                await import('@/lib/stores/coffeeBeanStore');
+                              await increaseBeanRemaining(beanId, coffeeAmount);
+                            }
+                          }
+                        } catch (error) {
+                          console.error('恢复咖啡豆容量失败:', error);
+                        }
+
+                        const { useBrewingNoteStore } =
+                          await import('@/lib/stores/brewingNoteStore');
+                        const deleteNote =
+                          useBrewingNoteStore.getState().deleteNote;
+                        await deleteNote(noteId);
+                      } catch (error) {
+                        console.error('删除笔记失败:', error);
+                      }
+                    }}
+                    onCopy={async noteId => {
+                      setNoteDetailOpen(false);
+                      const { Storage } = await import('@/lib/core/storage');
+                      const notesStr = await Storage.get('brewingNotes');
+                      if (notesStr) {
+                        const allNotes: BrewingNote[] = JSON.parse(notesStr);
+                        const fullNote = allNotes.find(n => n.id === noteId);
+                        if (fullNote) {
+                          setBrewingNoteEditData(fullNote as BrewingNoteData);
+                          setIsBrewingNoteCopy(true);
+                          setBrewingNoteEditOpen(true);
+                        }
+                      }
+                    }}
+                    onShare={noteId => {
+                      setNoteDetailOpen(false);
+                      window.dispatchEvent(
+                        new CustomEvent('noteShareTriggered', {
+                          detail: { noteId },
+                        })
+                      );
+                    }}
+                  />
+                )}
+              </div>
+            </aside>
+          )}
         </div>
 
         <BackupReminderModal
@@ -4158,6 +4265,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         setBeanDetailAddMode={setBeanDetailAddMode}
         beanDetailAddBeanState={beanDetailAddBeanState}
         onCreateNoteFromBean={handleCreateNoteFromBean}
+        onOpenNoteDetailFromBean={handleOpenNoteDetailFromBean}
         // 咖啡豆导入
         showImportBeanForm={showImportBeanForm}
         setShowImportBeanForm={setShowImportBeanForm}
@@ -4174,6 +4282,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         noteDetailOpen={noteDetailOpen}
         setNoteDetailOpen={setNoteDetailOpen}
         noteDetailData={noteDetailData}
+        onOpenBeanDetailFromNote={handleOpenBeanDetailFromNote}
         setNoteDetailData={setNoteDetailData}
         // 器具相关
         showEquipmentForm={showEquipmentForm}

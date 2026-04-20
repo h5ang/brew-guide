@@ -27,6 +27,12 @@ export interface BeanDetailModalProps {
   bean: CoffeeBean | null;
   onClose: () => void;
   onCreateNoteFromBean?: (bean: CoffeeBean) => void;
+  onOpenRelatedNote?: (detail: {
+    note: BrewingNote;
+    equipmentName: string;
+    beanUnitPrice: number;
+    beanInfo?: CoffeeBean | null;
+  }) => void;
   searchQuery?: string;
   onEdit?: (bean: CoffeeBean) => void;
   onDelete?: (bean: CoffeeBean) => void;

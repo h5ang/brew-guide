@@ -50,6 +50,36 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, children }) => (
   </div>
 );
 
+interface BeanTitleLinkProps {
+  title: string;
+  bean: CoffeeBean | null;
+  className: string;
+  onOpenBeanDetail?: (bean: CoffeeBean) => void;
+}
+
+const BeanTitleLink: React.FC<BeanTitleLinkProps> = ({
+  title,
+  bean,
+  className,
+  onOpenBeanDetail,
+}) => {
+  if (!bean?.id || !onOpenBeanDetail) {
+    return <span className={className}>{title}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenBeanDetail(bean)}
+      className={`${className} cursor-pointer transition-colors hover:text-neutral-950 dark:hover:text-white`}
+      title="查看咖啡豆详情"
+      aria-label={`${title}，查看咖啡豆详情`}
+    >
+      {title}
+    </button>
+  );
+};
+
 interface NoteDetailModalProps {
   isOpen: boolean;
   note: BrewingNote | null;
@@ -61,6 +91,7 @@ interface NoteDetailModalProps {
   onDelete?: (noteId: string) => void;
   onCopy?: (noteId: string) => void;
   onShare?: (noteId: string) => void;
+  onOpenBeanDetail?: (bean: CoffeeBean) => void;
 }
 
 const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
@@ -74,6 +105,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   onDelete,
   onCopy,
   onShare,
+  onOpenBeanDetail,
 }) => {
   // 检测是否为大屏幕（lg 断点）
   const isLargeScreen = useIsLargeScreen();
@@ -127,7 +159,10 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
       return [];
     }
 
-    if (note.equipment?.toLowerCase().includes('espresso') || note.equipment?.includes('意式')) {
+    if (
+      note.equipment?.toLowerCase().includes('espresso') ||
+      note.equipment?.includes('意式')
+    ) {
       return [
         normalizedParams.coffee,
         normalizedParams.grindSize,
@@ -558,7 +593,12 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
           >
             {titleText && (
               <h2 className="max-w-full truncate px-2 text-center text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                {titleText}
+                <BeanTitleLink
+                  title={titleText}
+                  bean={beanInfo}
+                  onOpenBeanDetail={onOpenBeanDetail}
+                  className="block max-w-full truncate"
+                />
               </h2>
             )}
           </div>
@@ -818,7 +858,12 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                 id="note-detail-title"
                 className="text-sm font-medium text-neutral-800 dark:text-neutral-100"
               >
-                {titleText}
+                <BeanTitleLink
+                  title={titleText}
+                  bean={beanInfo}
+                  onOpenBeanDetail={onOpenBeanDetail}
+                  className="text-left"
+                />
               </h2>
             </div>
           )}

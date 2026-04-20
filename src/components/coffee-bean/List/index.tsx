@@ -96,6 +96,10 @@ import {
 } from './components/TableView';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import { calculateEstimatedCupsPerBean } from '@/components/notes/utils';
+import {
+  COFFEE_BEAN_NAVIGATION_EVENTS,
+  type SyncCoffeeBeanInventoryContextDetail,
+} from '@/lib/navigation/coffeeBeanNavigation';
 import EmptyBeanTipDrawer, {
   shouldShowEmptyBeanTip,
 } from './components/EmptyBeanTipDrawer';
@@ -1322,6 +1326,52 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+
+  const syncInventoryContext = useCallback(
+    ({
+      beanState,
+      clearSearch = false,
+    }: SyncCoffeeBeanInventoryContextDetail = {}) => {
+      const nextBeanState: BeanState =
+        beanState === 'green' && enableGreenBeanInventory ? 'green' : 'roasted';
+
+      if (selectedBeanState !== nextBeanState) {
+        handleBeanStateChange(nextBeanState);
+      }
+
+      if (clearSearch) {
+        setIsSearching(false);
+        setSearchQuery('');
+      }
+    },
+    [
+      enableGreenBeanInventory,
+      handleBeanStateChange,
+      selectedBeanState,
+      setIsSearching,
+      setSearchQuery,
+    ]
+  );
+
+  useEffect(() => {
+    const handleSyncInventoryContext = (
+      event: CustomEvent<SyncCoffeeBeanInventoryContextDetail>
+    ) => {
+      syncInventoryContext(event.detail);
+    };
+
+    window.addEventListener(
+      COFFEE_BEAN_NAVIGATION_EVENTS.SYNC_INVENTORY_CONTEXT,
+      handleSyncInventoryContext as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        COFFEE_BEAN_NAVIGATION_EVENTS.SYNC_INVENTORY_CONTEXT,
+        handleSyncInventoryContext as EventListener
+      );
+    };
+  }, [syncInventoryContext]);
 
   // 分享模式状态
   const [isShareMode, setIsShareMode] = useState(false);

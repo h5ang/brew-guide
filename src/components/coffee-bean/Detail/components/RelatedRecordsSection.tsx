@@ -14,6 +14,7 @@ import {
   formatBeanDisplayName,
   type RoasterSettings,
 } from '@/lib/utils/beanVarietyUtils';
+import { getBeanUnitPrice } from '@/lib/notes/noteDisplay';
 
 interface RelatedRecordsSectionProps {
   relatedNotes: BrewingNote[];
@@ -27,6 +28,12 @@ interface RelatedRecordsSectionProps {
   setShowChangeRecords: (show: boolean) => void;
   setShowGreenBeanRecords: (show: boolean) => void;
   onImageClick: (imageUrl: string, backImageUrl?: string) => void;
+  onOpenNoteDetail?: (detail: {
+    note: BrewingNote;
+    equipmentName: string;
+    beanUnitPrice: number;
+    beanInfo?: CoffeeBean | null;
+  }) => void;
 }
 
 const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
@@ -42,6 +49,7 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
     setShowChangeRecords,
     setShowGreenBeanRecords,
     onImageClick,
+    onOpenNoteDetail,
   }) => {
     const { getValidTasteRatings } = useFlavorDimensions();
     const [noteImageErrors, setNoteImageErrors] = useState<
@@ -194,11 +202,15 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
               note => {
                 const isChangeRecord = isSimpleChangeRecord(note);
                 const isRoasting = isRoastingRecord(note);
+                const isClickableBrewingRecord =
+                  !isChangeRecord && !isRoasting && !!onOpenNoteDetail;
 
                 return (
                   <div
                     key={note.id}
-                    className="rounded bg-neutral-100 p-1.5 dark:bg-neutral-800/40"
+                    className={`rounded bg-neutral-100 p-1.5 dark:bg-neutral-800/40 ${
+                      isClickableBrewingRecord ? 'cursor-pointer' : ''
+                    }`}
                   >
                     {isChangeRecord ? (
                       <ChangeRecordItem note={note} />
@@ -212,11 +224,13 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
                       <BrewingRecordItem
                         note={note}
                         bean={bean}
+                        allBeans={allBeans}
                         equipmentNames={equipmentNames}
                         getValidTasteRatings={getValidTasteRatings}
                         noteImageErrors={noteImageErrors}
                         setNoteImageErrors={setNoteImageErrors}
                         onImageClick={onImageClick}
+                        onOpenNoteDetail={onOpenNoteDetail}
                         roasterSettings={roasterSettings}
                       />
                     )}
@@ -346,6 +360,7 @@ RoastingRecordItem.displayName = 'RoastingRecordItem';
 const BrewingRecordItem: React.FC<{
   note: BrewingNote;
   bean: CoffeeBean | null;
+  allBeans: CoffeeBean[];
   equipmentNames: Record<string, string>;
   getValidTasteRatings: (taste: BrewingNote['taste']) => Array<{
     id: string;
@@ -357,28 +372,55 @@ const BrewingRecordItem: React.FC<{
     React.SetStateAction<Record<string, boolean>>
   >;
   onImageClick: (imageUrl: string, backImageUrl?: string) => void;
+  onOpenNoteDetail?: (detail: {
+    note: BrewingNote;
+    equipmentName: string;
+    beanUnitPrice: number;
+    beanInfo?: CoffeeBean | null;
+  }) => void;
   roasterSettings: RoasterSettings;
 }> = React.memo(
   ({
     note,
     bean,
+    allBeans,
     equipmentNames,
     getValidTasteRatings,
     noteImageErrors,
     setNoteImageErrors,
     onImageClick,
+    onOpenNoteDetail,
     roasterSettings,
   }) => {
     const validTasteRatings = getValidTasteRatings(note.taste);
     const hasTasteRatings = validTasteRatings.length > 0;
+    const noteBean =
+      (note.beanId
+        ? allBeans.find(candidate => candidate.id === note.beanId) || null
+        : null) || bean;
+    const equipmentName = note.equipment
+      ? equipmentNames[note.equipment] || note.equipment
+      : '';
+    const beanUnitPrice = getBeanUnitPrice(noteBean);
 
     // 格式化咖啡豆显示名称
-    const beanDisplayName = bean
-      ? formatBeanDisplayName(bean, roasterSettings)
+    const beanDisplayName = noteBean
+      ? formatBeanDisplayName(noteBean, roasterSettings)
       : null;
 
     return (
-      <div className="space-y-3">
+      <button
+        type="button"
+        className="block w-full cursor-pointer space-y-3 text-left"
+        onClick={() =>
+          onOpenNoteDetail?.({
+            note,
+            equipmentName,
+            beanUnitPrice,
+            beanInfo: noteBean,
+          })
+        }
+      >
         {/* 图片和标题参数区域 */}
         <div className="flex gap-4">
           {/* 笔记图片 */}
@@ -433,32 +475,23 @@ const BrewingRecordItem: React.FC<{
                     </>
                   ) : (
                     <>
-                      {note.equipment
-                        ? equipmentNames[note.equipment] || note.equipment
-                        : '未知器具'}
+                      {equipmentName || '未知器具'}
                       <span className="mx-1">·</span>
                       <span>{note.method}</span>
                     </>
                   )
                 ) : beanDisplayName ? (
-                  beanDisplayName ===
-                  (note.equipment
-                    ? equipmentNames[note.equipment] || note.equipment
-                    : '未知器具') ? (
+                  beanDisplayName === (equipmentName || '未知器具') ? (
                     beanDisplayName
                   ) : (
                     <>
                       {beanDisplayName}
                       <span className="mx-1">·</span>
-                      <span>
-                        {note.equipment
-                          ? equipmentNames[note.equipment] || note.equipment
-                          : '未知器具'}
-                      </span>
+                      <span>{equipmentName || '未知器具'}</span>
                     </>
                   )
-                ) : note.equipment ? (
-                  equipmentNames[note.equipment] || note.equipment
+                ) : equipmentName ? (
+                  equipmentName
                 ) : (
                   '未知器具'
                 )}
@@ -479,12 +512,7 @@ const BrewingRecordItem: React.FC<{
                         note.method &&
                         note.method.trim() !== '' && (
                           <>
-                            <span>
-                              {note.equipment
-                                ? equipmentNames[note.equipment] ||
-                                  note.equipment
-                                : '未知器具'}
-                            </span>
+                            <span>{equipmentName || '未知器具'}</span>
                             <span>·</span>
                           </>
                         )}
@@ -573,7 +601,7 @@ const BrewingRecordItem: React.FC<{
             {note.notes}
           </div>
         )}
-      </div>
+      </button>
     );
   }
 );

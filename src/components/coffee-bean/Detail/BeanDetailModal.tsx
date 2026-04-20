@@ -63,6 +63,7 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   bean: propBean,
   onClose,
   onCreateNoteFromBean,
+  onOpenRelatedNote,
   searchQuery = '',
   onEdit,
   onDelete,
@@ -466,7 +467,10 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       const beanState = bean.beanState || 'roasted';
 
       if (beanState === 'green') {
-        const result = await RoastingManager.simpleRoast(bean.id, decrementAmount);
+        const result = await RoastingManager.simpleRoast(
+          bean.id,
+          decrementAmount
+        );
 
         if (result.success && result.greenBean) {
           window.dispatchEvent(
@@ -718,6 +722,7 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
                 setShowChangeRecords={setShowChangeRecords}
                 setShowGreenBeanRecords={setShowGreenBeanRecords}
                 onImageClick={handleImageClick}
+                onOpenNoteDetail={onOpenRelatedNote}
               />
             </div>
           ) : null}
