@@ -18,6 +18,11 @@ interface ShareOptions {
 export class TempFileManager {
   private static readonly TEMP_FILE_PREFIX = 'brew-guide-temp-';
 
+  private static createTempFileName(fileName: string): string {
+    const sanitizedFileName = fileName.replace(/[\\/:*?"<>|]/g, '-');
+    return `${this.TEMP_FILE_PREFIX}${Date.now()}-${sanitizedFileName}`;
+  }
+
   /**
    * 保存图片到相册
    * @param imageData base64格式的图片数据（支持带 data:image/png;base64, 前缀或纯 base64）
@@ -235,8 +240,7 @@ export class TempFileManager {
     fileName: string,
     shareOptions: ShareOptions
   ): Promise<void> {
-    const timestamp = new Date().getTime();
-    const fullFileName = `${this.TEMP_FILE_PREFIX}${fileName}-${timestamp}.json`;
+    const fullFileName = this.createTempFileName(fileName);
 
     try {
       // 写入临时文件
@@ -257,7 +261,7 @@ export class TempFileManager {
       await Share.share({
         title: shareOptions.title,
         text: shareOptions.text,
-        url: uriResult.uri,
+        files: [uriResult.uri],
         dialogTitle: shareOptions.dialogTitle,
       });
 
@@ -285,7 +289,7 @@ export class TempFileManager {
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
-    link.download = `${fileName}-${new Date().getTime()}.json`;
+    link.download = fileName;
     link.href = url;
     link.click();
 

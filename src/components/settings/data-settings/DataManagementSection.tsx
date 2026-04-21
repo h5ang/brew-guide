@@ -29,13 +29,11 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
       const jsonData = await DataManagerUtil.exportAllData();
       const exportResult = await exportDataAsJsonFile(jsonData);
 
-      if (exportResult.mode === 'android-local') {
+      if (exportResult.mode === 'native-share') {
         setStatus({
           type: 'success',
-          message: `数据已保存到文档/${exportResult.relativePath}，可在文件管理中直接发送到微信`,
+          message: '已打开系统分享，请选择保存位置或发送给其他应用',
         });
-      } else if (exportResult.mode === 'native-share') {
-        setStatus({ type: 'success', message: '数据已成功导出' });
       } else {
         setStatus({ type: 'success', message: '数据导出成功，文件已下载' });
       }

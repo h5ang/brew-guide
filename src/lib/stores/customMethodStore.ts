@@ -17,6 +17,7 @@ import {
   isLegacyFormat,
   autoMigrateStages,
 } from '@/lib/brewing/stageMigration';
+import { exportJsonFile } from '@/lib/utils/jsonExport';
 
 /**
  * 方案数据结构
@@ -604,7 +605,7 @@ export async function generateMethodShareText(
 }
 
 /**
- * 导出器具配置为 JSON 文件（下载）
+ * 导出器具配置为 JSON 文件
  */
 export async function exportEquipmentToFile(
   equipment: CustomEquipment,
@@ -629,16 +630,13 @@ export async function exportEquipmentToFile(
   // 转换为JSON格式
   const jsonData = JSON.stringify(exportData, null, 2);
 
-  // 创建 Blob 并下载为文件
-  const blob = new Blob([jsonData], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${equipment.name}_器具配置.json`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  await exportJsonFile({
+    jsonData,
+    fileName: `${equipment.name}_器具配置.json`,
+    title: '导出器具配置',
+    text: '请选择保存位置',
+    dialogTitle: '导出器具配置',
+  });
 }
 
 // ==================== 向后兼容的别名 ====================

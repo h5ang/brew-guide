@@ -43,10 +43,8 @@ const BackupReminderModal: React.FC<BackupReminderModalProps> = ({
       const jsonData = await DataManagerUtil.exportAllData();
       const exportResult = await exportDataAsJsonFile(jsonData);
 
-      if (exportResult.mode === 'android-local') {
-        setExportMessage(
-          `备份成功，已保存到文档/${exportResult.relativePath}`
-        );
+      if (exportResult.mode === 'native-share') {
+        setExportMessage('已打开系统分享，请选择保存位置或发送给其他应用');
       } else {
         setExportMessage('数据导出成功！');
       }

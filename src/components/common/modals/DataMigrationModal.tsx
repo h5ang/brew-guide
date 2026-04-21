@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, ArrowRight, AlertTriangle } from 'lucide-react';
 import { DataManager } from '@/lib/core/dataManager';
+import { exportJsonFile } from '@/lib/utils/jsonExport';
 
 interface DataMigrationModalProps {
   isOpen: boolean;
@@ -31,22 +32,13 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
       setError(null);
 
       const jsonData = await DataManager.exportAllData();
-      const fileName = `brew-guide-backup-${new Date().toISOString().slice(0, 10)}.json`;
-
-      // 创建下载链接
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-
-      // 清理
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
+      await exportJsonFile({
+        jsonData,
+        fileName: `brew-guide-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        title: '备份当前数据',
+        text: '请选择保存位置',
+        dialogTitle: '备份当前数据',
+      });
 
       setBackupCompleted(true);
     } catch (error) {

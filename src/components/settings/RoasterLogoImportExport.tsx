@@ -11,6 +11,7 @@ import {
   getSettingsStore,
 } from '@/lib/stores/settingsStore';
 import hapticsUtils from '@/lib/ui/haptics';
+import { exportJsonFile } from '@/lib/utils/jsonExport';
 import DownloadIcon from '@public/images/icons/ui/download-2.svg';
 import IosShareIcon from '@public/images/icons/ui/ios-share.svg';
 
@@ -185,18 +186,13 @@ const RoasterLogoImportExport: React.FC<RoasterLogoImportExportProps> = ({
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const fileName = `roaster-logos-${dateStr}.json`;
 
-      // 创建下载
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-        type: 'application/json',
+      await exportJsonFile({
+        jsonData: JSON.stringify(exportData, null, 2),
+        fileName,
+        title: '导出烘焙商图标',
+        text: '请选择保存位置',
+        dialogTitle: '导出烘焙商图标',
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       if (hapticFeedback) {
         hapticsUtils.success();
