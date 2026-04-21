@@ -106,7 +106,6 @@ import {
   buildBeanSummaryDetailItems,
   calculateBeanSummaryEstimatedCups,
   formatBeanSummaryEstimatedCups,
-  formatBeanSummaryWeight,
   formatBeanSummaryWeightWithLimit,
   getBeanSummaryDisplayLimit,
   getBeanSummaryLimitMode,
@@ -1177,8 +1176,14 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
       const capacity = bean.capacity ? parseFloat(bean.capacity) : 0;
       return sum + (isNaN(capacity) ? 0 : capacity);
     }, 0);
+    const maxDisplayWeight =
+      selectedBeanState === 'roasted' ? beanSummaryDisplayLimit : undefined;
 
-    return formatBeanSummaryWeight(totalWeight);
+    return formatBeanSummaryWeightWithLimit(
+      totalWeight,
+      maxDisplayWeight,
+      beanSummaryLimitMode
+    );
   };
 
   // 切换显示空豆子状态 - 简化版本，优化的Hook会自动处理筛选
