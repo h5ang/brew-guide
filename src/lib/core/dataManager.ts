@@ -39,6 +39,10 @@ interface ImportData {
   data?: Record<string, unknown>;
 }
 
+interface ExportAllDataOptions {
+  pretty?: boolean;
+}
+
 // 使用从 config.ts 导入的 BrewingNote 类型
 
 /**
@@ -111,8 +115,9 @@ export const DataManager = {
    * 导出数据
    * @returns 包含数据的JSON字符串
    */
-  async exportAllData(): Promise<string> {
+  async exportAllData(options: ExportAllDataOptions = {}): Promise<string> {
     try {
+      const { pretty = false } = options;
       const now = new Date();
       const exportData: ExportData = {
         exportDate: this.formatDateWithTimezone(now),
@@ -266,9 +271,14 @@ export const DataManager = {
         console.error('导出烘焙商配置失败:', error);
       }
 
-      return JSON.stringify(exportData, null, 2);
-    } catch {
-      throw new Error('导出数据失败');
+      return pretty
+        ? JSON.stringify(exportData, null, 2)
+        : JSON.stringify(exportData);
+    } catch (error) {
+      console.error('导出数据失败:', error);
+      throw new Error(
+        error instanceof Error ? `导出数据失败: ${error.message}` : '导出数据失败'
+      );
     }
   },
 

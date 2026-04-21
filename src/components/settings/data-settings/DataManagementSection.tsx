@@ -21,10 +21,16 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
     type: null,
     message: '',
   });
+  const [isExporting, setIsExporting] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   // 数据导出
   const handleExport = async () => {
+    if (isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
     try {
       const jsonData = await DataManagerUtil.exportAllData();
       const exportResult = await exportDataAsJsonFile(jsonData);
@@ -48,6 +54,8 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
         type: 'error',
         message: `导出失败: ${(_error as Error).message}`,
       });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -209,9 +217,10 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
       <div className="space-y-3">
         <button
           onClick={handleExport}
-          className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          disabled={isExporting}
+          className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
         >
-          <span>导出数据</span>
+          <span>{isExporting ? '导出中...' : '导出数据'}</span>
           <ChevronRight className="h-4 w-4 text-neutral-400" />
         </button>
 

@@ -17,6 +17,7 @@ interface ShareOptions {
  */
 export class TempFileManager {
   private static readonly TEMP_FILE_PREFIX = 'brew-guide-temp-';
+  private static readonly NATIVE_TEXT_CHUNK_SIZE = 128 * 1024;
 
   private static createTempFileName(fileName: string): string {
     const sanitizedFileName = fileName.replace(/[\\/:*?"<>|]/g, '-');
@@ -243,13 +244,8 @@ export class TempFileManager {
     const fullFileName = this.createTempFileName(fileName);
 
     try {
-      // 写入临时文件
-      await Filesystem.writeFile({
-        path: fullFileName,
-        data: jsonData,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8,
-      });
+      // Android 在大文本单次 writeFile 时可能出现跨桥负载过大，改为统一分块写入。
+      await this.writeUtf8TextFile(fullFileName, jsonData);
 
       // 获取文件URI
       const uriResult = await Filesystem.getUri({
@@ -275,6 +271,31 @@ export class TempFileManager {
         console.warn('清理临时文件失败:', cleanupError);
       }
       throw error;
+    }
+  }
+
+  private static async writeUtf8TextFile(
+    path: string,
+    data: string
+  ): Promise<void> {
+    const chunkSize = this.NATIVE_TEXT_CHUNK_SIZE;
+    const firstChunk = data.slice(0, chunkSize);
+
+    await Filesystem.writeFile({
+      path,
+      data: firstChunk,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+
+    for (let offset = chunkSize; offset < data.length; offset += chunkSize) {
+      await Filesystem.appendFile({
+        path,
+        data: data.slice(offset, offset + chunkSize),
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
     }
   }
 
