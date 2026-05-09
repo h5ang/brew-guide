@@ -4,6 +4,10 @@ import { Preferences } from '@capacitor/preferences';
 const CURRENT_SESSION_KEY = 'brew-guide:crash-diagnostics:current-session';
 const LAST_REPORT_KEY = 'brew-guide:crash-diagnostics:last-report';
 const MAX_CHECKPOINTS = 24;
+const NON_FATAL_BROWSER_ERROR_PHASES = new Set([
+  'window-error',
+  'unhandled-rejection',
+]);
 
 type JsonValue =
   | string
@@ -133,7 +137,10 @@ const readStorageValue = async <T>(key: string): Promise<T | null> => {
   return parseJson<T>(window.localStorage.getItem(key));
 };
 
-const writeStorageValue = async (key: string, value: unknown): Promise<void> => {
+const writeStorageValue = async (
+  key: string,
+  value: unknown
+): Promise<void> => {
   const serialized = JSON.stringify(value);
 
   if (isNativePlatform()) {
@@ -179,10 +186,23 @@ const isUnexpectedPreviousSession = (
 ): boolean => {
   if (!session) return false;
 
+  return session.startupState !== 'ready' || Boolean(session.nativeCrash);
+};
+
+const isRecoveredBrowserErrorReport = (
+  report: CrashDiagnosticReport | null
+): boolean => {
+  if (!report) return false;
+
+  const { session } = report;
+
   return (
-    session.startupState !== 'ready' ||
-    Boolean(session.fatalError) ||
-    Boolean(session.nativeCrash)
+    session.startupState === 'ready' &&
+    !session.nativeCrash &&
+    Boolean(
+      session.fatalError &&
+      NON_FATAL_BROWSER_ERROR_PHASES.has(session.fatalError.phase)
+    )
   );
 };
 
@@ -210,10 +230,7 @@ const updateActiveSession = (
   queuePersist(activeSession);
 };
 
-const serializeError = (
-  error: unknown,
-  phase: string
-): CrashErrorRecord => {
+const serializeError = (error: unknown, phase: string): CrashErrorRecord => {
   if (error instanceof Error) {
     return {
       phase,
@@ -246,8 +263,19 @@ export async function installCrashDiagnostics(): Promise<void> {
       readStorageValue<CrashDiagnosticSession>(CURRENT_SESSION_KEY),
       readStorageValue<CrashDiagnosticReport>(LAST_REPORT_KEY),
     ]);
+    const existingReport = isRecoveredBrowserErrorReport(storedReport)
+      ? null
+      : storedReport;
 
-    if (!storedReport && previousSession && isUnexpectedPreviousSession(previousSession)) {
+    if (storedReport && !existingReport) {
+      await removeStorageValue(LAST_REPORT_KEY);
+    }
+
+    if (
+      !existingReport &&
+      previousSession &&
+      isUnexpectedPreviousSession(previousSession)
+    ) {
       await writeStorageValue(
         LAST_REPORT_KEY,
         buildInferredReport(previousSession)
@@ -269,11 +297,15 @@ export async function installCrashDiagnostics(): Promise<void> {
     queuePersist(activeSession);
 
     window.addEventListener('error', event => {
-      recordCrashError(event.error || event.message, 'window-error');
+      recordObservedBrowserError(event.error || event.message, 'window-error', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
     });
 
     window.addEventListener('unhandledrejection', event => {
-      recordCrashError(event.reason, 'unhandled-rejection');
+      recordObservedBrowserError(event.reason, 'unhandled-rejection');
     });
   })();
 
@@ -317,6 +349,7 @@ export function markCrashDiagnosticsReady(
     return {
       ...session,
       startupState: 'ready',
+      fatalError: undefined,
       updatedAt: checkpoint.at,
       lastCheckpoint: checkpoint,
       checkpoints: [...session.checkpoints, checkpoint].slice(-MAX_CHECKPOINTS),
@@ -348,8 +381,29 @@ export function recordCrashError(
   });
 }
 
+export function recordObservedBrowserError(
+  error: unknown,
+  phase: 'window-error' | 'unhandled-rejection',
+  meta?: Record<string, unknown>
+): void {
+  const errorRecord = serializeError(error, phase);
+
+  recordCrashCheckpoint(`error:${phase}`, {
+    ...meta,
+    errorName: errorRecord.name,
+    message: errorRecord.message,
+  });
+}
+
 export async function getCrashDiagnosticReport(): Promise<CrashDiagnosticReport | null> {
-  return readStorageValue<CrashDiagnosticReport>(LAST_REPORT_KEY);
+  const report = await readStorageValue<CrashDiagnosticReport>(LAST_REPORT_KEY);
+
+  if (isRecoveredBrowserErrorReport(report)) {
+    await removeStorageValue(LAST_REPORT_KEY);
+    return null;
+  }
+
+  return report;
 }
 
 export async function dismissCrashDiagnosticReport(): Promise<void> {
@@ -396,26 +450,29 @@ export const formatCrashDiagnosticReport = (
     : [];
 
   const nativeCrash = session.nativeCrash
-    ? [
-        '',
-        '原生崩溃记录:',
-        safelyStringify(session.nativeCrash),
-      ]
+    ? ['', '原生崩溃记录:', safelyStringify(session.nativeCrash)]
     : [];
 
   const checkpoints = session.checkpoints.length
     ? [
         '',
         '最近检查点:',
-        ...session.checkpoints.map(checkpoint =>
-          `${checkpoint.at} ${checkpoint.name}${
-            checkpoint.meta ? ` ${safelyStringify(checkpoint.meta)}` : ''
-          }`
+        ...session.checkpoints.map(
+          checkpoint =>
+            `${checkpoint.at} ${checkpoint.name}${
+              checkpoint.meta ? ` ${safelyStringify(checkpoint.meta)}` : ''
+            }`
         ),
       ]
     : [];
 
-  return [...header, ...lastCheckpoint, ...fatalError, ...nativeCrash, ...checkpoints]
+  return [
+    ...header,
+    ...lastCheckpoint,
+    ...fatalError,
+    ...nativeCrash,
+    ...checkpoints,
+  ]
     .filter(Boolean)
     .join('\n');
 };
