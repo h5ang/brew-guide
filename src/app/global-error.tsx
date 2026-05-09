@@ -1,6 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  formatCrashDiagnosticReport,
+  getCrashDiagnosticReport,
+  getCurrentCrashDiagnosticSession,
+  recordCrashError,
+} from '@/lib/app/crashDiagnostics';
 
 /**
  * 全局错误边界 - Next.js 官方推荐方案
@@ -22,6 +28,33 @@ export default function GlobalError({
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [diagnosticDetails, setDiagnosticDetails] = useState('');
+
+  useEffect(() => {
+    recordCrashError(error, 'next-global-error');
+
+    let mounted = true;
+
+    void Promise.all([
+      getCrashDiagnosticReport(),
+      getCurrentCrashDiagnosticSession(),
+    ]).then(([report, session]) => {
+      if (!mounted) {
+        return;
+      }
+
+      const sections = [
+        report ? formatCrashDiagnosticReport(report) : '',
+        session ? JSON.stringify(session, null, 2) : '',
+      ].filter(Boolean);
+
+      setDiagnosticDetails(sections.join('\n\n'));
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [error]);
 
   // 检查是否是 chunk 加载错误
   const isChunkError =
@@ -42,6 +75,9 @@ export default function GlobalError({
       '',
       '堆栈信息:',
       error.stack || 'No stack trace available',
+      diagnosticDetails ? '' : '',
+      diagnosticDetails ? '诊断信息:' : '',
+      diagnosticDetails,
     ]
       .filter(Boolean)
       .join('\n');
@@ -147,7 +183,7 @@ export default function GlobalError({
                     {copied ? (
                       <>
                         <svg
-                          className="h-3.5 w-3.5"
+                          className="size-3.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -164,7 +200,7 @@ export default function GlobalError({
                     ) : (
                       <>
                         <svg
-                          className="h-3.5 w-3.5"
+                          className="size-3.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"

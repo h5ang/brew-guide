@@ -221,7 +221,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
           className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
         >
           <span>{isExporting ? '导出中...' : '导出数据'}</span>
-          <ChevronRight className="h-4 w-4 text-neutral-400" />
+          <ChevronRight className="size-4 text-neutral-400" />
         </button>
 
         <div>
@@ -230,7 +230,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
             className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           >
             <span>导入数据</span>
-            <ChevronRight className="h-4 w-4 text-neutral-400" />
+            <ChevronRight className="size-4 text-neutral-400" />
           </button>
           <input
             ref={fileInputRef}
@@ -247,7 +247,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
             className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           >
             <span>重置数据</span>
-            <ChevronRight className="h-4 w-4 text-neutral-400" />
+            <ChevronRight className="size-4 text-neutral-400" />
           </button>
         ) : (
           <div className="space-y-3 rounded bg-neutral-100 p-4 dark:bg-neutral-800">

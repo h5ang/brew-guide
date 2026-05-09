@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useDeferredValue,
   useMemo,
 } from 'react';
 import CoffeeBeanFormModal from '@/components/coffee-bean/Form/Modal';
@@ -16,7 +17,6 @@ import CopyFailureDrawer from '@/components/common/feedback/CopyFailureDrawer';
 import { beanToReadableText } from '@/lib/utils/jsonUtils';
 import {
   type SortOption,
-  sortBeans,
   convertToRankingSortOption as _convertToRankingSortOption,
 } from './SortSelector';
 import {
@@ -68,21 +68,12 @@ import {
   getSelectedBeanGroupByStatePreference,
   // 显示模式相关
   type DisplayMode,
-  isBeanEmpty,
   getSearchHistoryPreference,
   addSearchHistory,
 } from './preferences';
 import { useBeanOperations } from './hooks/useBeanOperations';
 import { useEnhancedBeanFiltering } from './hooks/useEnhancedBeanFiltering';
-import {
-  FlavorPeriodStatus,
-  beanHasVariety,
-  beanHasOrigin,
-  beanHasProcess,
-  beanHasFlavorPeriodStatus,
-  beanHasRoaster,
-  RoasterSettings,
-} from '@/lib/utils/beanVarietyUtils';
+import { FlavorPeriodStatus } from '@/lib/utils/beanVarietyUtils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import ViewSwitcher from './components/ViewSwitcher';
 import InventoryView from './components/InventoryView';
@@ -114,7 +105,10 @@ import {
   getBeanSummaryDisplayLimit,
   getBeanSummaryLimitMode,
 } from '@/lib/utils/beanSummaryDisplay';
-import { beanBelongsToGroup } from '@/lib/utils/coffeeBeanGroupUtils';
+import {
+  searchBeanRecords,
+  summarizeBeanTypeStats,
+} from './beanListPipeline';
 
 const CoffeeBeanRanking = _CoffeeBeanRanking;
 const convertToRankingSortOption = _convertToRankingSortOption;
@@ -352,16 +346,19 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
 
   // 使用增强的筛选Hook
   const {
+    filteredRecords,
+    emptyRecords,
+    tableFilteredRecords,
+    tableEmptyRecords,
     filteredBeans,
-    emptyBeans,
-    tableFilteredBeans,
-    tableEmptyBeans,
     availableVarieties,
     availableOrigins,
     availableProcessingMethods,
     availableFlavorPeriods,
     availableRoasters,
     availableBeanGroups,
+    hasEmptyBeansInCurrentState,
+    typeStats,
   } = useEnhancedBeanFiltering({
     beans,
     filterMode,
@@ -377,272 +374,27 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     sortOption,
   });
 
-  // 计算当前状态下的豆子统计
-  const { currentStateBeanCount, hasEmptyBeansInCurrentState } = useMemo(() => {
-    const currentStateBeans = beans.filter(
-      bean => (bean.beanState || 'roasted') === selectedBeanState
+  const totalEspressoCount = typeStats.espressoCount;
+  const totalFilterCount = typeStats.filterCount;
+  const totalOmniCount = typeStats.omniCount;
+
+  const updateFilteredBeansAndCategories = useCallback(() => {
+    globalCache.varieties = availableVarieties;
+    globalCache.availableOrigins = availableOrigins;
+    globalCache.availableFlavorPeriods = availableFlavorPeriods;
+    globalCache.availableRoasters = availableRoasters;
+    globalCache.availableBeanGroupIds = availableBeanGroups.map(
+      group => group.id
     );
-    return {
-      currentStateBeanCount: currentStateBeans.length,
-      hasEmptyBeansInCurrentState: currentStateBeans.some(isBeanEmpty),
-    };
-  }, [beans, selectedBeanState]);
-
-  // 计算每种类型的咖啡豆数量（用于类型筛选显示）
-  // 获取烘焙商相关设置 - 使用单独的选择器避免无限循环
-  const roasterFieldEnabled = useSettingsStore(
-    state => state.settings.roasterFieldEnabled
-  );
-  const roasterSeparator = useSettingsStore(
-    state => state.settings.roasterSeparator
-  );
-  const coffeeBeanGroups = useSettingsStore(
-    state => state.settings.coffeeBeanGroups
-  );
-  const roasterSettings = useMemo<RoasterSettings>(
-    () => ({
-      roasterFieldEnabled,
-      roasterSeparator,
-    }),
-    [roasterFieldEnabled, roasterSeparator]
-  );
-
-  // 计算类型统计 - 用于显示剩余量等信息（基于当前所有筛选条件）
-  const {
-    espressoCount,
-    filterCount,
-    omniCount,
-    espressoRemaining,
-    filterRemaining,
-    omniRemaining,
-  } = useMemo(() => {
-    // 根据当前的筛选条件计算不同类型的豆子数量
-    let beansToCount = beans;
-
-    // 先按 beanState 筛选
-    beansToCount = beansToCount.filter(bean => {
-      const beanState = bean.beanState || 'roasted';
-      return beanState === selectedBeanState;
-    });
-
-    // 如果不显示空豆子，先过滤掉空豆子
-    if (!showEmptyBeans) {
-      beansToCount = beansToCount.filter(bean => !isBeanEmpty(bean));
-    }
-
-    // 根据当前的分类模式和选择进行筛选
-    switch (filterMode) {
-      case 'variety':
-        if (selectedVariety) {
-          beansToCount = beansToCount.filter(bean =>
-            beanHasVariety(bean, selectedVariety)
-          );
-        }
-        break;
-      case 'origin':
-        if (selectedOrigin) {
-          beansToCount = beansToCount.filter(bean =>
-            beanHasOrigin(bean, selectedOrigin)
-          );
-        }
-        break;
-      case 'processingMethod':
-        if (selectedProcessingMethod) {
-          beansToCount = beansToCount.filter(bean =>
-            beanHasProcess(bean, selectedProcessingMethod)
-          );
-        }
-        break;
-      case 'flavorPeriod':
-        if (selectedFlavorPeriod) {
-          beansToCount = beansToCount.filter(bean =>
-            beanHasFlavorPeriodStatus(bean, selectedFlavorPeriod)
-          );
-        }
-        break;
-      case 'roaster':
-        if (selectedRoaster) {
-          beansToCount = beansToCount.filter(bean =>
-            beanHasRoaster(bean, selectedRoaster, roasterSettings)
-          );
-        }
-        break;
-      case 'group':
-        if (selectedBeanGroupId) {
-          const selectedGroup = coffeeBeanGroups?.find(
-            group => group.id === selectedBeanGroupId
-          );
-          beansToCount = beansToCount.filter(bean =>
-            beanBelongsToGroup(bean, selectedGroup)
-          );
-        }
-        break;
-    }
-
-    // 统计不同类型的豆子数量和剩余量
-    const espressoBeans = beansToCount.filter(
-      bean => bean.beanType === 'espresso'
-    );
-    const filterBeans = beansToCount.filter(bean => bean.beanType === 'filter');
-    const omniBeans = beansToCount.filter(bean => bean.beanType === 'omni');
-
-    const espresso = espressoBeans.length;
-    const filter = filterBeans.length;
-    const omni = omniBeans.length;
-
-    // 计算每种类型的剩余量
-    const espressoRemaining = espressoBeans.reduce(
-      (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-      0
-    );
-    const filterRemaining = filterBeans.reduce(
-      (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-      0
-    );
-    const omniRemaining = omniBeans.reduce(
-      (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-      0
-    );
-
-    return {
-      espressoCount: espresso,
-      filterCount: filter,
-      omniCount: omni,
-      espressoRemaining,
-      filterRemaining,
-      omniRemaining,
-    };
+    globalCache.filteredBeans = filteredBeans;
   }, [
-    beans,
-    selectedBeanState,
-    showEmptyBeans,
-    filterMode,
-    selectedVariety,
-    selectedOrigin,
-    selectedProcessingMethod,
-    selectedFlavorPeriod,
-    selectedRoaster,
-    selectedBeanGroupId,
-    roasterSettings,
-    coffeeBeanGroups,
+    availableVarieties,
+    availableOrigins,
+    availableFlavorPeriods,
+    availableRoasters,
+    availableBeanGroups,
+    filteredBeans,
   ]);
-
-  // 计算总体类型统计 - 用于判断按钮是否应该禁用（考虑分类栏选择，但不考虑类型本身的选择）
-  const { totalEspressoCount, totalFilterCount, totalOmniCount } =
-    useMemo(() => {
-      let beansToCount = beans;
-
-      // 按 beanState 筛选
-      beansToCount = beansToCount.filter(bean => {
-        const beanState = bean.beanState || 'roasted';
-        return beanState === selectedBeanState;
-      });
-
-      // 如果不显示空豆子，先过滤掉空豆子
-      if (!showEmptyBeans) {
-        beansToCount = beansToCount.filter(bean => !isBeanEmpty(bean));
-      }
-
-      // 根据当前的分类模式和选择进行筛选（但不考虑类型筛选）
-      switch (filterMode) {
-        case 'variety':
-          if (selectedVariety) {
-            beansToCount = beansToCount.filter(bean =>
-              beanHasVariety(bean, selectedVariety)
-            );
-          }
-          break;
-        case 'origin':
-          if (selectedOrigin) {
-            beansToCount = beansToCount.filter(bean =>
-              beanHasOrigin(bean, selectedOrigin)
-            );
-          }
-          break;
-        case 'processingMethod':
-          if (selectedProcessingMethod) {
-            beansToCount = beansToCount.filter(bean =>
-              beanHasProcess(bean, selectedProcessingMethod)
-            );
-          }
-          break;
-        case 'flavorPeriod':
-          if (selectedFlavorPeriod) {
-            beansToCount = beansToCount.filter(bean =>
-              beanHasFlavorPeriodStatus(bean, selectedFlavorPeriod)
-            );
-          }
-          break;
-        case 'roaster':
-          if (selectedRoaster) {
-            beansToCount = beansToCount.filter(bean =>
-              beanHasRoaster(bean, selectedRoaster, roasterSettings)
-            );
-          }
-          break;
-        case 'group':
-          if (selectedBeanGroupId) {
-            const selectedGroup = coffeeBeanGroups?.find(
-              group => group.id === selectedBeanGroupId
-            );
-            beansToCount = beansToCount.filter(bean =>
-              beanBelongsToGroup(bean, selectedGroup)
-            );
-          }
-          break;
-      }
-
-      // 统计不同类型的豆子数量（不考虑类型筛选）
-      const totalEspresso = beansToCount.filter(
-        bean => bean.beanType === 'espresso'
-      ).length;
-      const totalFilter = beansToCount.filter(
-        bean => bean.beanType === 'filter'
-      ).length;
-      const totalOmni = beansToCount.filter(
-        bean => bean.beanType === 'omni'
-      ).length;
-
-      return {
-        totalEspressoCount: totalEspresso,
-        totalFilterCount: totalFilter,
-        totalOmniCount: totalOmni,
-      };
-    }, [
-      beans,
-      selectedBeanState,
-      showEmptyBeans,
-      filterMode,
-      selectedVariety,
-      selectedOrigin,
-      selectedProcessingMethod,
-      selectedFlavorPeriod,
-      selectedRoaster,
-      selectedBeanGroupId,
-      roasterSettings,
-      coffeeBeanGroups,
-    ]);
-
-  const updateFilteredBeansAndCategories = useCallback(
-    (_beansToSort: ExtendedCoffeeBean[]) => {
-      globalCache.varieties = availableVarieties;
-      globalCache.availableOrigins = availableOrigins;
-      globalCache.availableFlavorPeriods = availableFlavorPeriods;
-      globalCache.availableRoasters = availableRoasters;
-      globalCache.availableBeanGroupIds = availableBeanGroups.map(
-        group => group.id
-      );
-      globalCache.filteredBeans = filteredBeans;
-    },
-    [
-      availableVarieties,
-      availableOrigins,
-      availableFlavorPeriods,
-      availableRoasters,
-      availableBeanGroups,
-      filteredBeans,
-    ]
-  );
 
   // 初始化加载数据
   useEffect(() => {
@@ -751,6 +503,9 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   // 生豆库启用设置 - 从 settingsStore 获取
   const enableGreenBeanInventory = useSettingsStore(
     state => state.settings.enableGreenBeanInventory === true
+  );
+  const coffeeBeanGroups = useSettingsStore(
+    state => state.settings.coffeeBeanGroups
   );
 
   // 预计杯数设置
@@ -886,18 +641,11 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     if (viewMode === VIEW_OPTIONS.RANKING) {
       loadRatedBeans();
     } else if (viewMode === VIEW_OPTIONS.INVENTORY) {
-      // 在切换到库存视图时，应用当前的排序选项重新排序
-      if (beans.length > 0) {
-        // 使用完整的 beans 对象，不需要映射
-        const sortedBeans = sortBeans(beans, sortOption);
-        updateFilteredBeansAndCategories(sortedBeans);
-      }
+      updateFilteredBeansAndCategories();
     }
   }, [
     viewMode,
     loadRatedBeans,
-    beans,
-    sortOption,
     updateFilteredBeansAndCategories,
   ]);
 
@@ -954,14 +702,12 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     }
   }, [viewMode, inventorySortOption, rankingSortOption]);
 
-  // 当排序选项改变时更新数据 - 优化防抖动
+  // 当库存快照变化时同步全局缓存，避免旧的分类数据残留
   useEffect(() => {
-    if (viewMode === VIEW_OPTIONS.INVENTORY && beans.length > 0) {
-      // 库存视图：使用完整的 beans 对象进行排序
-      const sortedBeans = sortBeans(beans, sortOption);
-      updateFilteredBeansAndCategories(sortedBeans);
+    if (viewMode === VIEW_OPTIONS.INVENTORY) {
+      updateFilteredBeansAndCategories();
     }
-  }, [sortOption, viewMode, beans, updateFilteredBeansAndCategories]);
+  }, [viewMode, updateFilteredBeansAndCategories]);
 
   // 处理品种标签点击 - 简化版本，优化的Hook会自动处理筛选
   const handleVarietyClick = useCallback(
@@ -1526,196 +1272,74 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     setSearchHistory(getSearchHistoryPreference());
   }, []);
 
-  // 搜索过滤函数 - 可复用于正常豆子和用完的豆子
-  const filterBeansBySearch = React.useCallback(
-    (beansToFilter: ExtendedCoffeeBean[]): ExtendedCoffeeBean[] => {
-      if (!searchQuery.trim() || !isSearching) {
-        return beansToFilter;
-      }
-
-      // 将查询拆分为多个关键词，移除空字符串
-      const queryTerms = searchQuery
-        .toLowerCase()
-        .trim()
-        .split(/\s+/)
-        .filter(term => term.length > 0);
-
-      // 给每个咖啡豆计算匹配分数
-      const beansWithScores = beansToFilter.map(bean => {
-        // 基本信息搜索
-        const name = bean.name?.toLowerCase() || '';
-        const roaster = bean.roaster?.toLowerCase() || '';
-        // 从 blendComponents 获取产地、庄园和处理法信息（用于向后兼容搜索）
-        const origin =
-          bean.blendComponents
-            ?.map(c => c.origin)
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase() || '';
-        const estate =
-          bean.blendComponents
-            ?.map(c => c.estate)
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase() || '';
-        const process =
-          bean.blendComponents
-            ?.map(c => c.process)
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase() || '';
-        const notes = bean.notes?.toLowerCase() || '';
-
-        // 额外信息搜索
-        const roastLevel = bean.roastLevel?.toLowerCase() || '';
-        const roastDate = bean.roastDate?.toLowerCase() || '';
-        const price = bean.price?.toLowerCase() || '';
-        const beanType = bean.beanType?.toLowerCase() || '';
-
-        // 风味标签搜索 - 将数组转换为字符串进行搜索
-        const flavors = bean.flavor?.join(' ').toLowerCase() || '';
-
-        // 拼配组件搜索 - 包含成分中的品种、庄园信息
-        const blendComponentsText =
-          bean.blendComponents
-            ?.map(
-              comp =>
-                `${comp.percentage || ''} ${comp.origin || ''} ${comp.estate || ''} ${comp.process || ''} ${comp.variety || ''}`
-            )
-            .join(' ')
-            .toLowerCase() || '';
-
-        // 计量信息搜索
-        const capacity = bean.capacity?.toLowerCase() || '';
-        const remaining = bean.remaining?.toLowerCase() || '';
-
-        // 赏味期搜索 - 将赏味期信息转换为可搜索的文本
-        const flavorPeriod =
-          `${bean.startDay || ''} ${bean.endDay || ''}`.toLowerCase();
-
-        // 组合所有可搜索文本到一个数组，为不同字段分配权重
-        const searchableTexts = [
-          { text: name, weight: 3 }, // 名称权重最高
-          { text: roaster, weight: 3 }, // 烘焙商权重最高
-          { text: origin, weight: 2 }, // 产地权重较高
-          { text: estate, weight: 2 }, // 庄园权重较高
-          { text: process, weight: 2 }, // 处理法权重较高
-          { text: notes, weight: 1 }, // 备注权重一般
-          { text: roastLevel, weight: 1 }, // 烘焙度权重一般
-          { text: roastDate, weight: 1 }, // 烘焙日期权重一般
-          { text: price, weight: 1 }, // 价格权重一般
-          { text: beanType, weight: 2 }, // 豆子类型权重较高
-          { text: flavors, weight: 2 }, // 风味标签权重较高
-          { text: blendComponentsText, weight: 2 }, // 拼配组件权重较高
-          { text: capacity, weight: 1 }, // 容量权重一般
-          { text: remaining, weight: 1 }, // 剩余量权重一般
-          { text: flavorPeriod, weight: 1 }, // 赏味期信息权重一般
-        ];
-
-        // 计算匹配分数 - 所有匹配关键词的权重总和
-        let score = 0;
-        let allTermsMatch = true;
-
-        for (const term of queryTerms) {
-          // 检查当前关键词是否至少匹配一个字段
-          const termMatches = searchableTexts.some(({ text }) =>
-            text.includes(term)
-          );
-
-          if (!termMatches) {
-            allTermsMatch = false;
-            break;
-          }
-
-          // 累加匹配到的权重
-          for (const { text, weight } of searchableTexts) {
-            if (text.includes(term)) {
-              score += weight;
-
-              // 精确匹配整个字段给予额外加分
-              if (text === term) {
-                score += weight * 2;
-              }
-
-              // 匹配字段开头给予额外加分
-              if (text.startsWith(term)) {
-                score += weight;
-              }
-            }
-          }
-        }
-
-        return {
-          bean,
-          score,
-          matches: allTermsMatch,
-        };
-      });
-
-      // 过滤掉不匹配所有关键词的豆子
-      const matchingBeans = beansWithScores.filter(item => item.matches);
-
-      // 根据分数排序，分数高的在前面
-      matchingBeans.sort((a, b) => b.score - a.score);
-
-      // 返回排序后的豆子列表
-      return matchingBeans.map(item => item.bean);
-    },
-    [searchQuery, isSearching]
-  );
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   // 按显示模式选择库存数据源：
   // - list/imageFlow: 使用列表排序结果
   // - table: 仅使用筛选结果，排序交由表头控制
-  const inventoryFilteredBeans = React.useMemo(() => {
-    return displayMode === 'table' ? tableFilteredBeans : filteredBeans;
-  }, [displayMode, tableFilteredBeans, filteredBeans]);
+  const inventoryFilteredRecords = React.useMemo(
+    () => (displayMode === 'table' ? tableFilteredRecords : filteredRecords),
+    [displayMode, tableFilteredRecords, filteredRecords]
+  );
 
-  const inventoryEmptyBeans = React.useMemo(() => {
-    return displayMode === 'table' ? tableEmptyBeans : emptyBeans;
-  }, [displayMode, tableEmptyBeans, emptyBeans]);
+  const inventoryEmptyRecords = React.useMemo(
+    () => (displayMode === 'table' ? tableEmptyRecords : emptyRecords),
+    [displayMode, tableEmptyRecords, emptyRecords]
+  );
 
-  // 搜索过滤后的正常豆子
-  const searchFilteredBeans = React.useMemo(() => {
-    return filterBeansBySearch(inventoryFilteredBeans);
-  }, [inventoryFilteredBeans, filterBeansBySearch]);
+  const inventoryFilteredBeans = React.useMemo(
+    () => inventoryFilteredRecords.map(record => record.bean),
+    [inventoryFilteredRecords]
+  );
 
-  // 搜索过滤后的用完的豆子（当showEmptyBeans为true时）
-  const searchFilteredEmptyBeans = React.useMemo(() => {
-    if (!showEmptyBeans) return [];
-    return filterBeansBySearch(inventoryEmptyBeans);
-  }, [inventoryEmptyBeans, showEmptyBeans, filterBeansBySearch]);
+  const inventoryEmptyBeans = React.useMemo(
+    () => inventoryEmptyRecords.map(record => record.bean),
+    [inventoryEmptyRecords]
+  );
+
+  const searchFilteredRecords = React.useMemo(() => {
+    if (!isSearching) {
+      return inventoryFilteredRecords;
+    }
+
+    return searchBeanRecords(inventoryFilteredRecords, deferredSearchQuery);
+  }, [deferredSearchQuery, inventoryFilteredRecords, isSearching]);
+
+  const searchFilteredEmptyRecords = React.useMemo(() => {
+    if (!showEmptyBeans) {
+      return [];
+    }
+
+    if (!isSearching) {
+      return inventoryEmptyRecords;
+    }
+
+    return searchBeanRecords(inventoryEmptyRecords, deferredSearchQuery);
+  }, [
+    deferredSearchQuery,
+    inventoryEmptyRecords,
+    isSearching,
+    showEmptyBeans,
+  ]);
+
+  const searchFilteredBeans = React.useMemo(
+    () => searchFilteredRecords.map(record => record.bean),
+    [searchFilteredRecords]
+  );
+
+  const searchFilteredEmptyBeans = React.useMemo(
+    () => searchFilteredEmptyRecords.map(record => record.bean),
+    [searchFilteredEmptyRecords]
+  );
 
   // 基于搜索结果的类型统计（搜索时使用搜索过滤后的数据）
-  const searchAwareTypeStats = React.useMemo(() => {
-    const beansToCount = isSearching
-      ? searchFilteredBeans
-      : inventoryFilteredBeans;
-
-    const espressoBeans = beansToCount.filter(
-      bean => bean.beanType === 'espresso'
-    );
-    const filterBeans = beansToCount.filter(bean => bean.beanType === 'filter');
-    const omniBeans = beansToCount.filter(bean => bean.beanType === 'omni');
-
-    return {
-      espressoCount: espressoBeans.length,
-      filterCount: filterBeans.length,
-      omniCount: omniBeans.length,
-      espressoRemaining: espressoBeans.reduce(
-        (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-        0
+  const searchAwareTypeStats = React.useMemo(
+    () =>
+      summarizeBeanTypeStats(
+        (isSearching ? searchFilteredBeans : inventoryFilteredBeans) || []
       ),
-      filterRemaining: filterBeans.reduce(
-        (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-        0
-      ),
-      omniRemaining: omniBeans.reduce(
-        (sum, bean) => sum + parseFloat(bean.remaining || '0'),
-        0
-      ),
-    };
-  }, [isSearching, searchFilteredBeans, inventoryFilteredBeans]);
+    [isSearching, searchFilteredBeans, inventoryFilteredBeans]
+  );
 
   // 基于搜索结果的预计杯数
   const searchAwareEstimatedCupsLabel = React.useMemo(() => {

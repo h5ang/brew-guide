@@ -9,6 +9,7 @@ import '@/styles/base/globals.css';
 import KeyboardManager from '@/components/layout/KeyboardManager';
 import { Suspense } from 'react';
 import CapacitorInit from '@/providers/CapacitorProvider';
+import CrashDiagnosticsProvider from '@/providers/CrashDiagnosticsProvider';
 import StorageInit from '@/providers/StorageProvider';
 import ModalHistoryInit from '@/providers/ModalHistoryProvider';
 import { DataLayerProvider } from '@/providers/DataLayerProvider';
@@ -320,6 +321,7 @@ export default function RootLayout({
             <DevTools />
             <div className="h-dvh overflow-hidden bg-neutral-50 dark:bg-neutral-900">
               <Suspense>
+                <CrashDiagnosticsProvider />
                 <CapacitorInit />
                 <StorageInit />
                 <ModalHistoryInit />

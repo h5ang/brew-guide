@@ -10,6 +10,7 @@ import {
   normalizeCoffeeBean,
   normalizeCoffeeBeans,
 } from '@/lib/utils/coffeeBeanUtils';
+import { recordCrashCheckpoint } from '@/lib/app/crashDiagnostics';
 
 interface CoffeeBeanStore {
   beans: CoffeeBean[];
@@ -31,6 +32,28 @@ interface CoffeeBeanStore {
   refreshBeans: () => Promise<void>;
 }
 
+const collectBeanPayloadMetrics = (beans: CoffeeBean[]) => {
+  let imageBeanCount = 0;
+  let inlineImageChars = 0;
+
+  for (const bean of beans) {
+    if (bean.image) {
+      imageBeanCount += 1;
+      inlineImageChars += bean.image.length;
+    }
+
+    if (bean.backImage) {
+      inlineImageChars += bean.backImage.length;
+    }
+  }
+
+  return {
+    beanCount: beans.length,
+    imageBeanCount,
+    inlineImageChars,
+  };
+};
+
 export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
   subscribeWithSelector((set, get) => ({
     beans: [],
@@ -44,6 +67,10 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
       set({ isLoading: true, error: null });
       try {
         const rawBeans = await db.coffeeBeans.toArray();
+        recordCrashCheckpoint(
+          'coffee-beans:raw-loaded',
+          collectBeanPayloadMetrics(rawBeans as CoffeeBean[])
+        );
         const beans = normalizeCoffeeBeans(rawBeans, {
           ensureFlavorArray: true,
         });
@@ -55,6 +82,10 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
           await db.coffeeBeans.bulkPut(repairedBeans);
         }
 
+        recordCrashCheckpoint('coffee-beans:normalized', {
+          beanCount: beans.length,
+          repairedBeanCount: repairedBeans.length,
+        });
         set({ beans, isLoading: false, initialized: true });
       } catch (error) {
         console.error('[CoffeeBeanStore] loadBeans failed:', error);

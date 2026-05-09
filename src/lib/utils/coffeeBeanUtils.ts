@@ -500,6 +500,24 @@ export function normalizeCoffeeBean<
   if (!hasRoasterField && !hasNameField && !shouldNormalizeFlavor) {
     return bean;
   }
+  const normalizedName = hasNameField
+    ? normalizeCoffeeBeanName(bean.name)
+    : undefined;
+  const normalizedRoaster = hasRoasterField
+    ? normalizeCoffeeBeanRoaster(bean.roaster) || undefined
+    : undefined;
+  const normalizedFlavor = shouldNormalizeFlavor
+    ? normalizeFlavorList(bean.flavor)
+    : undefined;
+
+  const nameChanged = hasNameField && normalizedName !== bean.name;
+  const roasterChanged = hasRoasterField && normalizedRoaster !== bean.roaster;
+  const flavorChanged =
+    shouldNormalizeFlavor && hasInvalidFlavorValue(bean.flavor);
+
+  if (!nameChanged && !roasterChanged && !flavorChanged) {
+    return bean;
+  }
 
   const normalizedBean = {
     ...bean,
@@ -510,16 +528,15 @@ export function normalizeCoffeeBean<
   };
 
   if (hasNameField) {
-    normalizedBean.name = normalizeCoffeeBeanName(bean.name);
+    normalizedBean.name = normalizedName;
   }
 
   if (hasRoasterField) {
-    normalizedBean.roaster =
-      normalizeCoffeeBeanRoaster(bean.roaster) || undefined;
+    normalizedBean.roaster = normalizedRoaster;
   }
 
   if (shouldNormalizeFlavor) {
-    normalizedBean.flavor = normalizeFlavorList(bean.flavor);
+    normalizedBean.flavor = normalizedFlavor;
   }
 
   return normalizedBean;

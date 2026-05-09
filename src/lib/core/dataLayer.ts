@@ -14,6 +14,7 @@ import { useCustomMethodStore } from '@/lib/stores/customMethodStore';
 import { useEquipmentStore } from '@/lib/stores/equipmentStore';
 import { useGrinderStore } from '@/lib/stores/grinderStore';
 import { useYearlyReportStore } from '@/lib/stores/yearlyReportStore';
+import { recordCrashCheckpoint } from '@/lib/app/crashDiagnostics';
 import { migrateRoasterField } from '@/lib/utils/roasterMigration';
 
 /**
@@ -53,14 +54,17 @@ export async function initializeDataLayer(): Promise<void> {
   try {
     // 1. 初始化数据库
     console.log('📦 Step 1: 初始化数据库...');
+    recordCrashCheckpoint('data-layer:db:init');
     await dbUtils.initialize();
 
     // 2. 迁移旧数据
     console.log('📦 Step 2: 迁移旧数据...');
+    recordCrashCheckpoint('data-layer:db:migrate');
     await dbUtils.migrateFromLocalStorage();
 
     // 3. 并行初始化所有 Store
     console.log('📦 Step 3: 初始化 Stores...');
+    recordCrashCheckpoint('data-layer:stores:init');
     await Promise.all([
       useSettingsStore.getState().loadSettings(),
       useCoffeeBeanStore.getState().loadBeans(),
@@ -72,10 +76,12 @@ export async function initializeDataLayer(): Promise<void> {
     ]);
 
     // 4. 同步初始化 UI 状态 Store（不需要 await，不涉及异步操作）
+    recordCrashCheckpoint('data-layer:ui-store:init');
     useEquipmentStore.getState().initialize();
 
     // 5. 执行烘焙商字段迁移（如果尚未完成）
     console.log('📦 Step 4: 检查烘焙商字段迁移...');
+    recordCrashCheckpoint('data-layer:roaster-migrate');
     await migrateRoasterField();
 
     initState.isInitialized = true;

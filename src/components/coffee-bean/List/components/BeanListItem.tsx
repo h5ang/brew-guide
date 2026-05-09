@@ -391,13 +391,13 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
                 if (onToggleSelect) onToggleSelect(bean.id);
               }}
               onClick={e => e.stopPropagation()}
-              className="relative h-4 w-4 appearance-none rounded border border-neutral-300 text-xs checked:bg-neutral-800 checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:text-white checked:after:content-['✓'] dark:border-neutral-700 dark:checked:bg-neutral-200 dark:checked:after:text-black"
+              className="relative size-4 appearance-none rounded border border-neutral-300 text-xs checked:bg-neutral-800 checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:text-white checked:after:content-['✓'] dark:border-neutral-700 dark:checked:bg-neutral-200 dark:checked:after:text-black"
             />
           </div>
         )}
         <div className="relative self-start">
           <div
-            className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded border border-neutral-200/50 bg-neutral-100 dark:border-neutral-800/50 dark:bg-neutral-800/20"
+            className="relative size-14 shrink-0 cursor-pointer overflow-hidden rounded border border-neutral-200/50 bg-neutral-100 dark:border-neutral-800/50 dark:bg-neutral-800/20"
             onClick={() => {
               if ((bean.image || roasterLogo) && !imageError) {
                 openImageViewer({
@@ -421,8 +421,7 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
                 style={{ width: '100%', height: '100%' }}
                 className="object-cover"
                 sizes="48px"
-                priority={true}
-                loading="eager"
+                loading="lazy"
                 onError={() => setImageError(true)}
                 placeholder="blur"
                 blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
@@ -438,8 +437,7 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
                 style={{ width: '100%', height: '100%' }}
                 className="object-cover"
                 sizes="48px"
-                priority={true}
-                loading="eager"
+                loading="lazy"
                 onError={() => setImageError(true)}
               />
             ) : (

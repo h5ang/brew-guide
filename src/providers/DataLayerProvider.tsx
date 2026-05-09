@@ -18,6 +18,11 @@ import {
   initializeDataLayer,
   getInitializationState,
 } from '@/lib/core/dataLayer';
+import {
+  markCrashDiagnosticsReady,
+  recordCrashCheckpoint,
+  recordCrashError,
+} from '@/lib/app/crashDiagnostics';
 
 interface DataLayerContextValue {
   isInitialized: boolean;
@@ -51,10 +56,14 @@ export function DataLayerProvider({ children }: DataLayerProviderProps) {
 
     async function init() {
       try {
+        recordCrashCheckpoint('data-layer-provider:init:start');
         await initializeDataLayer();
 
         if (mounted) {
           const initState = getInitializationState();
+          markCrashDiagnosticsReady({
+            initialized: initState.isInitialized,
+          });
           setState({
             isInitialized: initState.isInitialized,
             isInitializing: false,
@@ -63,6 +72,7 @@ export function DataLayerProvider({ children }: DataLayerProviderProps) {
         }
       } catch (error) {
         console.error('数据层初始化失败:', error);
+        recordCrashError(error, 'data-layer-provider:init');
         if (mounted) {
           setState({
             isInitialized: false,
