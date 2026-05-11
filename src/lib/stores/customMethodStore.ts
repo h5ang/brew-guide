@@ -18,6 +18,7 @@ import {
   autoMigrateStages,
 } from '@/lib/brewing/stageMigration';
 import { exportJsonFile } from '@/lib/utils/jsonExport';
+import { methodToReadableText } from '@/lib/utils/jsonUtils';
 
 /**
  * 方案数据结构
@@ -596,11 +597,10 @@ export async function copyMethodToEquipment(
  * 生成冲煮方案的可读文本
  * 用于复制分享，UI 层使用 useCopy hook 处理实际复制逻辑
  */
-export async function generateMethodShareText(
+export function generateMethodShareText(
   method: Method,
   customEquipment?: CustomEquipment
-): Promise<string> {
-  const { methodToReadableText } = await import('@/lib/utils/jsonUtils');
+): string {
   return methodToReadableText(method, customEquipment);
 }
 

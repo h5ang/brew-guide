@@ -30,6 +30,7 @@ import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { useCopy } from '@/lib/hooks/useCopy';
 import { useInputFocus } from '@/lib/hooks/useInputFocus';
 import CopyFailureDrawer from '@/components/common/feedback/CopyFailureDrawer';
+import { methodToReadableText } from '@/lib/utils/jsonUtils';
 
 import { Search, X, Shuffle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -558,12 +559,7 @@ const TabContent: React.FC<TabContentProps> = ({
   // 简化的分享处理函数 - 使用统一的 useCopy hook
   const handleShareMethod = useCallback(
     async (method: Method) => {
-      const { generateMethodShareText } =
-        await import('@/lib/stores/customMethodStore');
-      const text = await generateMethodShareText(
-        method,
-        getSelectedCustomEquipment()
-      );
+      const text = methodToReadableText(method, getSelectedCustomEquipment());
       await copyText(text);
     },
     [getSelectedCustomEquipment, copyText]
