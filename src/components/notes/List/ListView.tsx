@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { BrewingNote } from '@/lib/core/config';
+import type { CoffeeBean } from '@/types/app';
 import NoteItem from './NoteItem';
 import NoteItemStandard from './NoteItemStandard';
 import ChangeRecordNoteItem from './ChangeRecordNoteItem';
@@ -16,6 +17,11 @@ import {
   resolveNoteBean,
   resolveNoteEquipmentName,
 } from '@/lib/notes/noteDisplay';
+
+const EMPTY_NOTES: BrewingNote[] = [];
+const EMPTY_SELECTED_NOTES: string[] = [];
+const EMPTY_EQUIPMENT_NAMES: Record<string, string> = {};
+const EMPTY_COFFEE_BEANS: CoffeeBean[] = [];
 
 // 定义组件属性接口
 interface NotesListViewProps {
@@ -37,7 +43,7 @@ interface NotesListViewProps {
   // 设备名称映射
   equipmentNames?: Record<string, string>;
   // 咖啡豆列表
-  coffeeBeans?: import('@/types/app').CoffeeBean[];
+  coffeeBeans?: CoffeeBean[];
   // 设置
   settings?: SettingsOptions;
 }
@@ -49,7 +55,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
   onDeleteNote,
   onCopyNote,
   isShareMode = false,
-  selectedNotes = [],
+  selectedNotes = EMPTY_SELECTED_NOTES,
   onToggleSelect,
   searchQuery = '',
   isSearching = false,
@@ -57,26 +63,17 @@ const NotesListView: React.FC<NotesListViewProps> = ({
   viewMode = 'list',
   isDateImageFlowMode = false,
   scrollParentRef,
-  equipmentNames = {},
-  coffeeBeans = [],
+  equipmentNames = EMPTY_EQUIPMENT_NAMES,
+  coffeeBeans = EMPTY_COFFEE_BEANS,
   settings,
 }) => {
-  const [showQuickDecrementNotes, setShowQuickDecrementNotes] = useState(
-    settings?.defaultExpandChangeLog ?? false
-  );
-
-  // 监听设置变化，更新展开状态
-  React.useEffect(() => {
-    if (settings?.defaultExpandChangeLog !== undefined) {
-      setShowQuickDecrementNotes(settings.defaultExpandChangeLog);
-    }
-  }, [settings?.defaultExpandChangeLog]);
+  const [showQuickDecrementNotes, setShowQuickDecrementNotes] = useState(false);
 
   // 使用评分维度hook - 在父组件中调用一次，然后传递给所有子组件
   const { getValidTasteRatings } = useFlavorDimensions();
 
   // 🔥 直接使用 preFilteredNotes，不需要内部 state
-  const notes = preFilteredNotes || [];
+  const notes = preFilteredNotes || EMPTY_NOTES;
   const coffeeBeanLookup = useMemo(
     () => buildCoffeeBeanLookup(coffeeBeans),
     [coffeeBeans]
@@ -148,6 +145,29 @@ const NotesListView: React.FC<NotesListViewProps> = ({
     setShowQuickDecrementNotes(prev => !prev);
   }, []);
 
+  const renderChangeRecordNote = useCallback(
+    (note: BrewingNote) => (
+      <ChangeRecordNoteItem
+        key={note.id}
+        note={note}
+        onEdit={onNoteClick}
+        onDelete={onDeleteNote}
+        onCopy={onCopyNote}
+        isShareMode={isShareMode}
+        isSelected={selectedNotes.includes(note.id)}
+        onToggleSelect={handleToggleSelect}
+      />
+    ),
+    [
+      handleToggleSelect,
+      isShareMode,
+      onCopyNote,
+      onDeleteNote,
+      onNoteClick,
+      selectedNotes,
+    ]
+  );
+
   const handleImageFlowNoteClick = useCallback(
     (note: BrewingNote) => {
       const equipmentName = resolveNoteEquipmentName(note, equipmentNames);
@@ -216,6 +236,14 @@ const NotesListView: React.FC<NotesListViewProps> = ({
     ? NoteItemStandard
     : NoteItem;
 
+  if (regularNotes.length === 0 && changeRecordNotes.length > 0) {
+    return (
+      <div className="pb-20 opacity-80">
+        {changeRecordNotes.map(renderChangeRecordNote)}
+      </div>
+    );
+  }
+
   return (
     <div className="pb-20">
       <Virtuoso
@@ -229,12 +257,14 @@ const NotesListView: React.FC<NotesListViewProps> = ({
             <div className="mt-2">
               {changeRecordNotes.length > 0 && (
                 <>
-                  <div
-                    className="relative mb-2 flex cursor-pointer items-center"
+                  <button
+                    type="button"
+                    className="relative mb-2 flex w-full cursor-pointer items-center border-0 bg-transparent p-0"
                     onClick={toggleShowQuickDecrementNotes}
+                    aria-expanded={showQuickDecrementNotes}
                   >
                     <div className="grow border-t border-neutral-200/50 dark:border-neutral-800/50"></div>
-                    <button className="mx-3 flex items-center justify-center rounded-sm px-2 py-0.5 text-xs font-medium tracking-wide text-neutral-600 transition-colors dark:text-neutral-400">
+                    <span className="mx-3 flex items-center justify-center rounded-sm px-2 py-0.5 text-xs font-medium tracking-wide text-neutral-600 transition-colors dark:text-neutral-400">
                       {changeRecordNotes.length}条变动记录
                       <svg
                         className={`ml-1 h-3 w-3 transition-transform duration-200 ${showQuickDecrementNotes ? 'rotate-180' : ''}`}
@@ -250,23 +280,12 @@ const NotesListView: React.FC<NotesListViewProps> = ({
                           strokeLinejoin="round"
                         />
                       </svg>
-                    </button>
+                    </span>
                     <div className="grow border-t border-neutral-200/50 dark:border-neutral-800/50"></div>
-                  </div>
+                  </button>
                   {showQuickDecrementNotes && (
                     <div className="opacity-80">
-                      {changeRecordNotes.map(note => (
-                        <ChangeRecordNoteItem
-                          key={note.id}
-                          note={note}
-                          onEdit={onNoteClick}
-                          onDelete={onDeleteNote}
-                          onCopy={onCopyNote}
-                          isShareMode={isShareMode}
-                          isSelected={selectedNotes.includes(note.id)}
-                          onToggleSelect={handleToggleSelect}
-                        />
-                      ))}
+                      {changeRecordNotes.map(renderChangeRecordNote)}
                     </div>
                   )}
                 </>

@@ -146,7 +146,6 @@ export const defaultSettings: AppSettings = {
   showGrinderScale: true,
 
   // 笔记设置
-  defaultExpandChangeLog: false,
   showFlavorRatingInForm: true,
   showOverallRatingInForm: true,
   flavorRatingFollowOverall: false,
