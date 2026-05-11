@@ -41,10 +41,11 @@ const MOCK_BEAN_DATA = {
 
 interface BeanImportModalProps {
   showForm: boolean;
-  onImport: (jsonData: string) => Promise<void>;
+  onImport: (
+    jsonData: string,
+    options?: { recognitionImage?: string }
+  ) => Promise<void>;
   onClose: () => void;
-  /** 识别图片成功后回调，传递原始图片的 base64 */
-  onRecognitionImage?: (imageBase64: string) => void;
   /** 设置项，用于控制是否自动填充识图图片 */
   settings?: SettingsOptions;
 }
@@ -135,7 +136,6 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
   showForm,
   onImport,
   onClose,
-  onRecognitionImage,
   settings,
 }) => {
   // 统一的复制功能
@@ -247,7 +247,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
 
   // 处理添加数据（通用）
   const handleImportData = useCallback(
-    async (data: unknown) => {
+    async (data: unknown, options?: { recognitionImage?: string }) => {
       try {
         const isArray = Array.isArray(data);
         const dataArray = isArray ? data : [data];
@@ -276,7 +276,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
           timestamp: Date.now(),
         }));
 
-        await onImport(JSON.stringify(processedBeans));
+        await onImport(JSON.stringify(processedBeans), options);
         onClose();
       } catch (error) {
         const errorMessage =
@@ -415,7 +415,9 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
             !Array.isArray(beanData) ||
             (Array.isArray(beanData) && beanData.length === 1);
 
-          if (isSingleBean && onRecognitionImage) {
+          let recognitionImage: string | undefined;
+
+          if (isSingleBean) {
             await new Promise<void>(resolve => {
               const reader = new FileReader();
               reader.onload = async () => {
@@ -429,9 +431,9 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
                       maxWidthOrHeight: 1200,
                       initialQuality: 0.8,
                     });
-                    onRecognitionImage(compressedBase64);
+                    recognitionImage = compressedBase64;
                   } catch (_error) {
-                    onRecognitionImage(base64);
+                    recognitionImage = base64;
                   }
                 }
                 resolve();
@@ -446,7 +448,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
           setRecognizingImageUrl(null);
           setCurrentStep('main');
 
-          await handleImportData(beanData);
+          await handleImportData(beanData, { recognitionImage });
         } catch (error) {
           showToast({
             type: 'error',
@@ -474,7 +476,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
         fileInputRef.current.value = '';
       }
     },
-    [handleImportData, onRecognitionImage, recognizeSingleImage]
+    [handleImportData, recognizeSingleImage]
   );
 
   // 删除预览中的图片

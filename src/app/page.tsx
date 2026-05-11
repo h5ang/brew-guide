@@ -381,6 +381,9 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
   >('roasted');
   // 识别时使用的原始图片 base64（用于在表单中显示）
   const [recognitionImage, setRecognitionImage] = useState<string | null>(null);
+  const [recognitionImageBeanId, setRecognitionImageBeanId] = useState<
+    string | null
+  >(null);
 
   // 咖啡豆详情状态
   const [beanDetailOpen, setBeanDetailOpen] = useState(false);
@@ -1791,10 +1794,12 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       setAlternativeHeaderContent(null);
 
       // 使用setTimeout确保状态更新完成后再跳转
-      setTimeout(() => {
+      const navigationTimer = window.setTimeout(() => {
         navigateToStep('notes', { force: true });
         setHasAutoNavigatedToNotes(true);
       }, 0);
+
+      return () => window.clearTimeout(navigationTimer);
     }
   }, [
     showComplete,
@@ -1835,7 +1840,10 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     }
   };
 
-  const handleImportBean = async (jsonData: string) => {
+  const handleImportBean = async (
+    jsonData: string,
+    options?: { recognitionImage?: string }
+  ) => {
     try {
       // 尝试从文本中提取数据
       const extractedData = await import('@/lib/utils/jsonUtils').then(
@@ -1870,6 +1878,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
 
       let importCount = 0;
       let lastImportedBean: ExtendedCoffeeBean | null = null;
+      const pendingRecognitionImage = options?.recognitionImage || null;
 
       // 动态导入 coffeeBeanStore
       const { getCoffeeBeanStore } =
@@ -2041,10 +2050,17 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       handleMainTabClick('咖啡豆');
 
       if (importCount === 1 && lastImportedBean) {
+        setRecognitionImage(pendingRecognitionImage);
+        setRecognitionImageBeanId(
+          pendingRecognitionImage ? lastImportedBean.id : null
+        );
         setTimeout(() => {
           setEditingBean(lastImportedBean);
           setShowBeanForm(true);
         }, 300);
+      } else {
+        setRecognitionImage(null);
+        setRecognitionImageBeanId(null);
       }
     } catch (error) {
       // 导入失败
@@ -2263,6 +2279,8 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
 
       setShowBeanForm(false);
       setEditingBean(null);
+      setRecognitionImage(null);
+      setRecognitionImageBeanId(null);
 
       window.dispatchEvent(
         new CustomEvent('coffeeBeanDataChanged', {
@@ -3226,10 +3244,14 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     ) => {
       const beanState = event.detail?.beanState || 'roasted';
       setImportingBeanState(beanState);
+      setRecognitionImage(null);
+      setRecognitionImageBeanId(null);
       setShowImportBeanForm(true);
     };
 
     const handleBeanImportClosing = () => {
+      setRecognitionImage(null);
+      setRecognitionImageBeanId(null);
       setShowImportBeanForm(false);
     };
 
@@ -4254,6 +4276,8 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         setRoastingSourceBeanId={setRoastingSourceBeanId}
         recognitionImage={recognitionImage}
         setRecognitionImage={setRecognitionImage}
+        recognitionImageBeanId={recognitionImageBeanId}
+        setRecognitionImageBeanId={setRecognitionImageBeanId}
         handleSaveBean={handleSaveBean}
         handleBeanListChange={handleBeanListChange}
         // 咖啡豆详情（非大屏幕）
