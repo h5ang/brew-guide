@@ -1132,7 +1132,7 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
             stage.label = pourTypeName;
           }
           // 确保有 duration 字段，萃取模式需要
-          if (!stage.duration) {
+          if (typeof stage.duration !== 'number') {
             stage.duration = 25;
           }
           break;
@@ -1466,15 +1466,21 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
       return Number.isInteger(duration) && duration >= 0;
     };
 
+    const hasStageDuration = (duration: number | undefined): boolean => {
+      return typeof duration === 'number';
+    };
+
     // 验证 water 是否为非负整数（非等待步骤）
     const isValidWater = (
-      water: string | undefined,
+      water: string | number | undefined,
       pourType: string | undefined
     ): boolean => {
       // 等待步骤不需要水量
       if (pourType === 'wait') return true;
-      if (!water || !water.trim()) return false;
-      const waterValue = parseInt(water.replace('g', '') || '0');
+      if (water === undefined || water === null || water === '') return false;
+      const waterText = String(water).trim();
+      if (!waterText) return false;
+      const waterValue = parseInt(waterText.replace('g', '') || '0');
       return Number.isInteger(waterValue) && waterValue >= 0;
     };
 
@@ -1503,8 +1509,8 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
               switch (stage.pourType) {
                 case 'extraction': // 萃取类型 - 需要 duration 和 water
                   return (
+                    hasStageDuration(stage.duration) &&
                     isValidDuration(stage.duration) &&
-                    (stage.duration ?? 0) > 0 &&
                     !!stage.label.trim() &&
                     isValidWater(stage.water, stage.pourType)
                   );
@@ -1525,13 +1531,14 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
               // 等待类型只需要 duration
               if (stage.pourType === 'wait') {
                 return (
-                  isValidDuration(stage.duration) && (stage.duration ?? 0) > 0
+                  hasStageDuration(stage.duration) &&
+                  isValidDuration(stage.duration)
                 );
               }
 
               const basicValidation =
+                hasStageDuration(stage.duration) &&
                 isValidDuration(stage.duration) &&
-                (stage.duration ?? 0) > 0 &&
                 isValidWater(stage.water, stage.pourType);
 
               // 聪明杯验证阀门状态
@@ -1549,7 +1556,8 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
             // 等待类型特殊验证（只需要 duration）
             if (stage.pourType === 'wait') {
               return (
-                isValidDuration(stage.duration) && (stage.duration ?? 0) > 0
+                hasStageDuration(stage.duration) &&
+                isValidDuration(stage.duration)
               );
             }
 
@@ -1564,8 +1572,8 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
 
             // 标准器具验证
             const basicValidation =
+              hasStageDuration(stage.duration) &&
               isValidDuration(stage.duration) &&
-              (stage.duration ?? 0) > 0 &&
               !!stage.label.trim() &&
               isValidWater(stage.water, stage.pourType) &&
               !!stage.pourType;
@@ -1620,8 +1628,8 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
               switch (stage.pourType) {
                 case 'extraction':
                   if (
-                    !isValidDuration(stage.duration) ||
-                    (stage.duration ?? 0) <= 0
+                    !hasStageDuration(stage.duration) ||
+                    !isValidDuration(stage.duration)
                   )
                     return `步骤${stageNum}：请输入萃取时间`;
                   if (!stage.label.trim())
@@ -1643,15 +1651,15 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
             if (isCustomPreset) {
               if (stage.pourType === 'wait') {
                 if (
-                  !isValidDuration(stage.duration) ||
-                  (stage.duration ?? 0) <= 0
+                  !hasStageDuration(stage.duration) ||
+                  !isValidDuration(stage.duration)
                 )
                   return `步骤${stageNum}：请输入等待时间`;
                 continue;
               }
               if (
-                !isValidDuration(stage.duration) ||
-                (stage.duration ?? 0) <= 0
+                !hasStageDuration(stage.duration) ||
+                !isValidDuration(stage.duration)
               )
                 return `步骤${stageNum}：请输入阶段用时`;
               if (!isValidWater(stage.water, stage.pourType))
@@ -1668,8 +1676,8 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
             // 等待类型
             if (stage.pourType === 'wait') {
               if (
-                !isValidDuration(stage.duration) ||
-                (stage.duration ?? 0) <= 0
+                !hasStageDuration(stage.duration) ||
+                !isValidDuration(stage.duration)
               )
                 return `步骤${stageNum}：请输入等待时间`;
               continue;
@@ -1684,7 +1692,10 @@ const CustomMethodForm: React.FC<CustomMethodFormProps> = ({
             }
 
             // 标准器具验证
-            if (!isValidDuration(stage.duration) || (stage.duration ?? 0) <= 0)
+            if (
+              !hasStageDuration(stage.duration) ||
+              !isValidDuration(stage.duration)
+            )
               return `步骤${stageNum}：请输入阶段用时`;
             if (!stage.label.trim()) return `步骤${stageNum}：请输入步骤名称`;
             if (!isValidWater(stage.water, stage.pourType))

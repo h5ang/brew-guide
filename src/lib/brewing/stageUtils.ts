@@ -119,8 +119,7 @@ export function buildStageTimelineData(stages: Stage[]): StageTimelineData[] {
   let pourStageCount = 0;
 
   stages.forEach((stage, index) => {
-    const hasDuration =
-      typeof stage.duration === 'number' && stage.duration > 0;
+    const hasDuration = hasConfiguredDuration(stage);
     const isWait = stage.pourType === 'wait';
     const isTimeless = !isTimedStage(stage);
 
@@ -129,9 +128,7 @@ export function buildStageTimelineData(stages: Stage[]): StageTimelineData[] {
       const duration = stage.duration || 0;
       const endTime = hasDuration ? currentTime + duration : null;
 
-      if (hasDuration) {
-        currentTime += duration;
-      }
+      currentTime += duration;
 
       result.push({
         originalIndex: index,
@@ -176,9 +173,7 @@ export function buildStageTimelineData(stages: Stage[]): StageTimelineData[] {
     const duration = stage.duration || 0;
     const endTime = hasDuration ? currentTime + duration : null;
 
-    if (hasDuration) {
-      currentTime += duration;
-    }
+    currentTime += duration;
 
     result.push({
       originalIndex: index,

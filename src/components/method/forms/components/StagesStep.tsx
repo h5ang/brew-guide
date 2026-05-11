@@ -363,19 +363,20 @@ const StagesStep: React.FC<StagesStepProps> = ({
   const getWaterDisplayValue = (stage: Stage, index: number) => {
     if (editingWater && editingWater.index === index) return editingWater.value;
     // 如果没有设置水量，显示空（不预设）
-    if (!stage.water) return '';
+    if (stage.water === undefined || stage.water === null || stage.water === '')
+      return '';
     const independentValue =
       typeof stage.water === 'number'
         ? stage.water
         : parseInt((stage.water as string).replace('g', '') || '0');
     if (useCumulativeMode) {
-      return String(cumulativeData[index]?.cumulativeWater || independentValue);
+      return String(cumulativeData[index]?.cumulativeWater ?? independentValue);
     }
     return String(independentValue);
   };
 
   const formatDurationDisplay = (seconds: number): string => {
-    if (!seconds) return '';
+    if (!Number.isFinite(seconds)) return '';
     if (seconds >= 60) {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
@@ -466,8 +467,9 @@ const StagesStep: React.FC<StagesStepProps> = ({
       return editingWater.value;
     }
     // 如果当前阶段没有设置水量，显示空（不预设）
-    if (!stage.water) return '';
-    return String(timeData.cumulativeWater || 0);
+    if (stage.water === undefined || stage.water === null || stage.water === '')
+      return '';
+    return String(timeData.cumulativeWater);
   };
 
   // 时间模式：处理水量变更
@@ -557,19 +559,19 @@ const StagesStep: React.FC<StagesStepProps> = ({
     if (editingDuration && editingDuration.index === index)
       return editingDuration.value;
     // 如果没有设置时长，显示空（不预设）
-    if (!stage.duration) return '';
+    if (typeof stage.duration !== 'number') return '';
     const seconds = useCumulativeMode
       ? cumulativeData[index]?.cumulativeDuration || 0
-      : stage.duration || 0;
+      : stage.duration;
     return formatDurationDisplay(seconds);
   };
 
   const getDurationSeconds = (stage: Stage, index: number): number => {
     // 如果没有设置时长，返回 0
-    if (!stage.duration) return 0;
+    if (typeof stage.duration !== 'number') return 0;
     return useCumulativeMode
       ? cumulativeData[index]?.cumulativeDuration || 0
-      : stage.duration || 0;
+      : stage.duration;
   };
 
   const handleDurationChange = (index: number, value: string) => {
@@ -1179,7 +1181,8 @@ const StagesStep: React.FC<StagesStepProps> = ({
                       >
                         {(() => {
                           const seconds = getDurationSeconds(stage, index);
-                          const hasDuration = !!stage.duration; // 当前步骤是否有设置时长
+                          const hasDuration =
+                            typeof stage.duration === 'number'; // 当前步骤是否有设置时长
                           // 累计模式：如果前面累计已>=60秒，当前也显示分钟格式
                           const cumulativeSecs = useCumulativeMode
                             ? cumulativeData[index]?.cumulativeDuration || 0
