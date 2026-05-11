@@ -16,6 +16,11 @@ import { useGrinderStore } from '@/lib/stores/grinderStore';
 import { useYearlyReportStore } from '@/lib/stores/yearlyReportStore';
 import { recordCrashCheckpoint } from '@/lib/app/crashDiagnostics';
 import { migrateRoasterField } from '@/lib/utils/roasterMigration';
+import {
+  exportCoffeeBeansWithImages,
+  replaceCoffeeBeansWithSplitImages,
+} from '@/lib/coffee-beans/imageRepository';
+import { stripCoffeeBeanImages } from '@/lib/coffee-beans/imageRecords';
 
 /**
  * 初始化状态
@@ -61,6 +66,7 @@ export async function initializeDataLayer(): Promise<void> {
     console.log('📦 Step 2: 迁移旧数据...');
     recordCrashCheckpoint('data-layer:db:migrate');
     await dbUtils.migrateFromLocalStorage();
+    await dbUtils.migrateCoffeeBeanImages();
 
     // 3. 并行初始化所有 Store
     console.log('📦 Step 3: 初始化 Stores...');
@@ -157,7 +163,7 @@ export async function exportAllData(): Promise<{
 
   return {
     settings: useSettingsStore.getState().settings,
-    coffeeBeans: useCoffeeBeanStore.getState().beans,
+    coffeeBeans: await exportCoffeeBeansWithImages(),
     brewingNotes: useBrewingNoteStore.getState().notes,
     customEquipments: useCustomEquipmentStore.getState().equipments,
     customMethods: useCustomMethodStore.getState().methodsByEquipment,
@@ -193,9 +199,10 @@ export async function importAllData(data: {
   if (data.coffeeBeans) {
     tasks.push(
       (async () => {
-        for (const bean of data.coffeeBeans!) {
-          await useCoffeeBeanStore.getState().upsertBean(bean);
-        }
+        await replaceCoffeeBeansWithSplitImages(data.coffeeBeans!);
+        useCoffeeBeanStore.setState({
+          beans: data.coffeeBeans!.map(stripCoffeeBeanImages),
+        });
       })()
     );
   }

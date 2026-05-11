@@ -13,6 +13,10 @@ import {
   getSettingsStore,
 } from '@/lib/stores/settingsStore';
 import { normalizeCoffeeBeans } from '@/lib/utils/coffeeBeanUtils';
+import {
+  exportCoffeeBeansWithImages,
+  replaceCoffeeBeansWithSplitImages,
+} from '@/lib/coffee-beans/imageRepository';
 
 // 检查是否在浏览器环境中
 const isBrowser = typeof window !== 'undefined';
@@ -145,7 +149,7 @@ export const DataManager = {
 
         // 特殊处理 coffeeBeans - 从 IndexedDB 获取
         if (key === 'coffeeBeans') {
-          exportData.data[key] = await db.coffeeBeans.toArray();
+          exportData.data[key] = await exportCoffeeBeansWithImages();
           continue;
         }
 
@@ -277,7 +281,9 @@ export const DataManager = {
     } catch (error) {
       console.error('导出数据失败:', error);
       throw new Error(
-        error instanceof Error ? `导出数据失败: ${error.message}` : '导出数据失败'
+        error instanceof Error
+          ? `导出数据失败: ${error.message}`
+          : '导出数据失败'
       );
     }
   },
@@ -312,8 +318,7 @@ export const DataManager = {
             await db.customEquipments.bulkPut(data as CustomEquipment[]);
             break;
           case 'coffeeBeans':
-            await db.coffeeBeans.clear();
-            await db.coffeeBeans.bulkPut(
+            await replaceCoffeeBeansWithSplitImages(
               normalizeCoffeeBeans(data as _CoffeeBean[], {
                 ensureFlavorArray: true,
               })
@@ -609,6 +614,7 @@ export const DataManager = {
       // 清除所有 IndexedDB 数据
       await db.brewingNotes.clear();
       await db.coffeeBeans.clear();
+      await db.coffeeBeanImages.clear();
       await db.customEquipments.clear();
       await db.customMethods.clear();
       await db.grinders.clear();
@@ -950,8 +956,7 @@ export const DataManager = {
 
         // 同时更新IndexedDB
         try {
-          await db.coffeeBeans.clear();
-          await db.coffeeBeans.bulkPut(migratedBeans);
+          await replaceCoffeeBeansWithSplitImages(migratedBeans);
         } catch (dbError) {
           console.error('更新IndexedDB失败:', dbError);
         }

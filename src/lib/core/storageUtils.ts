@@ -3,6 +3,10 @@ import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import type { CoffeeBean } from '@/types/app';
 import { normalizeCoffeeBeans } from '@/lib/utils/coffeeBeanUtils';
+import {
+  exportCoffeeBeansWithImages,
+  replaceCoffeeBeansWithSplitImages,
+} from '@/lib/coffee-beans/imageRepository';
 
 /**
  * 存储分类常量，用于决定不同数据的存储方式
@@ -179,7 +183,7 @@ export const StorageUtils = {
                   }
                 );
                 if (beans.length > 0) {
-                  await db.coffeeBeans.bulkPut(beans);
+                  await replaceCoffeeBeansWithSplitImages(beans);
                   // 验证迁移是否成功
                   const migratedCount = await db.coffeeBeans.count();
                   if (migratedCount === beans.length) {
@@ -358,7 +362,7 @@ export const StorageUtils = {
                   }
                 );
                 if (beans.length > 0) {
-                  await db.coffeeBeans.bulkPut(beans);
+                  await replaceCoffeeBeansWithSplitImages(beans);
                   // 验证迁移是否成功
                   const migratedCount = await db.coffeeBeans.count();
                   if (migratedCount === beans.length) {
@@ -481,25 +485,13 @@ export const StorageUtils = {
         }
       } else if (key === 'coffeeBeans') {
         try {
-          const beans = normalizeCoffeeBeans(JSON.parse(value) as CoffeeBean[], {
-            ensureFlavorArray: true,
-          });
-          // 🔥 使用事务确保咖啡豆数据的原子性操作
-          await db.transaction('rw', db.coffeeBeans, async () => {
-            const existingBeanIds = await db.coffeeBeans
-              .toCollection()
-              .primaryKeys();
-            const newBeanIds = new Set(beans.map((b: { id: string }) => b.id));
-
-            const idsToDelete = existingBeanIds.filter(
-              id => !newBeanIds.has(id as string)
-            );
-            if (idsToDelete.length > 0) {
-              await db.coffeeBeans.bulkDelete(idsToDelete as string[]);
+          const beans = normalizeCoffeeBeans(
+            JSON.parse(value) as CoffeeBean[],
+            {
+              ensureFlavorArray: true,
             }
-
-            await db.coffeeBeans.bulkPut(beans);
-          });
+          );
+          await replaceCoffeeBeansWithSplitImages(beans);
 
           // 同步触发事件，确保数据一致性
           const storageEvent = new CustomEvent('storage:changed', {
@@ -579,7 +571,7 @@ export const StorageUtils = {
       } else if (key === 'coffeeBeans') {
         try {
           const beans = normalizeCoffeeBeans(
-            await db.coffeeBeans.toArray(),
+            await exportCoffeeBeansWithImages(),
             {
               ensureFlavorArray: true,
             }
@@ -624,6 +616,7 @@ export const StorageUtils = {
         await db.brewingNotes.clear();
       } else if (key === 'coffeeBeans') {
         await db.coffeeBeans.clear();
+        await db.coffeeBeanImages.clear();
       } else {
         // 其他使用IndexedDB的键
         await db.settings.delete(key);

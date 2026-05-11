@@ -17,6 +17,7 @@ import {
 import { useModalHistory } from '@/lib/hooks/useModalHistory';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { formatBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 interface CoffeeBeanRandomPickerProps {
   beans: CoffeeBean[];
@@ -398,23 +399,10 @@ const CoffeeBeanRandomPicker: React.FC<CoffeeBeanRandomPickerProps> = ({
                             : 'border-neutral-200/50 dark:border-neutral-700'
                         }`}
                       >
-                        {bean.image ? (
-                          <div className="relative mb-2 h-16 w-full">
-                            <Image
-                              src={bean.image}
-                              alt={bean.name}
-                              fill
-                              className="object-contain"
-                              sizes="(max-width: 768px) 100vw, 160px"
-                              loading="eager"
-                              priority={index < 10} // 只对前几张图片设置优先加载
-                            />
-                          </div>
-                        ) : (
-                          <div className="mb-2 flex h-16 w-full items-center justify-center">
-                            <span className="text-2xl">☕</span>
-                          </div>
-                        )}
+                        <RandomPickerBeanImage
+                          bean={bean}
+                          priority={index < 10}
+                        />
                         <div className="w-full text-center">
                           <h3 className="text-sm font-medium">
                             {formatBeanDisplayName(bean, roasterSettings)}
@@ -489,6 +477,38 @@ const CoffeeBeanRandomPicker: React.FC<CoffeeBeanRandomPickerProps> = ({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+};
+
+const RandomPickerBeanImage: React.FC<{
+  bean: CoffeeBean;
+  priority: boolean;
+}> = ({ bean, priority }) => {
+  const imageSource = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
+
+  if (!imageSource) {
+    return (
+      <div className="mb-2 flex h-16 w-full items-center justify-center">
+        <span className="text-2xl">☕</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mb-2 h-16 w-full">
+      <Image
+        src={imageSource}
+        alt={bean.name}
+        fill
+        className="object-contain"
+        sizes="(max-width: 768px) 100vw, 160px"
+        loading="eager"
+        priority={priority}
+      />
+    </div>
   );
 };
 

@@ -10,6 +10,8 @@ import { useThemeColor } from '@/lib/hooks/useThemeColor';
 import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { useBrewingNoteStore } from '@/lib/stores/brewingNoteStore';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { useCoffeeBeanImageSources } from '@/lib/hooks/useCoffeeBeanImage';
+import type { CoffeeBean } from '@/types/app';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -56,9 +58,29 @@ const YearlyReviewDrawer: React.FC<YearlyReviewDrawerProps> = ({
   // 获取冲煮笔记数据
   const notes = useBrewingNoteStore(state => state.notes);
 
+  const beanIds = useMemo(() => beans.map(bean => bean.id), [beans]);
+  const beanImageSources = useCoffeeBeanImageSources(beanIds, {
+    preferThumbnail: true,
+  });
+  const beansForStories = useMemo<CoffeeBean[]>(
+    () =>
+      beans.map(bean => {
+        const image = beanImageSources.get(bean.id) || bean.image;
+        if (!image || image === bean.image) {
+          return bean;
+        }
+
+        return {
+          ...bean,
+          image,
+        };
+      }),
+    [beanImageSources, beans]
+  );
+
   // 提取有图片的咖啡豆图片列表（最少 5 张，不足时重复）
   const beanImages = useMemo(() => {
-    const images = beans
+    const images = beansForStories
       .filter(bean => bean.image && bean.image.trim() !== '')
       .slice(0, 5)
       .map(bean => bean.image as string);
@@ -73,7 +95,7 @@ const YearlyReviewDrawer: React.FC<YearlyReviewDrawerProps> = ({
     }
 
     return images;
-  }, [beans]);
+  }, [beansForStories]);
 
   // 计算2025年购买的咖啡豆总重量（克）
   const totalWeight = useMemo(() => {
@@ -323,7 +345,7 @@ const YearlyReviewDrawer: React.FC<YearlyReviewDrawerProps> = ({
                     onReplay={handleReplay}
                     beanImages={beanImages}
                     totalWeight={totalWeight}
-                    beans={beans}
+                    beans={beansForStories}
                     notes={notes}
                   />
                 </AnimatePresence>

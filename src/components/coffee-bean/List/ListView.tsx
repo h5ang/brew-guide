@@ -26,6 +26,7 @@ import {
   calculateFlavorInfo,
   getDefaultFlavorPeriodByRoastLevelSync,
 } from '@/lib/utils/flavorPeriodUtils';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 const LIST_VIRTUOSO_OVERSCAN = { top: 240, bottom: 480 };
 const getCoffeeBeanListItemKey = (_index: number, bean: CoffeeBean) =>
@@ -67,9 +68,13 @@ const BeanImage: React.FC<{
     () => getRoasterName(bean, roasterSettings),
     [bean, roasterSettings]
   );
+  const beanImage = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
 
   const roasterLogo = useMemo(() => {
-    if (!bean.name || bean.image) {
+    if (!bean.name || beanImage) {
       return null;
     }
 
@@ -78,23 +83,23 @@ const BeanImage: React.FC<{
     }
 
     return null;
-  }, [bean.name, bean.image, roasterName]);
+  }, [bean.name, beanImage, roasterName]);
 
-  const imageSource = bean.image || roasterLogo;
+  const imageSource = beanImage || roasterLogo;
   const hasImageError = imageError.source === imageSource && imageError.failed;
 
   return (
     <>
-      {bean.image && !hasImageError ? (
+      {beanImage && !hasImageError ? (
         <Image
-          src={bean.image}
+          src={beanImage}
           alt={bean.name || '咖啡豆图片'}
           width={56}
           height={56}
           className="h-full w-full object-cover"
           loading="eager"
           onError={() =>
-            setImageError({ source: bean.image || null, failed: true })
+            setImageError({ source: beanImage || null, failed: true })
           }
           unoptimized
         />

@@ -26,6 +26,7 @@ import { showToast } from '@/components/common/feedback/LightToast';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import RemainingEditor from '@/components/coffee-bean/List/components/RemainingEditor';
 import { buildEquipmentNameMap } from '@/lib/notes/noteDisplay';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 import {
   BeanDetailModalProps,
@@ -125,6 +126,10 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   );
 
   const bean = isAddMode ? (tempBean as CoffeeBean) : storeBean || propBean;
+  const beanOriginalImage = useCoffeeBeanImage(bean?.id, {
+    fallback: bean?.image,
+    preferThumbnail: false,
+  });
   const allBeans = useCoffeeBeanStore(state => state.beans);
   const allNotes = useBrewingNoteStore(state => state.notes);
   const loadNotes = useBrewingNoteStore(state => state.loadNotes);
@@ -588,7 +593,7 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       beanType: bean.beanType,
       capacity: '',
       remaining: '',
-      image: bean.image,
+      image: beanOriginalImage,
       roastLevel: '',
       roastDate: today,
       flavor: bean.flavor,

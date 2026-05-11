@@ -34,6 +34,7 @@ import {
   resolveNoteBeanDisplayName,
   resolveNoteEquipmentName,
 } from '@/lib/notes/noteDisplay';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 // 信息行组件
 interface InfoRowProps {
@@ -144,6 +145,15 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
         : initialBeanInfo,
     [note, coffeeBeanLookup, initialBeanInfo]
   );
+  const beanFrontImage = useCoffeeBeanImage(beanInfo?.id, {
+    fallback: beanInfo?.image,
+    preferThumbnail: false,
+  });
+  const beanBackImage = useCoffeeBeanImage(beanInfo?.id, {
+    side: 'back',
+    fallback: beanInfo?.backImage,
+    preferThumbnail: false,
+  });
   const equipmentName = useMemo(
     () => (note ? resolveNoteEquipmentName(note, equipmentNames) : ''),
     [note, equipmentNames]
@@ -261,14 +271,14 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
     if (note?.image) {
       setImageError(false);
     }
-    if (beanInfo?.image) {
+    if (beanFrontImage) {
       setBeanImageError(false);
     }
     // 重置轮播状态
     setShowMultiImages(false);
     setMultiImageErrors(new Set());
     setCurrentHeight('auto');
-  }, [note?.image, beanInfo?.image, note?.id]);
+  }, [note?.image, beanFrontImage, note?.id]);
 
   // 使用 ResizeObserver 实时监听高度变化
   useEffect(() => {
@@ -637,7 +647,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
           }}
         >
           {/* 图片区域 - 带滑动轮播 */}
-          {(noteImages.length > 0 || beanInfo?.image) && (
+          {(noteImages.length > 0 || beanFrontImage) && (
             <div
               className="relative mb-4 overflow-hidden"
               style={{
@@ -661,7 +671,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
               >
                 <div className="relative flex cursor-pointer items-end justify-center gap-3 bg-neutral-200/30 px-6 py-3 dark:bg-neutral-800/40">
                   {/* 咖啡豆图片 - 当没有笔记图片时显示大图 */}
-                  {beanInfo?.image && noteImages.length === 0 && (
+                  {beanFrontImage && noteImages.length === 0 && (
                     <div className="relative h-32 overflow-hidden bg-neutral-100 dark:bg-neutral-800">
                       {beanImageError ? (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-500 dark:text-neutral-400">
@@ -669,7 +679,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                         </div>
                       ) : (
                         <Image
-                          src={beanInfo.image}
+                          src={beanFrontImage}
                           alt={beanName || '咖啡豆图片'}
                           height={192}
                           width={192}
@@ -678,9 +688,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                           onClick={() => {
                             if (!beanImageError) {
                               openImageViewer({
-                                url: beanInfo.image || '',
+                                url: beanFrontImage,
                                 alt: beanName || '咖啡豆图片',
-                                backUrl: beanInfo.backImage,
+                                backUrl: beanBackImage,
                               });
                             }
                           }}
@@ -693,7 +703,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                   {noteImages.length > 0 && (
                     <>
                       {/* 咖啡豆图片 - 小图 */}
-                      {beanInfo?.image && (
+                      {beanFrontImage && (
                         <div className="relative h-20 shrink-0 overflow-hidden bg-neutral-100 dark:bg-neutral-800">
                           {beanImageError ? (
                             <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-500 dark:text-neutral-400">
@@ -701,7 +711,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                             </div>
                           ) : (
                             <Image
-                              src={beanInfo.image}
+                              src={beanFrontImage}
                               alt={beanName || '咖啡豆图片'}
                               height={80}
                               width={80}
@@ -711,9 +721,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                                 e.stopPropagation();
                                 if (!beanImageError) {
                                   openImageViewer({
-                                    url: beanInfo.image || '',
+                                    url: beanFrontImage,
                                     alt: beanName || '咖啡豆图片',
-                                    backUrl: beanInfo.backImage,
+                                    backUrl: beanBackImage,
                                   });
                                 }
                               }}

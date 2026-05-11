@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import { ExtendedCoffeeBean } from '../types';
 import { isBeanEmpty } from '../preferences';
@@ -20,6 +20,8 @@ import {
   getRoasterName,
 } from '@/lib/utils/beanVarietyUtils';
 import { openImageViewer } from '@/lib/ui/imageViewer';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
+import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
 
 interface BeanListItemProps {
   bean: ExtendedCoffeeBean;
@@ -95,8 +97,18 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
     [bean, roasterSettings]
   );
 
+  const beanImage = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
+  const beanBackImage = useCoffeeBeanImage(bean.id, {
+    side: 'back',
+    fallback: bean.backImage,
+    preferThumbnail: false,
+  });
+
   const roasterLogo = useMemo(() => {
-    if (!bean.name || bean.image) {
+    if (!bean.name || beanImage) {
       return null;
     }
 
@@ -105,10 +117,45 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
     }
 
     return null;
-  }, [bean.name, bean.image, roasterName]);
+  }, [bean.name, beanImage, roasterName]);
 
-  const imageSource = bean.image || roasterLogo;
+  const imageSource = beanImage || roasterLogo;
   const hasImageError = imageError.source === imageSource && imageError.failed;
+
+  const handleImageViewerOpen = useCallback(() => {
+    if (!imageSource || hasImageError) {
+      return;
+    }
+
+    void (async () => {
+      const isBeanImage = Boolean(beanImage);
+      const [frontImage, backImage] = isBeanImage
+        ? await Promise.all([
+            getCoffeeBeanImageSource(bean.id, { preferThumbnail: false }),
+            getCoffeeBeanImageSource(bean.id, {
+              side: 'back',
+              preferThumbnail: false,
+            }),
+          ])
+        : [undefined, beanBackImage];
+
+      openImageViewer({
+        url: frontImage || imageSource,
+        alt: isBeanImage
+          ? bean.name || '咖啡豆图片'
+          : `${roasterName} 烘焙商图标`,
+        backUrl: backImage || beanBackImage,
+      });
+    })();
+  }, [
+    bean.id,
+    bean.name,
+    beanBackImage,
+    beanImage,
+    hasImageError,
+    imageSource,
+    roasterName,
+  ]);
 
   // 设置默认值
   const dateDisplayMode = settings?.dateDisplayMode ?? 'date';
@@ -405,22 +452,12 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
         <div className="relative self-start">
           <div
             className="relative size-14 shrink-0 cursor-pointer overflow-hidden rounded border border-neutral-200/50 bg-neutral-100 dark:border-neutral-800/50 dark:bg-neutral-800/20"
-            onClick={() => {
-              if (imageSource && !hasImageError) {
-                openImageViewer({
-                  url: imageSource,
-                  alt: bean.image
-                    ? bean.name || '咖啡豆图片'
-                    : `${roasterName} 烘焙商图标`,
-                  backUrl: bean.backImage,
-                });
-              }
-            }}
+            onClick={handleImageViewerOpen}
             data-click-area="image"
           >
-            {bean.image && !hasImageError ? (
+            {beanImage && !hasImageError ? (
               <Image
-                src={bean.image}
+                src={beanImage}
                 alt={bean.name || '咖啡豆图片'}
                 height={48}
                 width={48}
@@ -430,7 +467,7 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
                 sizes="48px"
                 loading="eager"
                 onError={() =>
-                  setImageError({ source: bean.image || null, failed: true })
+                  setImageError({ source: beanImage || null, failed: true })
                 }
               />
             ) : roasterLogo && !hasImageError ? (

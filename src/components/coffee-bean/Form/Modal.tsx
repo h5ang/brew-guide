@@ -9,6 +9,7 @@ import {
   useMultiStepModalHistory,
   modalHistory,
 } from '@/lib/hooks/useModalHistory';
+import { mergeBeanWithStoredImages } from '@/lib/coffee-beans/imageRepository';
 
 interface CoffeeBeanFormModalProps {
   showForm: boolean;
@@ -39,6 +40,8 @@ const CoffeeBeanFormModal: React.FC<CoffeeBeanFormModalProps> = ({
 
   // 添加平台检测
   const [isIOS, setIsIOS] = useState(false);
+  const [hydratedInitialBean, setHydratedInitialBean] =
+    useState<ExtendedCoffeeBean | null>(initialBean || null);
 
   // 同步顶部安全区颜色
   useThemeColor({ useOverlay: true, enabled: showForm });
@@ -70,6 +73,25 @@ const CoffeeBeanFormModal: React.FC<CoffeeBeanFormModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [showForm]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!showForm || !initialBean) {
+      setHydratedInitialBean(initialBean || null);
+      return;
+    }
+
+    mergeBeanWithStoredImages(initialBean).then(bean => {
+      if (!cancelled) {
+        setHydratedInitialBean(bean);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showForm, initialBean]);
 
   // 使用多步骤历史栈管理
   useMultiStepModalHistory({
@@ -146,11 +168,11 @@ const CoffeeBeanFormModal: React.FC<CoffeeBeanFormModalProps> = ({
       >
         <div className="modal-form-container flex min-h-0 flex-1 flex-col px-6">
           <CoffeeBeanForm
-            key={`bean-form-${initialBean?.id || 'new'}-${initialBean?.name || ''}-${initialBeanState || 'roasted'}`}
+            key={`bean-form-${hydratedInitialBean?.id || 'new'}-${hydratedInitialBean?.name || ''}-${initialBeanState || 'roasted'}`}
             ref={formRef}
             onSave={onSave}
             onCancel={onClose}
-            initialBean={initialBean || undefined}
+            initialBean={hydratedInitialBean || undefined}
             onRepurchase={onRepurchase}
             onStepChange={setCurrentStep}
             initialBeanState={initialBeanState}

@@ -15,6 +15,7 @@ import {
   getRoasterLogoSync,
   useSettingsStore,
 } from '@/lib/stores/settingsStore';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 // 获取烘焙商名称用于 alt 文本的辅助函数
 const getRoasterAltText = (
@@ -58,9 +59,13 @@ export const BeanImageSmall: React.FC<{ bean: CoffeeBean }> = ({ bean }) => {
     }),
     [roasterFieldEnabled, roasterSeparator]
   );
+  const beanImage = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
 
   useEffect(() => {
-    if (!bean.name || bean.image) {
+    if (!bean.name || beanImage) {
       setRoasterLogo(null);
       return;
     }
@@ -72,15 +77,15 @@ export const BeanImageSmall: React.FC<{ bean: CoffeeBean }> = ({ bean }) => {
     } else {
       setRoasterLogo(null);
     }
-  }, [bean.name, bean.image, bean.roaster, roasterSettings]);
+  }, [bean.name, beanImage, bean.roaster, roasterSettings]);
 
   const roasterName = getRoasterName(bean, roasterSettings);
 
   return (
     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xs bg-neutral-200/30 dark:bg-neutral-800/40">
-      {bean.image && !imageError ? (
+      {beanImage && !imageError ? (
         <Image
-          src={bean.image}
+          src={beanImage}
           alt={bean.name}
           fill
           className="object-cover"
@@ -128,6 +133,26 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
     }),
     [roasterFieldEnabled, roasterSeparator]
   );
+  const storedFrontImage = useCoffeeBeanImage(bean?.id, {
+    fallback: bean?.image,
+    preferThumbnail: false,
+  });
+  const storedBackImage = useCoffeeBeanImage(bean?.id, {
+    side: 'back',
+    fallback: bean?.backImage,
+    preferThumbnail: false,
+  });
+  const viewBean = useMemo(
+    () =>
+      bean
+        ? {
+            ...bean,
+            image: storedFrontImage,
+            backImage: storedBackImage,
+          }
+        : null,
+    [bean, storedFrontImage, storedBackImage]
+  );
 
   // 处理图片选择
   const handleImageSelect = async (
@@ -169,7 +194,7 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
   };
 
   // 不显示图片区域的条件
-  if (!isAddMode && !bean?.image && !bean?.backImage && !roasterLogo) {
+  if (!isAddMode && !viewBean?.image && !viewBean?.backImage && !roasterLogo) {
     return null;
   }
 
@@ -193,7 +218,7 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
           />
         ) : (
           <ViewModeImages
-            bean={bean}
+            bean={viewBean}
             roasterLogo={roasterLogo}
             imageError={imageError}
             setImageError={setImageError}

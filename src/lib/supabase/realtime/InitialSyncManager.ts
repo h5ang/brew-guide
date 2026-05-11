@@ -35,7 +35,12 @@ import {
 } from './handlers/StoreNotifier';
 import type { RealtimeSyncTable } from './types';
 import type { Method } from '@/lib/core/config';
+import type { CoffeeBean } from '@/types/app';
 import { showToast } from '@/components/common/feedback/LightToast';
+import {
+  mergeBeansWithStoredImages,
+  persistCoffeeBeanImagesFromBean,
+} from '@/lib/coffee-beans/imageRepository';
 
 // 网络请求超时时间 (ms)
 const SYNC_TIMEOUT = 60000; // 增加到 60s 以适应移动端大文件传输
@@ -319,7 +324,9 @@ export class InitialSyncManager {
           throw new Error(fetchResult.error || `下载 ${table} 详情失败`);
         }
 
-        const missingIds = idsToDownload.filter(id => !downloadedDataMap.has(id));
+        const missingIds = idsToDownload.filter(
+          id => !downloadedDataMap.has(id)
+        );
         if (missingIds.length > 0) {
           console.error(
             `[InitialSync] ${table} 详情下载不完整，缺失 ${missingIds.length} 条记录`
@@ -330,27 +337,26 @@ export class InitialSyncManager {
       }
 
       // 组装完整的 remoteRecords
-      const remoteRecords = remoteMetaRecords
-        .map(r => {
-          if (downloadedDataMap.has(r.id)) {
-            const data = downloadedDataMap.get(r.id);
-            // PATCH: 确保数据的修改时间不小于 updated_at
-            // 这防止了因数据时间戳滞后于 updated_at 导致无限循环下载
-            // 注意：对于 BrewingNote，应该更新 updatedAt 而不是 timestamp（创建时间）
-            if (data) {
-              const updatedAtTime = new Date(r.updated_at).getTime();
-              if ('updatedAt' in data || table === SYNC_TABLES.BREWING_NOTES) {
-                // BrewingNote: 更新 updatedAt，保留 timestamp（创建时间）
-                data.updatedAt = Math.max(data.updatedAt || 0, updatedAtTime);
-              } else {
-                // CoffeeBean 等其他类型: 更新 timestamp
-                data.timestamp = Math.max(data.timestamp || 0, updatedAtTime);
-              }
+      const remoteRecords = remoteMetaRecords.map(r => {
+        if (downloadedDataMap.has(r.id)) {
+          const data = downloadedDataMap.get(r.id);
+          // PATCH: 确保数据的修改时间不小于 updated_at
+          // 这防止了因数据时间戳滞后于 updated_at 导致无限循环下载
+          // 注意：对于 BrewingNote，应该更新 updatedAt 而不是 timestamp（创建时间）
+          if (data) {
+            const updatedAtTime = new Date(r.updated_at).getTime();
+            if ('updatedAt' in data || table === SYNC_TABLES.BREWING_NOTES) {
+              // BrewingNote: 更新 updatedAt，保留 timestamp（创建时间）
+              data.updatedAt = Math.max(data.updatedAt || 0, updatedAtTime);
+            } else {
+              // CoffeeBean 等其他类型: 更新 timestamp
+              data.timestamp = Math.max(data.timestamp || 0, updatedAtTime);
             }
-            return { ...r, data };
           }
-          return r;
-        });
+          return { ...r, data };
+        }
+        return r;
+      });
 
       // 冲突解决
       const { toUpload, toDownload, toDeleteLocal } = batchResolveConflicts(
@@ -361,7 +367,12 @@ export class InitialSyncManager {
 
       // 执行上传
       if (toUpload.length > 0) {
-        await upsertRecords(this.client, table, toUpload, record => ({
+        const recordsForUpload =
+          table === SYNC_TABLES.COFFEE_BEANS
+            ? await mergeBeansWithStoredImages(toUpload as CoffeeBean[])
+            : toUpload;
+
+        await upsertRecords(this.client, table, recordsForUpload, record => ({
           id: record.id,
           data: record,
           updated_at: new Date(
@@ -387,16 +398,33 @@ export class InitialSyncManager {
           console.warn(
             `[InitialSync] ${table} 写入 ${validRecords.length} 条记录到本地 DB`
           );
-          const putRecord = dbTable.put.bind(dbTable) as (
-            item: unknown
-          ) => Promise<unknown>;
+          if (table === SYNC_TABLES.COFFEE_BEANS) {
+            await db.transaction(
+              'rw',
+              db.coffeeBeans,
+              db.coffeeBeanImages,
+              async () => {
+                for (const record of validRecords as CoffeeBean[]) {
+                  const beanForStore = await persistCoffeeBeanImagesFromBean(
+                    record,
+                    { generateThumbnails: false }
+                  );
+                  await db.coffeeBeans.put(beanForStore);
+                }
+              }
+            );
+          } else {
+            const putRecord = dbTable.put.bind(dbTable) as (
+              item: unknown
+            ) => Promise<unknown>;
 
-          // 批量写入以提高性能
-          await db.transaction('rw', dbTable, async () => {
-            for (const record of validRecords) {
-              await putRecord(record);
-            }
-          });
+            // 批量写入以提高性能
+            await db.transaction('rw', dbTable, async () => {
+              for (const record of validRecords) {
+                await putRecord(record);
+              }
+            });
+          }
         }
       }
 
@@ -406,6 +434,9 @@ export class InitialSyncManager {
           `[InitialSync] ${table} 删除 ${toDeleteLocal.length} 条本地记录`
         );
         await dbTable.bulkDelete(toDeleteLocal);
+        if (table === SYNC_TABLES.COFFEE_BEANS) {
+          await db.coffeeBeanImages.bulkDelete(toDeleteLocal);
+        }
       }
 
       return {

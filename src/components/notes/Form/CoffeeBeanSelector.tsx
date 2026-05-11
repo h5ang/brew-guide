@@ -20,6 +20,7 @@ import {
   calculateFlavorInfo,
   getDefaultFlavorPeriodByRoastLevelSync,
 } from '@/lib/utils/flavorPeriodUtils';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 interface CoffeeBeanSelectorProps {
   coffeeBeans: CoffeeBean[];
@@ -67,27 +68,34 @@ const BeanImage: React.FC<{
   };
 }> = ({ bean, roasterSettings }) => {
   const [imageError, setImageError] = useState(false);
-  const [roasterLogo, setRoasterLogo] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!bean.name || bean.image) {
-      return;
-    }
-
-    const roasterName = getRoasterName(bean, roasterSettings);
-    if (roasterName && roasterName !== '未知烘焙商') {
-      const logo = getRoasterLogoSync(roasterName);
-      setRoasterLogo(logo || null);
-    }
-  }, [bean.name, bean.image, bean.roaster, roasterSettings]);
+  const beanImage = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
 
   const roasterName = getRoasterName(bean, roasterSettings);
+  const roasterLogo = useMemo(() => {
+    if (!bean.name || beanImage) {
+      return null;
+    }
+
+    if (!roasterName || roasterName === '未知烘焙商') {
+      return null;
+    }
+
+    return getRoasterLogoSync(roasterName) || null;
+  }, [bean.name, beanImage, roasterName]);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [beanImage, roasterLogo]);
 
   return (
     <>
-      {bean.image && !imageError ? (
+      {beanImage && !imageError ? (
         <Image
-          src={bean.image}
+          src={beanImage}
           alt={bean.name || '咖啡豆图片'}
           height={48}
           width={48}

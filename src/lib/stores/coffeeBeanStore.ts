@@ -11,6 +11,11 @@ import {
   normalizeCoffeeBeans,
 } from '@/lib/utils/coffeeBeanUtils';
 import { recordCrashCheckpoint } from '@/lib/app/crashDiagnostics';
+import {
+  mergeBeanWithStoredImages,
+  persistCoffeeBeanImagesFromBean,
+} from '@/lib/coffee-beans/imageRepository';
+import { stripCoffeeBeanImages } from '@/lib/coffee-beans/imageRecords';
 
 interface CoffeeBeanStore {
   beans: CoffeeBean[];
@@ -67,16 +72,20 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
       set({ isLoading: true, error: null });
       try {
         const rawBeans = await db.coffeeBeans.toArray();
-        recordCrashCheckpoint(
-          'coffee-beans:raw-loaded',
-          collectBeanPayloadMetrics(rawBeans as CoffeeBean[])
-        );
+        recordCrashCheckpoint('coffee-beans:raw-loaded', {
+          ...collectBeanPayloadMetrics(rawBeans as CoffeeBean[]),
+          imageRecordCount: await db.coffeeBeanImages.count(),
+        });
         const beans = normalizeCoffeeBeans(rawBeans, {
           ensureFlavorArray: true,
-        });
+        }).map(stripCoffeeBeanImages);
         const repairedBeans = rawBeans
           .filter(bean => hasInvalidFlavorValue(bean.flavor))
-          .map(bean => normalizeCoffeeBean(bean, { ensureFlavorArray: true }));
+          .map(bean =>
+            stripCoffeeBeanImages(
+              normalizeCoffeeBean(bean, { ensureFlavorArray: true })
+            )
+          );
 
         if (repairedBeans.length > 0) {
           await db.coffeeBeans.bulkPut(repairedBeans);
@@ -85,6 +94,7 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
         recordCrashCheckpoint('coffee-beans:normalized', {
           beanCount: beans.length,
           repairedBeanCount: repairedBeans.length,
+          imageRecordCount: await db.coffeeBeanImages.count(),
         });
         set({ beans, isLoading: false, initialized: true });
       } catch (error) {
@@ -104,8 +114,9 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
       );
 
       try {
-        await db.coffeeBeans.put(newBean);
-        set(state => ({ beans: [...state.beans, newBean] }));
+        const beanForStore = await persistCoffeeBeanImagesFromBean(newBean);
+        await db.coffeeBeans.put(beanForStore);
+        set(state => ({ beans: [...state.beans, beanForStore] }));
 
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
@@ -137,19 +148,21 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
       ) as CoffeeBean;
 
       try {
-        await db.coffeeBeans.put(updatedBean);
+        const beanForStore = await persistCoffeeBeanImagesFromBean(updatedBean);
+        const eventBean = await mergeBeanWithStoredImages(beanForStore);
+        await db.coffeeBeans.put(beanForStore);
         set(state => ({
-          beans: state.beans.map(b => (b.id === id ? updatedBean : b)),
+          beans: state.beans.map(b => (b.id === id ? beanForStore : b)),
         }));
 
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('coffeeBeanDataChanged', {
-              detail: { action: 'update', beanId: id, bean: updatedBean },
+              detail: { action: 'update', beanId: id, bean: eventBean },
             })
           );
         }
-        return updatedBean;
+        return eventBean;
       } catch (error) {
         console.error('[CoffeeBeanStore] updateBean failed:', error);
         throw error;
@@ -158,7 +171,15 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
 
     deleteBean: async id => {
       try {
-        await db.coffeeBeans.delete(id);
+        await db.transaction(
+          'rw',
+          db.coffeeBeans,
+          db.coffeeBeanImages,
+          async () => {
+            await db.coffeeBeans.delete(id);
+            await db.coffeeBeanImages.delete(id);
+          }
+        );
         set(state => ({
           beans: state.beans.filter(b => b.id !== id),
         }));
@@ -186,18 +207,20 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
         const normalizedBean = normalizeCoffeeBean(bean, {
           ensureFlavorArray: true,
         }) as CoffeeBean;
+        const beanForStore =
+          await persistCoffeeBeanImagesFromBean(normalizedBean);
 
-        await db.coffeeBeans.put(normalizedBean);
+        await db.coffeeBeans.put(beanForStore);
         set(state => {
-          const exists = state.beans.some(b => b.id === normalizedBean.id);
+          const exists = state.beans.some(b => b.id === beanForStore.id);
           if (exists) {
             return {
               beans: state.beans.map(b =>
-                b.id === normalizedBean.id ? normalizedBean : b
+                b.id === beanForStore.id ? beanForStore : b
               ),
             };
           } else {
-            return { beans: [...state.beans, normalizedBean] };
+            return { beans: [...state.beans, beanForStore] };
           }
         });
       } catch (error) {
@@ -207,7 +230,15 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
 
     removeBean: async id => {
       try {
-        await db.coffeeBeans.delete(id);
+        await db.transaction(
+          'rw',
+          db.coffeeBeans,
+          db.coffeeBeanImages,
+          async () => {
+            await db.coffeeBeans.delete(id);
+            await db.coffeeBeanImages.delete(id);
+          }
+        );
         set(state => ({ beans: state.beans.filter(b => b.id !== id) }));
       } catch (error) {
         console.error('[CoffeeBeanStore] removeBean failed:', error);
@@ -300,8 +331,9 @@ export async function updateBeanRemaining(
         remaining: formattedNewRemaining,
         timestamp: Date.now(),
       };
-      await db.coffeeBeans.put(updatedBean);
-      return updatedBean;
+      const beanForStore = stripCoffeeBeanImages(updatedBean);
+      await db.coffeeBeans.put(beanForStore);
+      return beanForStore;
     }
 
     const currentRemaining = bean.remaining ? parseFloat(bean.remaining) : 0;

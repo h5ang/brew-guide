@@ -34,6 +34,7 @@ import {
   getDefaultFlavorPeriodByRoastLevelSync,
 } from '@/lib/utils/flavorPeriodUtils';
 import hapticsUtils from '@/lib/ui/haptics';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 interface CoffeeBeanGroupSettingsProps {
   settings: SettingsOptions;
@@ -255,16 +256,24 @@ const BeanThumbnail: React.FC<{
   size?: 'xs' | 'sm' | 'md';
 }> = ({ bean, size = 'md' }) => {
   const [imageError, setImageError] = React.useState(false);
+  const imageSource = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
   const sizeClass =
     size === 'xs' ? 'h-5 w-5' : size === 'sm' ? 'h-9 w-9' : 'h-12 w-12';
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [imageSource]);
 
   return (
     <div
       className={`relative ${sizeClass} shrink-0 overflow-hidden rounded-[5px] border border-black/5 bg-neutral-200/60 dark:border-white/5 dark:bg-neutral-800`}
     >
-      {bean.image && !imageError ? (
+      {imageSource && !imageError ? (
         <Image
-          src={bean.image}
+          src={imageSource}
           alt={bean.name || '咖啡豆图片'}
           fill
           sizes={size === 'xs' ? '20px' : size === 'sm' ? '36px' : '48px'}

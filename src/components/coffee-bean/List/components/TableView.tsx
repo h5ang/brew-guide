@@ -30,6 +30,7 @@ import {
 } from '@/lib/utils/beanVarietyUtils';
 import FlavorStatusRing from './FlavorStatusRing';
 import TableHoverPreview, { type HoverPreviewBean } from './TableHoverPreview';
+import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
 
 // 表格列配置
 export type TableColumnKey =
@@ -187,10 +188,8 @@ const getPricePerGram = (price: string, capacity: string): number => {
   return priceNum / capacityNum;
 };
 
-const getSortingDesc = (
-  sorting: SortingState,
-  columnId: string
-): boolean => sorting.find(sort => sort.id === columnId)?.desc === true;
+const getSortingDesc = (sorting: SortingState, columnId: string): boolean =>
+  sorting.find(sort => sort.id === columnId)?.desc === true;
 
 const compareEmptyBeanGroup = (
   rowA: Row<ExtendedCoffeeBean>,
@@ -401,8 +400,11 @@ const TableView: React.FC<TableViewProps> = ({
   }, [allBeans, roasterSettings]);
 
   const buildHoverPreviewBean = useCallback(
-    (bean: ExtendedCoffeeBean): HoverPreviewBean | null => {
-      const imageSrc = bean.image || roasterLogos[bean.id] || '';
+    async (bean: ExtendedCoffeeBean): Promise<HoverPreviewBean | null> => {
+      const storedImage = await getCoffeeBeanImageSource(bean.id, {
+        preferThumbnail: true,
+      });
+      const imageSrc = storedImage || bean.image || roasterLogos[bean.id] || '';
       if (!imageSrc) return null;
 
       return {
@@ -425,7 +427,7 @@ const TableView: React.FC<TableViewProps> = ({
     (bean: ExtendedCoffeeBean, event: React.MouseEvent<HTMLElement>) => {
       if (!supportsHoverPreview) return;
       updatePreviewPosition(event);
-      setHoverPreviewBean(buildHoverPreviewBean(bean));
+      void buildHoverPreviewBean(bean).then(setHoverPreviewBean);
     },
     [buildHoverPreviewBean, supportsHoverPreview, updatePreviewPosition]
   );
@@ -493,15 +495,12 @@ const TableView: React.FC<TableViewProps> = ({
           sortingFn: alphanumericSortingFn,
         }
       ),
-      name: columnHelper.accessor(
-        row => getNameDisplayValue(row),
-        {
-          id: 'name',
-          header: '名称',
-          cell: ({ row }) => getNameDisplayValue(row.original),
-          sortingFn: nameSortingFn,
-        }
-      ),
+      name: columnHelper.accessor(row => getNameDisplayValue(row), {
+        id: 'name',
+        header: '名称',
+        cell: ({ row }) => getNameDisplayValue(row.original),
+        sortingFn: nameSortingFn,
+      }),
       flavorPeriod: columnHelper.accessor(
         row => {
           const isGreenBean = row.beanState === 'green';
@@ -797,7 +796,8 @@ const TableView: React.FC<TableViewProps> = ({
                     const isLast = index === row.getVisibleCells().length - 1;
                     const isCapacity = cell.column.id === 'capacity';
                     const isName = cell.column.id === 'name';
-                    const isRating = cell.column.id === 'rating' && Boolean(onRate);
+                    const isRating =
+                      cell.column.id === 'rating' && Boolean(onRate);
 
                     const cellClass =
                       'text-xs leading-relaxed font-medium text-neutral-600 dark:text-neutral-400';
@@ -822,7 +822,7 @@ const TableView: React.FC<TableViewProps> = ({
                               }
                             : isRating
                               ? e => handleRateClick(bean, e)
-                            : undefined
+                              : undefined
                         }
                         onMouseEnter={
                           isName

@@ -15,6 +15,7 @@ import { showToast } from '@/components/common/feedback/LightToast';
 import { formatNoteBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
 import { Loader2 } from 'lucide-react';
 import { normalizeBrewingNoteParams } from '@/lib/notes/noteDisplay';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
 interface ArtisticShareDrawerProps {
   isOpen: boolean;
@@ -44,6 +45,10 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
 
   // 从 Store 获取咖啡豆数据
   const allBeans = useCoffeeBeanStore(state => state.beans);
+  const beanImage = useCoffeeBeanImage(bean?.id, {
+    fallback: bean?.image,
+    preferThumbnail: false,
+  });
 
   // 获取烘焙商相关设置
   const roasterFieldEnabled = useSettingsStore(
@@ -114,16 +119,17 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
       }
     } else {
       // Reset to text tab when closed
-      setTimeout(() => setActiveTab('text'), 300);
+      const resetTimer = window.setTimeout(() => setActiveTab('text'), 300);
+      return () => window.clearTimeout(resetTimer);
     }
   }, [isOpen, note.beanId, allBeans]);
 
   const tabs = useMemo(() => {
     const list: { id: Tab; label: string }[] = [{ id: 'text', label: '文案' }];
     if (note.image) list.push({ id: 'note-image', label: '记录图片' });
-    if (bean?.image) list.push({ id: 'bean-image', label: '豆子图片' });
+    if (beanImage) list.push({ id: 'bean-image', label: '豆子图片' });
     return list;
-  }, [bean, note.image]);
+  }, [beanImage, note.image]);
 
   /**
    * 使用纯 Canvas API 生成图片
@@ -192,7 +198,7 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
   const handleSaveImage = async () => {
     const imageSrc =
       activeTab === 'bean-image'
-        ? bean?.image
+        ? beanImage
         : activeTab === 'note-image'
           ? note.image
           : null;
@@ -381,7 +387,7 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
                 {generateShareText()}
               </div>
             ) : activeTab === 'bean-image' ? (
-              renderImagePreview(bean?.image)
+              renderImagePreview(beanImage)
             ) : (
               renderImagePreview(note.image)
             )}

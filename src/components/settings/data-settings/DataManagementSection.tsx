@@ -88,20 +88,26 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
             const importResult = await importBeanconquerorData(jsonString);
 
             if (importResult.success && importResult.data) {
-              const { Storage } = await import('@/lib/core/storage');
-              const { db } = await import('@/lib/core/db');
+              const [{ Storage }, { db }, { getCoffeeBeanStore }] =
+                await Promise.all([
+                  import('@/lib/core/storage'),
+                  import('@/lib/core/db'),
+                  import('@/lib/stores/coffeeBeanStore'),
+                ]);
 
-              await Storage.set('coffeeBeans', JSON.stringify([]));
-              await db.coffeeBeans.clear();
-              await Storage.set('brewingNotes', JSON.stringify([]));
-              await db.brewingNotes.clear();
+              await Promise.all([
+                Storage.set('coffeeBeans', JSON.stringify([])),
+                db.coffeeBeans.clear(),
+                db.coffeeBeanImages.clear(),
+                Storage.set('brewingNotes', JSON.stringify([])),
+                db.brewingNotes.clear(),
+              ]);
 
-              const { getCoffeeBeanStore } =
-                await import('@/lib/stores/coffeeBeanStore');
               const store = getCoffeeBeanStore();
               await store.refreshBeans();
 
               try {
+                // 顺序导入可避免大量图片同时压缩/写入导致移动端内存峰值过高。
                 for (const bean of importResult.data.coffeeBeans) {
                   const { id: _id, timestamp: _timestamp, ...beanData } = bean;
                   await store.addBean(beanData);

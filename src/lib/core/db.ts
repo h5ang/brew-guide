@@ -3,6 +3,10 @@ import { BrewingNote, Method, CustomEquipment } from './config';
 import type { EstimatedCupDoseSettings } from '@/lib/settings/estimatedCupDose';
 import { CoffeeBean } from '@/types/app';
 import { normalizeCoffeeBeans } from '@/lib/utils/coffeeBeanUtils';
+import {
+  type CoffeeBeanImageRecord,
+  splitCoffeeBeanImages,
+} from '@/lib/coffee-beans/imageRecords';
 
 /**
  * 研磨度历史记录
@@ -346,6 +350,7 @@ export class BrewGuideDB extends Dexie {
   // 核心数据表
   brewingNotes!: Dexie.Table<BrewingNote, string>;
   coffeeBeans!: Dexie.Table<CoffeeBean, string>;
+  coffeeBeanImages!: Dexie.Table<CoffeeBeanImageRecord, string>;
 
   // 器具与方案表
   customEquipments!: Dexie.Table<CustomEquipment, string>;
@@ -434,6 +439,20 @@ export class BrewGuideDB extends Dexie {
       appSettings: 'id',
       pendingOperations: 'id, table, recordId, timestamp',
     });
+
+    // 版本6：咖啡豆图片从主记录拆分，降低日常加载内存
+    this.version(6).stores({
+      brewingNotes: 'id, timestamp, equipment, method',
+      coffeeBeans: 'id, timestamp, name, type',
+      coffeeBeanImages: 'beanId, updatedAt',
+      settings: 'key',
+      customEquipments: 'id, name',
+      customMethods: 'equipmentId',
+      grinders: 'id, name',
+      yearlyReports: 'id, year, createdAt',
+      appSettings: 'id',
+      pendingOperations: 'id, table, recordId, timestamp',
+    });
   }
 }
 
@@ -454,6 +473,9 @@ export const dbUtils = {
 
       // v4 迁移：从 localStorage 迁移数据到新表
       await this.migrateToV4();
+
+      // v6 迁移：将咖啡豆图片拆到独立表，避免主 Store 整表加载图片
+      await this.migrateCoffeeBeanImages();
 
       // 验证迁移状态与数据一致性
       const migrated = await db.settings.get('migrated');
@@ -769,6 +791,49 @@ export const dbUtils = {
   },
 
   /**
+   * v6 迁移：将咖啡豆内联图片拆分到独立表
+   */
+  async migrateCoffeeBeanImages(): Promise<void> {
+    try {
+      let migratedBeanCount = 0;
+      let imageRecordCount = 0;
+
+      await db.transaction(
+        'rw',
+        db.coffeeBeans,
+        db.coffeeBeanImages,
+        async () => {
+          await db.coffeeBeans.each(async bean => {
+            const split = splitCoffeeBeanImages(bean);
+            if (!split.imageRecord) {
+              return;
+            }
+
+            const existingRecord = await db.coffeeBeanImages.get(bean.id);
+            await db.coffeeBeanImages.put({
+              ...split.imageRecord,
+              imageThumbnail: existingRecord?.imageThumbnail,
+              backImageThumbnail: existingRecord?.backImageThumbnail,
+            });
+            await db.coffeeBeans.put(split.bean);
+            migratedBeanCount += 1;
+          });
+
+          imageRecordCount = await db.coffeeBeanImages.count();
+        }
+      );
+
+      if (migratedBeanCount > 0) {
+        console.warn(
+          `已拆分 ${migratedBeanCount} 条咖啡豆图片记录，当前图片记录 ${imageRecordCount} 条`
+        );
+      }
+    } catch (error) {
+      console.error('拆分咖啡豆图片失败:', error);
+    }
+  },
+
+  /**
    * 从localStorage迁移数据到IndexedDB
    */
   async migrateFromLocalStorage(): Promise<boolean> {
@@ -826,7 +891,27 @@ export const dbUtils = {
             }
           );
           if (coffeeBeans.length > 0) {
-            await db.coffeeBeans.bulkPut(coffeeBeans);
+            const splitBeans = coffeeBeans.map(bean =>
+              splitCoffeeBeanImages(bean)
+            );
+            await db.transaction(
+              'rw',
+              db.coffeeBeans,
+              db.coffeeBeanImages,
+              async () => {
+                await db.coffeeBeans.bulkPut(
+                  splitBeans.map(split => split.bean)
+                );
+                const imageRecords = splitBeans
+                  .map(split => split.imageRecord)
+                  .filter((record): record is CoffeeBeanImageRecord =>
+                    Boolean(record)
+                  );
+                if (imageRecords.length > 0) {
+                  await db.coffeeBeanImages.bulkPut(imageRecords);
+                }
+              }
+            );
             const migratedCount = await db.coffeeBeans.count();
             if (migratedCount === coffeeBeans.length) {
               console.warn(`已迁移 ${coffeeBeans.length} 条咖啡豆数据`);
@@ -863,6 +948,7 @@ export const dbUtils = {
     try {
       await db.brewingNotes.clear();
       await db.coffeeBeans.clear();
+      await db.coffeeBeanImages.clear();
       await db.customEquipments.clear();
       await db.customMethods.clear();
       await db.grinders.clear();
@@ -897,6 +983,7 @@ export const dbUtils = {
 
       const grinderCount = await db.grinders.count();
       const equipmentCount = await db.customEquipments.count();
+      const beanImageCount = await db.coffeeBeanImages.count();
 
       console.warn(`IndexedDB 存储信息:`);
       console.warn(
@@ -905,10 +992,11 @@ export const dbUtils = {
       console.warn(
         `- 咖啡豆数量: ${beanCount}, 大小: ${beansSizeInBytes} 字节 (${beansSizeInKB} KB, ${beansSizeInMB} MB)`
       );
+      console.warn(`- 咖啡豆图片数量: ${beanImageCount}`);
       console.warn(`- 磨豆机数量: ${grinderCount}`);
       console.warn(`- 自定义器具数量: ${equipmentCount}`);
       console.warn(
-        `- 总大小: ${notesSizeInBytes + beansSizeInBytes} 字节 (${notesSizeInKB + beansSizeInKB} KB)`
+        `- 总大小: ${notesSizeInBytes + beansSizeInBytes} 字节 (${notesSizeInKB + beansSizeInKB} KB，不含独立图片表)`
       );
 
       try {

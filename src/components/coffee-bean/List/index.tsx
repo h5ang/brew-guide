@@ -105,10 +105,8 @@ import {
   getBeanSummaryDisplayLimit,
   getBeanSummaryLimitMode,
 } from '@/lib/utils/beanSummaryDisplay';
-import {
-  searchBeanRecords,
-  summarizeBeanTypeStats,
-} from './beanListPipeline';
+import { searchBeanRecords, summarizeBeanTypeStats } from './beanListPipeline';
+import { useCoffeeBeanImageIds } from '@/lib/hooks/useCoffeeBeanImage';
 
 const CoffeeBeanRanking = _CoffeeBeanRanking;
 const convertToRankingSortOption = _convertToRankingSortOption;
@@ -532,9 +530,13 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   }, [enableGreenBeanInventory, selectedBeanState]);
 
   // 计算是否有图片咖啡豆（用于禁用/启用图片流按钮）
+  const beanImageIds = useCoffeeBeanImageIds(beans.map(bean => bean.id));
   const hasImageBeans = useMemo(() => {
-    return beans.some(bean => bean.image && bean.image.trim() !== '');
-  }, [beans]);
+    return beans.some(
+      bean =>
+        beanImageIds.has(bean.id) || (bean.image && bean.image.trim() !== '')
+    );
+  }, [beans, beanImageIds]);
 
   // 切换图片流模式（简化版，直接使用 updateDisplayMode）
   const handleToggleImageFlowMode = useCallback(() => {
@@ -643,11 +645,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     } else if (viewMode === VIEW_OPTIONS.INVENTORY) {
       updateFilteredBeansAndCategories();
     }
-  }, [
-    viewMode,
-    loadRatedBeans,
-    updateFilteredBeansAndCategories,
-  ]);
+  }, [viewMode, loadRatedBeans, updateFilteredBeansAndCategories]);
 
   // 确保在榜单beanType变化时更新计数
   useEffect(() => {
@@ -1315,12 +1313,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     }
 
     return searchBeanRecords(inventoryEmptyRecords, deferredSearchQuery);
-  }, [
-    deferredSearchQuery,
-    inventoryEmptyRecords,
-    isSearching,
-    showEmptyBeans,
-  ]);
+  }, [deferredSearchQuery, inventoryEmptyRecords, isSearching, showEmptyBeans]);
 
   const searchFilteredBeans = React.useMemo(
     () => searchFilteredRecords.map(record => record.bean),

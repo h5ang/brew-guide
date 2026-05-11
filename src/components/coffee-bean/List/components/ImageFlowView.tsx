@@ -4,6 +4,10 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ExtendedCoffeeBean } from '../types';
 import { isBeanEmpty } from '../preferences';
+import {
+  useCoffeeBeanImage,
+  useCoffeeBeanImageIds,
+} from '@/lib/hooks/useCoffeeBeanImage';
 
 interface ImageFlowViewProps {
   filteredBeans: ExtendedCoffeeBean[];
@@ -55,10 +59,21 @@ const ImageFlowView: React.FC<ImageFlowViewProps> = ({
     );
   };
 
+  const allCandidateBeans = useMemo(
+    () => (showEmptyBeans ? [...filteredBeans, ...emptyBeans] : filteredBeans),
+    [filteredBeans, emptyBeans, showEmptyBeans]
+  );
+  const candidateBeanIds = useMemo(
+    () => allCandidateBeans.map(bean => bean.id),
+    [allCandidateBeans]
+  );
+  const imageBeanIds = useCoffeeBeanImageIds(candidateBeanIds);
+
   // 合并正常豆子和用完的豆子（如果显示），然后过滤出有图片的
   const beansWithImages = useMemo(() => {
     const normalBeans = filteredBeans.filter(
-      bean => bean.image && bean.image.trim() !== ''
+      bean =>
+        imageBeanIds.has(bean.id) || (bean.image && bean.image.trim() !== '')
     );
 
     if (!showEmptyBeans) {
@@ -66,12 +81,13 @@ const ImageFlowView: React.FC<ImageFlowViewProps> = ({
     }
 
     const emptyBeansWithImages = emptyBeans.filter(
-      bean => bean.image && bean.image.trim() !== ''
+      bean =>
+        imageBeanIds.has(bean.id) || (bean.image && bean.image.trim() !== '')
     );
 
     // 正常豆子在前，用完的豆子在后
     return [...normalBeans, ...emptyBeansWithImages];
-  }, [filteredBeans, emptyBeans, showEmptyBeans]);
+  }, [filteredBeans, emptyBeans, showEmptyBeans, imageBeanIds]);
 
   // 将咖啡豆分组，每排根据屏幕大小显示不同数量
   const rows = useMemo(() => {
@@ -109,31 +125,11 @@ const ImageFlowView: React.FC<ImageFlowViewProps> = ({
                     const isEmpty = isBeanEmpty(bean);
                     return (
                       <div key={bean.id} className="relative pb-0.5">
-                        <Image
-                          src={bean.image!}
-                          alt={bean.name || '咖啡豆图片'}
-                          width={0}
-                          height={0}
-                          className={`w-full cursor-pointer rounded-t-xs border border-b-0 border-neutral-200/50 transition-opacity dark:border-neutral-800/50 ${
-                            isEmpty ? 'opacity-40' : ''
-                          }`}
-                          style={{
-                            height: 'auto',
-                          }}
-                          sizes={`${Math.floor(100 / columnsPerRow)}vw`}
-                          priority={false}
-                          loading="lazy"
-                          unoptimized
-                          onClick={() => handleDetailClick(bean)}
-                          onKeyDown={(e: React.KeyboardEvent) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleDetailClick(bean);
-                            }
-                          }}
-                          tabIndex={0}
-                          role="button"
-                          aria-label={`查看 ${bean.name || '咖啡豆'} 详情`}
+                        <ImageFlowBeanImage
+                          bean={bean}
+                          columnsPerRow={columnsPerRow}
+                          isEmpty={isEmpty}
+                          onDetailClick={handleDetailClick}
                         />
                       </div>
                     );
@@ -157,6 +153,51 @@ const ImageFlowView: React.FC<ImageFlowViewProps> = ({
         </div>
       </div>
     </div>
+  );
+};
+
+const ImageFlowBeanImage: React.FC<{
+  bean: ExtendedCoffeeBean;
+  columnsPerRow: number;
+  isEmpty: boolean;
+  onDetailClick: (bean: ExtendedCoffeeBean) => void;
+}> = ({ bean, columnsPerRow, isEmpty, onDetailClick }) => {
+  const imageSource = useCoffeeBeanImage(bean.id, {
+    fallback: bean.image,
+    preferThumbnail: true,
+  });
+
+  if (!imageSource) {
+    return null;
+  }
+
+  return (
+    <Image
+      src={imageSource}
+      alt={bean.name || '咖啡豆图片'}
+      width={0}
+      height={0}
+      className={`w-full cursor-pointer rounded-t-xs border border-b-0 border-neutral-200/50 transition-opacity dark:border-neutral-800/50 ${
+        isEmpty ? 'opacity-40' : ''
+      }`}
+      style={{
+        height: 'auto',
+      }}
+      sizes={`${Math.floor(100 / columnsPerRow)}vw`}
+      priority={false}
+      loading="lazy"
+      unoptimized
+      onClick={() => onDetailClick(bean)}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onDetailClick(bean);
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`查看 ${bean.name || '咖啡豆'} 详情`}
+    />
   );
 };
 

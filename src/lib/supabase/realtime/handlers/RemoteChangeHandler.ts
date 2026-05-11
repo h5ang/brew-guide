@@ -24,6 +24,7 @@ import {
   removeRoasterFromName,
 } from '@/lib/utils/beanVarietyUtils';
 import { getSettingsStore } from '@/lib/stores/settingsStore';
+import { persistCoffeeBeanImagesFromBean } from '@/lib/coffee-beans/imageRepository';
 
 type PostgresPayload = RealtimePostgresChangesPayload<Record<string, unknown>>;
 
@@ -103,6 +104,9 @@ export class RemoteChangeHandler {
 
     if (remoteTime >= localTime) {
       await dbTable.delete(recordId);
+      if (table === SYNC_TABLES.COFFEE_BEANS) {
+        await db.coffeeBeanImages.delete(recordId);
+      }
       await notifyStoreDelete(table, recordId);
     }
     // 如果本地更新更晚，则忽略远程删除
@@ -149,13 +153,16 @@ export class RemoteChangeHandler {
         const beanData = await this.migrateRoasterIfNeeded(
           remoteData as unknown as CoffeeBean
         );
+        const beanForStore = await persistCoffeeBeanImagesFromBean(beanData, {
+          generateThumbnails: false,
+        });
         await (dbTable as { put: (data: unknown) => Promise<unknown> }).put(
-          beanData
+          beanForStore
         );
         await notifyStoreUpsert(
           table,
           recordId,
-          beanData as unknown as Record<string, unknown>
+          beanForStore as unknown as Record<string, unknown>
         );
       } else {
         await (dbTable as { put: (data: unknown) => Promise<unknown> }).put(

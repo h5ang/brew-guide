@@ -19,6 +19,8 @@ import {
   resolveNoteBeanDisplayName,
   resolveNoteEquipmentName,
 } from '@/lib/notes/noteDisplay';
+import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
+import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
 
 // 动态导入 RatingRadarDrawer 组件
 const RatingRadarDrawer = dynamic(
@@ -143,14 +145,59 @@ const NoteItem: React.FC<NoteItemProps> = ({
     beanInfo
   );
   const beanUnitPrice = getBeanUnitPrice(beanInfo);
+  const beanImage = useCoffeeBeanImage(beanInfo?.id, {
+    fallback: beanInfo?.image,
+    preferThumbnail: true,
+  });
 
   // 获取烘焙商图片
   const roasterLogo = React.useMemo(() => {
-    if (!beanInfo?.roaster) return null;
+    if (!beanInfo?.roaster || beanImage) return null;
     const settings = useSettingsStore.getState().settings;
     const roasterLogos = (settings as any).roasterLogos || {};
     return roasterLogos[beanInfo.roaster] || null;
-  }, [beanInfo?.roaster]);
+  }, [beanImage, beanInfo?.roaster]);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [beanImage, roasterLogo]);
+
+  const handleBeanImageClick = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      const imageSource = beanImage || roasterLogo;
+      if (!imageSource || imageError) {
+        return;
+      }
+
+      void (async () => {
+        const [frontImage, backImage] =
+          beanImage && beanInfo?.id
+            ? await Promise.all([
+                getCoffeeBeanImageSource(beanInfo.id, {
+                  preferThumbnail: false,
+                }),
+                getCoffeeBeanImageSource(beanInfo.id, {
+                  side: 'back',
+                  preferThumbnail: false,
+                }),
+              ])
+            : [undefined, undefined];
+
+        const isBeanImage = Boolean(beanImage);
+        openImageViewer({
+          url: frontImage || (isBeanImage ? beanInfo?.image : undefined) || imageSource,
+          alt: isBeanImage
+            ? beanName || '咖啡豆图片'
+            : beanInfo
+              ? `${getRoasterName(beanInfo, roasterSettings)} 烘焙商图标`
+              : '烘焙商图标',
+          backUrl: backImage || beanInfo?.backImage,
+        });
+      })();
+    },
+    [beanImage, beanInfo, beanName, imageError, roasterLogo, roasterSettings]
+  );
 
   const singleImageUrl = isSingleNoteImage ? noteImages[0] : '';
   const cachedSingleImageSize = useMemo(
@@ -209,24 +256,11 @@ const NoteItem: React.FC<NoteItemProps> = ({
           {/* 咖啡豆图片 - 方形带圆角，固定在左侧 */}
           <div
             className="relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded border border-neutral-200/50 bg-neutral-100 dark:border-neutral-800/50 dark:bg-neutral-800/20"
-            onClick={e => {
-              e.stopPropagation();
-              if ((beanInfo?.image || roasterLogo) && !imageError)
-                openImageViewer({
-                  url: beanInfo?.image || roasterLogo || '',
-                  alt: beanInfo?.image
-                    ? beanName || '咖啡豆图片'
-                    : beanInfo
-                      ? getRoasterName(beanInfo, roasterSettings) +
-                        ' 烘焙商图标'
-                      : '烘焙商图标',
-                  backUrl: beanInfo?.backImage,
-                });
-            }}
+            onClick={handleBeanImageClick}
           >
-            {beanInfo?.image && !imageError ? (
+            {beanImage && !imageError ? (
               <Image
-                src={beanInfo.image}
+                src={beanImage}
                 alt={beanName || '咖啡豆图片'}
                 height={48}
                 width={48}
