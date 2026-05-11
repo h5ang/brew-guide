@@ -5,6 +5,7 @@ import {
   formatNoteBeanDisplayName,
   type RoasterSettings,
 } from '@/lib/utils/beanVarietyUtils';
+import { parseDateToTimestamp } from '@/lib/utils/dateUtils';
 
 export type CoffeeBeanLookup = ReadonlyMap<string, CoffeeBean>;
 
@@ -176,4 +177,33 @@ export const getBeanUnitPrice = (
   }
 
   return price / capacity;
+};
+
+export const getNoteBeanAgingDays = (
+  roastDate?: string | null,
+  referenceDate: Date = new Date()
+): number | null => {
+  const normalizedRoastDate = normalizeOptionalText(roastDate);
+  if (!normalizedRoastDate) return null;
+
+  const roastTimestamp = parseDateToTimestamp(normalizedRoastDate);
+  if (Number.isNaN(roastTimestamp)) return null;
+
+  const parsedRoastDate = new Date(roastTimestamp);
+  const roastDateOnly = new Date(
+    parsedRoastDate.getFullYear(),
+    parsedRoastDate.getMonth(),
+    parsedRoastDate.getDate()
+  );
+  const referenceDateOnly = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+  const days = Math.ceil(
+    (referenceDateOnly.getTime() - roastDateOnly.getTime()) /
+      (1000 * 60 * 60 * 24)
+  );
+
+  return Math.max(0, days);
 };

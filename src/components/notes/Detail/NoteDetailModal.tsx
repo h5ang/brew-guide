@@ -33,6 +33,7 @@ import {
   resolveNoteBean,
   resolveNoteBeanDisplayName,
   resolveNoteEquipmentName,
+  getNoteBeanAgingDays,
 } from '@/lib/notes/noteDisplay';
 import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
@@ -114,6 +115,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   // 获取克价显示设置
   const showUnitPriceInNote = useSettingsStore(
     state => state.settings.showUnitPriceInNote ?? false
+  );
+  const showBeanAgingDaysInNote = useSettingsStore(
+    state => state.settings.showBeanAgingDaysInNote ?? false
   );
 
   // 从 store 获取实时笔记，避免详情页停留时数据快照过期
@@ -470,6 +474,18 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
     [note, getValidTasteRatings]
   );
   const hasTasteRatings = validTasteRatings.length > 0;
+  const beanAgingDays = useMemo(() => {
+    if (!showBeanAgingDaysInNote || !note) return null;
+
+    return getNoteBeanAgingDays(
+      beanInfo?.roastDate || note.coffeeBeanInfo?.roastDate
+    );
+  }, [
+    beanInfo?.roastDate,
+    note,
+    note?.coffeeBeanInfo?.roastDate,
+    showBeanAgingDaysInNote,
+  ]);
 
   // 获取该咖啡豆的所有有风味评分的笔记（用于对比）
   const compareNotes = useMemo(() => {
@@ -919,6 +935,14 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                       }
                       return null;
                     })()}
+
+                  {beanAgingDays !== null && (
+                    <InfoRow label="养豆">
+                      <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                        {beanAgingDays} 天
+                      </div>
+                    </InfoRow>
+                  )}
 
                   {/* 风味 */}
                   {beanInfo.flavor && beanInfo.flavor.length > 0 && (

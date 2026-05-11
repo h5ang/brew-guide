@@ -96,7 +96,7 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
           />
         </SettingRow>
         {!(settings.useClassicNotesListStyle ?? false) && (
-          <SettingRow label="评分维度入口" isLast>
+          <SettingRow label="评分维度入口" isSubSetting isLast>
             <SettingToggle
               checked={settings.showRatingDimensionsEntry ?? false}
               onChange={checked =>
@@ -108,10 +108,18 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
       </SettingSection>
 
       <SettingSection title="详情">
-        <SettingRow label="价格" isLast>
+        <SettingRow label="价格">
           <SettingToggle
             checked={settings.showUnitPriceInNote ?? false}
             onChange={checked => handleChange('showUnitPriceInNote', checked)}
+          />
+        </SettingRow>
+        <SettingRow label="养豆" isLast>
+          <SettingToggle
+            checked={settings.showBeanAgingDaysInNote ?? false}
+            onChange={checked =>
+              handleChange('showBeanAgingDaysInNote', checked)
+            }
           />
         </SettingRow>
       </SettingSection>

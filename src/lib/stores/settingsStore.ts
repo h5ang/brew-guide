@@ -154,6 +154,7 @@ export const defaultSettings: AppSettings = {
   overallRatingUseSlider: false,
   showRatingDimensionsEntry: false,
   showUnitPriceInNote: false,
+  showBeanAgingDaysInNote: false,
   showCapacityAdjustmentRecords: true,
   useClassicNotesListStyle: false,
 
