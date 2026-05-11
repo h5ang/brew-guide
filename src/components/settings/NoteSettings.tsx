@@ -186,17 +186,6 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
         </SettingSection>
       )}
 
-      <SettingSection title="默认行为">
-        <SettingRow label="展开变动记录" isLast>
-          <SettingToggle
-            checked={settings.defaultExpandChangeLog ?? false}
-            onChange={checked =>
-              handleChange('defaultExpandChangeLog', checked)
-            }
-          />
-        </SettingRow>
-      </SettingSection>
-
       <SettingSection title="记录">
         <SettingRow label="容量调整记录" isLast>
           <SettingToggle
