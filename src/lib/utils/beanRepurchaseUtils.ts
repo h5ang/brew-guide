@@ -5,6 +5,7 @@
 
 import { CoffeeBean } from '@/types/app';
 import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
+import { mergeBeanWithStoredImages } from '@/lib/coffee-beans/imageRepository';
 
 /**
  * 从咖啡豆名称中提取基础名称和编号
@@ -70,22 +71,23 @@ export function getNextAvailableNumber(
 export async function createRepurchaseBean(
   bean: CoffeeBean
 ): Promise<Omit<CoffeeBean, 'id' | 'timestamp'>> {
+  const sourceBean = bean.id ? await mergeBeanWithStoredImages(bean) : bean;
   // 从 Store 获取所有咖啡豆以检测编号
   const allBeans = useCoffeeBeanStore.getState().beans;
 
   // 解析当前咖啡豆名称
-  const { baseName } = parseBeanName(bean.name);
+  const { baseName } = parseBeanName(sourceBean.name);
 
   // 获取下一个可用编号
   const nextNumber = getNextAvailableNumber(baseName, allBeans);
 
   // 复制所有数据，只修改名称、剩余量和烘焙日期
   const newBeanData: Omit<CoffeeBean, 'id' | 'timestamp'> = {
-    ...bean,
+    ...sourceBean,
     // 更新名称编号
     name: `${baseName} #${nextNumber}`,
     // 剩余量改为总量
-    remaining: bean.capacity || '',
+    remaining: sourceBean.capacity || '',
     // 清除烘焙日期
     roastDate: '',
   };

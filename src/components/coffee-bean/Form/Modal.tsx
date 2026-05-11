@@ -76,8 +76,14 @@ const CoffeeBeanFormModal: React.FC<CoffeeBeanFormModalProps> = ({
 
   useEffect(() => {
     let cancelled = false;
+    const hasPersistedInitialBean = Boolean(initialBean?.id);
 
     if (!showForm || !initialBean) {
+      setHydratedInitialBean(initialBean || null);
+      return;
+    }
+
+    if (!hasPersistedInitialBean) {
       setHydratedInitialBean(initialBean || null);
       return;
     }
