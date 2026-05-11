@@ -120,6 +120,8 @@ export interface AppModalsProps {
   setRoastingSourceBeanId: (id: string | null) => void;
   recognitionImage: string | null;
   setRecognitionImage: (image: string | null) => void;
+  recognitionImageBeanId: string | null;
+  setRecognitionImageBeanId: (id: string | null) => void;
   handleSaveBean: (
     bean: Omit<ExtendedCoffeeBean, 'id' | 'timestamp'>
   ) => Promise<void>;
@@ -145,7 +147,10 @@ export interface AppModalsProps {
   // 咖啡豆导入
   showImportBeanForm: boolean;
   setShowImportBeanForm: (show: boolean) => void;
-  handleImportBean: (jsonData: string) => Promise<void>;
+  handleImportBean: (
+    jsonData: string,
+    options?: { recognitionImage?: string }
+  ) => Promise<void>;
 
   // 笔记编辑
   brewingNoteEditOpen: boolean;
@@ -313,6 +318,8 @@ const AppModals: React.FC<AppModalsProps> = ({
   setRoastingSourceBeanId,
   recognitionImage,
   setRecognitionImage,
+  recognitionImageBeanId,
+  setRecognitionImageBeanId,
   handleSaveBean,
   handleBeanListChange,
 
@@ -819,10 +826,15 @@ const AppModals: React.FC<AppModalsProps> = ({
           setEditingBeanState('roasted');
           setRoastingSourceBeanId(null);
           setRecognitionImage(null);
+          setRecognitionImageBeanId(null);
         }}
         initialBeanState={editingBeanState}
         roastingSourceBeanId={roastingSourceBeanId}
-        recognitionImage={recognitionImage}
+        recognitionImage={
+          recognitionImageBeanId && editingBean?.id === recognitionImageBeanId
+            ? recognitionImage
+            : null
+        }
         onRepurchase={
           editingBean
             ? async () => {
@@ -1006,7 +1018,6 @@ const AppModals: React.FC<AppModalsProps> = ({
         showForm={showImportBeanForm}
         onImport={handleImportBean}
         onClose={() => setShowImportBeanForm(false)}
-        onRecognitionImage={setRecognitionImage}
         settings={settings}
       />
 
