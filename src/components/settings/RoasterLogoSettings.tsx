@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ImagePlus } from 'lucide-react';
+import { ImagePlus, X } from 'lucide-react';
 import Image from 'next/image';
 import {
   getRoasterConfigsSync,
@@ -18,12 +18,21 @@ import hapticsUtils from '@/lib/ui/haptics';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
 import { SettingPage } from './atomic';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
+import ConfirmDrawer from '@/components/common/ui/ConfirmDrawer';
 import RoasterLogoImportExport from './RoasterLogoImportExport';
+import { renameRoasters } from '@/lib/utils/roasterRename';
+import DataAlertIcon from '@public/images/icons/ui/data-alert.svg';
 
 interface RoasterLogoSettingsProps {
   isOpen: boolean;
   onClose: () => void;
   hapticFeedback: boolean;
+}
+
+interface RoasterEditState {
+  isEditing: boolean;
+  drafts: Record<string, string>;
+  isSaving: boolean;
 }
 
 const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
@@ -38,13 +47,28 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     Map<string, RoasterConfig>
   >(new Map());
   const [uploading, setUploading] = useState<string | null>(null);
+  const [roasterEditState, setRoasterEditState] = useState<RoasterEditState>({
+    isEditing: false,
+    drafts: {},
+    isSaving: false,
+  });
+  const {
+    isEditing: isEditingRoasters,
+    drafts: draftRoasterNames,
+    isSaving: isSavingRoasters,
+  } = roasterEditState;
   const fileInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const nameInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const [focusedRoasterName, setFocusedRoasterName] = useState<string | null>(
+    null
+  );
 
   // 删除确认抽屉状态
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteRoasterName, setDeleteRoasterName] = useState<string | null>(
     null
   );
+  const [showRenameConfirm, setShowRenameConfirm] = useState(false);
 
   // 导入导出抽屉状态
   const [showImportExport, setShowImportExport] = useState(false);
@@ -127,6 +151,14 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
   }, [isOpen, loadRoasters, loadConfigs]);
 
   const handleClose = () => {
+    if (isEditingRoasters) {
+      setRoasterEditState({
+        isEditing: false,
+        drafts: {},
+        isSaving: false,
+      });
+      setFocusedRoasterName(null);
+    }
     modalHistory.back();
   };
 
@@ -237,6 +269,145 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     loadConfigs();
   }, [loadConfigs]);
 
+  const handleStartEditRoasters = useCallback(() => {
+    setRoasterEditState({
+      isEditing: true,
+      drafts: roasters.reduce<Record<string, string>>((drafts, roaster) => {
+        drafts[roaster] = roaster;
+        return drafts;
+      }, {}),
+      isSaving: false,
+    });
+    setFocusedRoasterName(null);
+  }, [roasters]);
+
+  const handleCancelEditRoasters = useCallback(() => {
+    setRoasterEditState({
+      isEditing: false,
+      drafts: {},
+      isSaving: false,
+    });
+    setFocusedRoasterName(null);
+  }, []);
+
+  const hasInvalidDraftRoasterName = React.useMemo(
+    () =>
+      roasters.some(roaster => {
+        const draftName = draftRoasterNames[roaster] ?? roaster;
+        return draftName.trim().length === 0;
+      }),
+    [draftRoasterNames, roasters]
+  );
+
+  const hasDraftRoasterChanges = React.useMemo(
+    () =>
+      roasters.some(roaster => {
+        const draftName = draftRoasterNames[roaster] ?? roaster;
+        return draftName.trim() !== roaster;
+      }),
+    [draftRoasterNames, roasters]
+  );
+
+  const pendingRenameCount = React.useMemo(
+    () =>
+      roasters.reduce((count, roaster) => {
+        const draftName = draftRoasterNames[roaster] ?? roaster;
+        return draftName.trim() !== roaster ? count + 1 : count;
+      }, 0),
+    [draftRoasterNames, roasters]
+  );
+
+  const buildRenameEntries = useCallback(
+    () =>
+      roasters.reduce<Record<string, string>>((entries, roaster) => {
+        entries[roaster] = draftRoasterNames[roaster] ?? roaster;
+        return entries;
+      }, {}),
+    [draftRoasterNames, roasters]
+  );
+
+  const focusRoasterNameInput = useCallback((roasterName: string) => {
+    setFocusedRoasterName(roasterName);
+    requestAnimationFrame(() => {
+      nameInputRefs.current.get(roasterName)?.focus();
+    });
+  }, []);
+
+  const handleRequestSaveRoasters = useCallback(() => {
+    if (isSavingRoasters || hasInvalidDraftRoasterName) {
+      return;
+    }
+
+    if (!hasDraftRoasterChanges) {
+      handleCancelEditRoasters();
+      return;
+    }
+
+    setShowRenameConfirm(true);
+  }, [
+    handleCancelEditRoasters,
+    hasDraftRoasterChanges,
+    hasInvalidDraftRoasterName,
+    isSavingRoasters,
+  ]);
+
+  const executeSaveRoasters = useCallback(async () => {
+    if (isSavingRoasters || hasInvalidDraftRoasterName) {
+      return;
+    }
+
+    const renameEntries = buildRenameEntries();
+
+    if (!hasDraftRoasterChanges) {
+      handleCancelEditRoasters();
+      return;
+    }
+
+    setRoasterEditState(current => ({
+      ...current,
+      isSaving: true,
+    }));
+
+    try {
+      const result = await renameRoasters(renameEntries);
+
+      loadRoasters();
+      loadConfigs();
+      setRoasterEditState({
+        isEditing: false,
+        drafts: {},
+        isSaving: false,
+      });
+      setFocusedRoasterName(null);
+
+      if (hapticFeedback) {
+        result.updatedBeanCount > 0
+          ? hapticsUtils.success()
+          : hapticsUtils.light();
+      }
+    } catch (error) {
+      console.error('Rename roasters error:', error);
+      alert('保存失败：' + (error as Error).message);
+      if (hapticFeedback) {
+        hapticsUtils.error();
+      }
+    } finally {
+      setRoasterEditState(current => ({
+        ...current,
+        isSaving: false,
+      }));
+    }
+  }, [
+    buildRenameEntries,
+    handleCancelEditRoasters,
+    hasDraftRoasterChanges,
+    hasInvalidDraftRoasterName,
+    hapticFeedback,
+    isSavingRoasters,
+    loadConfigs,
+    loadRoasters,
+  ]);
+
   if (!shouldRender) return null;
 
   return (
@@ -244,7 +415,7 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
       <div className="-mt-4 px-6">
         {roasters.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <ImagePlus className="mb-2 h-10 w-10 text-neutral-300 dark:text-neutral-600" />
+            <ImagePlus className="mb-2 size-10 text-neutral-300 dark:text-neutral-600" />
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
               暂无烘焙商
             </p>
@@ -255,9 +426,44 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
         ) : (
           <div className="space-y-4">
             {/* 烘焙商列表标题 */}
-            <h3 className="text-sm font-medium tracking-wider text-neutral-500 uppercase dark:text-neutral-400">
-              烘焙商列表 ({roasters.length})
-            </h3>
+            <div className="flex items-center justify-between gap-3 pl-3.5">
+              <h3 className="text-sm font-medium tracking-wider text-neutral-500 uppercase tabular-nums dark:text-neutral-400">
+                烘焙商列表 ({roasters.length})
+              </h3>
+
+              {isEditingRoasters ? (
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={handleCancelEditRoasters}
+                    disabled={isSavingRoasters}
+                    className="flex cursor-pointer items-center rounded-full px-3 text-sm font-medium text-neutral-500 transition-transform active:scale-[0.96] disabled:cursor-default disabled:opacity-40 disabled:active:scale-100 dark:text-neutral-400"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRequestSaveRoasters}
+                    disabled={
+                      isSavingRoasters ||
+                      hasInvalidDraftRoasterName ||
+                      !hasDraftRoasterChanges
+                    }
+                    className="flex cursor-pointer items-center rounded-full px-3 text-sm font-medium text-neutral-800 transition-transform active:scale-[0.96] disabled:cursor-default disabled:opacity-40 disabled:active:scale-100 dark:text-neutral-100"
+                  >
+                    {isSavingRoasters ? '保存中' : '保存'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartEditRoasters}
+                  className="flex cursor-pointer items-center rounded-full px-3 text-sm font-medium text-neutral-600 transition-transform active:scale-[0.96] dark:text-neutral-300"
+                >
+                  编辑
+                </button>
+              )}
+            </div>
 
             {/* 烘焙商列表 */}
             <div className="space-y-2">
@@ -266,20 +472,31 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                 const hasLogo = !!config?.logoData;
                 const logoData = config?.logoData;
                 const isUploading = uploading === roaster;
+                const draftName = draftRoasterNames[roaster] ?? roaster;
+                const normalizedDraftName = draftName.trim();
+                const hasDraftNameChange =
+                  normalizedDraftName.length > 0 &&
+                  normalizedDraftName !== roaster;
+                const shouldShowRenamePreview =
+                  isEditingRoasters &&
+                  !isSavingRoasters &&
+                  hasDraftNameChange &&
+                  focusedRoasterName !== roaster;
 
                 return (
                   <div
                     key={roaster}
-                    className="flex items-center justify-between rounded bg-neutral-100 p-2 dark:bg-neutral-800"
+                    className="flex items-center justify-between rounded bg-neutral-100 p-2 transition-colors dark:bg-neutral-800"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                       {/* 图标预览 */}
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded border border-neutral-200/50 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-900">
+                      <div className="relative size-10 shrink-0 overflow-hidden rounded border border-neutral-200/50 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-900">
                         {hasLogo && logoData ? (
                           <Image
                             src={logoData}
                             alt={roaster}
                             fill
+                            sizes="40px"
                             className="object-cover"
                             unoptimized
                           />
@@ -291,13 +508,83 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                       </div>
 
                       {/* 烘焙商名称 */}
-                      <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                        {roaster}
-                      </span>
+                      {isEditingRoasters ? (
+                        <div className="relative flex h-5 min-w-0 flex-1 items-center">
+                          <input
+                            ref={el => {
+                              if (el) {
+                                nameInputRefs.current.set(roaster, el);
+                              } else {
+                                nameInputRefs.current.delete(roaster);
+                              }
+                            }}
+                            value={draftName}
+                            onFocus={() => setFocusedRoasterName(roaster)}
+                            onBlur={() =>
+                              setFocusedRoasterName(current =>
+                                current === roaster ? null : current
+                              )
+                            }
+                            onChange={e =>
+                              setRoasterEditState(current => ({
+                                ...current,
+                                drafts: {
+                                  ...current.drafts,
+                                  [roaster]: e.target.value,
+                                },
+                              }))
+                            }
+                            disabled={isSavingRoasters}
+                            className={`block h-5 w-full min-w-0 bg-transparent p-0 text-sm leading-5 font-medium text-neutral-800 transition-[color,opacity] duration-150 outline-none placeholder:text-neutral-400 disabled:opacity-60 dark:text-neutral-200 dark:placeholder:text-neutral-600 ${
+                              shouldShowRenamePreview
+                                ? 'pointer-events-none opacity-0'
+                                : 'opacity-100'
+                            }`}
+                            aria-label={`编辑 ${roaster} 的烘焙商名称`}
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+
+                          {shouldShowRenamePreview && (
+                            <button
+                              type="button"
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => focusRoasterNameInput(roaster)}
+                              className="roaster-rename-preview absolute inset-0 flex min-w-0 cursor-text items-center gap-2 text-left"
+                              aria-label={`继续编辑 ${roaster}，当前目标名称为 ${normalizedDraftName}`}
+                            >
+                              <span className="roaster-rename-preview-old relative max-w-[42%] min-w-0 truncate text-sm leading-5 font-medium text-neutral-500/60 dark:text-neutral-400/60">
+                                {roaster}
+                                <span
+                                  aria-hidden="true"
+                                  className="roaster-rename-preview-line"
+                                />
+                              </span>
+                              <span
+                                aria-hidden="true"
+                                className="h-px w-3 shrink-0 bg-neutral-300/70 dark:bg-neutral-600/70"
+                              />
+                              <span className="roaster-rename-preview-new min-w-0 flex-1 truncate text-sm leading-5 font-medium text-neutral-800 dark:text-neutral-200">
+                                {normalizedDraftName}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="min-w-0 truncate text-sm leading-5 font-medium text-neutral-800 dark:text-neutral-200">
+                          {roaster}
+                        </span>
+                      )}
                     </div>
 
                     {/* 操作按钮 */}
-                    <div className="flex items-center gap-1.5">
+                    <div
+                      className={
+                        isEditingRoasters
+                          ? 'pointer-events-none flex items-center gap-1.5 opacity-0 transition-opacity'
+                          : 'flex items-center gap-1.5 opacity-100 transition-opacity'
+                      }
+                    >
                       {hasLogo && (
                         <button
                           onClick={e => handleDeleteLogo(roaster, e)}
@@ -305,7 +592,7 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                           className="rounded p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-red-500 disabled:opacity-50 dark:hover:bg-neutral-700"
                           title="删除图标"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="size-4" />
                         </button>
                       )}
 
@@ -402,6 +689,26 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
         onExitComplete={() => setDeleteRoasterName(null)}
       />
 
+      <ConfirmDrawer
+        isOpen={showRenameConfirm}
+        onClose={() => setShowRenameConfirm(false)}
+        onConfirm={() => {
+          void executeSaveRoasters();
+        }}
+        icon={DataAlertIcon}
+        confirmText="确认"
+        message={
+          <>
+            本次会统一修改
+            <span className="text-neutral-800 dark:text-neutral-200">
+              {' '}
+              {pendingRenameCount} 个烘焙商名称{' '}
+            </span>
+            ，并同步更新咖啡豆、冲煮记录快照、烘焙商图标配置等。保存后无法还原。
+          </>
+        }
+      />
+
       {/* 导入导出抽屉 */}
       <RoasterLogoImportExport
         isOpen={showImportExport}
@@ -411,6 +718,88 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
         existingRoasters={roasters}
         onImportComplete={handleImportComplete}
       />
+
+      <style>{`
+        .roaster-rename-preview {
+          animation: roaster-preview-in 160ms cubic-bezier(0.23, 1, 0.32, 1)
+            both;
+        }
+
+        .roaster-rename-preview-old {
+          animation: roaster-old-dim 180ms cubic-bezier(0.23, 1, 0.32, 1) 40ms
+            both;
+        }
+
+        .roaster-rename-preview-line {
+          position: absolute;
+          top: 50%;
+          left: 0;
+          right: 0;
+          height: 1px;
+          background: currentColor;
+          opacity: 0.8;
+          transform: scaleX(0);
+          transform-origin: left center;
+          animation: roaster-strike 180ms cubic-bezier(0.23, 1, 0.32, 1) 90ms
+            both;
+        }
+
+        .roaster-rename-preview-new {
+          animation: roaster-new-in 180ms cubic-bezier(0.23, 1, 0.32, 1) 120ms
+            both;
+        }
+
+        @keyframes roaster-preview-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes roaster-old-dim {
+          from {
+            opacity: 1;
+          }
+          to {
+            opacity: 0.72;
+          }
+        }
+
+        @keyframes roaster-strike {
+          from {
+            transform: scaleX(0);
+          }
+          to {
+            transform: scaleX(1);
+          }
+        }
+
+        @keyframes roaster-new-in {
+          from {
+            opacity: 0;
+            transform: translateX(-4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .roaster-rename-preview,
+          .roaster-rename-preview-old,
+          .roaster-rename-preview-line,
+          .roaster-rename-preview-new {
+            animation: none;
+          }
+
+          .roaster-rename-preview-line {
+            transform: scaleX(1);
+          }
+        }
+      `}</style>
     </SettingPage>
   );
 };
