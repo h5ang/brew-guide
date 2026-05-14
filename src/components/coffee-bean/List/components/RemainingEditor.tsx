@@ -11,6 +11,12 @@ import { CoffeeBean } from '@/types/app';
 import { BrewingNoteData } from '@/types/app';
 import hapticsUtils from '@/lib/ui/haptics';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
+import { resolveSelectedDateTimestamp } from '@/lib/utils/dateUtils';
+import {
+  getDateGroupingModePreference,
+  getFilterModePreference,
+  getSelectedDatePreference,
+} from '@/components/notes/List/globalCache';
 
 interface RemainingEditorProps {
   position?: { x: number; y: number } | null;
@@ -261,20 +267,43 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
     e.stopPropagation();
   };
 
+  const getAutoNoteTimestamp = (fallbackTimestamp: number) => {
+    const settings = storeSettings as SettingsOptions;
+    if (
+      !settings.syncNewNoteDateWithSelectedDate ||
+      !settings.syncQuickDecrementDateWithSelectedDate ||
+      getFilterModePreference() !== 'date'
+    ) {
+      return fallbackTimestamp;
+    }
+
+    const selectedDate = getSelectedDatePreference();
+    if (!selectedDate) {
+      return fallbackTimestamp;
+    }
+
+    const baseDate = new Date(fallbackTimestamp);
+    return (
+      resolveSelectedDateTimestamp(
+        selectedDate,
+        getDateGroupingModePreference(),
+        baseDate
+      ) ?? baseDate.getTime()
+    );
+  };
+
   // 创建自动笔记 - 根据实际扣除量创建变动记录
-  const createAutoNote = async (
-    requestedAmount: number,
-    actualAmount: number
-  ) => {
+  const createAutoNote = async (actualAmount: number) => {
     if (!coffeeBean || !isMounted.current) return;
 
     const processingTimestamp = Date.now();
+    const noteTimestamp = getAutoNoteTimestamp(processingTimestamp);
 
     try {
       // 创建一个默认的笔记数据
       const newNote: BrewingNoteData = {
         id: processingTimestamp.toString(),
-        timestamp: processingTimestamp,
+        timestamp: noteTimestamp,
         source: 'quick-decrement',
         quickDecrementAmount: actualAmount, // 使用实际扣除量
         beanId: coffeeBean.id,
@@ -299,8 +328,6 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
         totalTime: 0, // 添加totalTime字段，快捷扣除记录没有时间概念
       };
 
-      const { Storage } = await import('@/lib/core/storage');
-      const existingNotesStr = await Storage.get('brewingNotes');
       if (!isMounted.current) return;
 
       // 🔥 使用 Zustand store 保存笔记
@@ -320,7 +347,7 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
       const currentRemaining = parseFloat(coffeeBean.remaining || '0');
       const actualDecrementAmount = Math.min(value, currentRemaining);
       onQuickDecrement(value);
-      await createAutoNote(value, actualDecrementAmount);
+      await createAutoNote(actualDecrementAmount);
       if (hapticEnabled) {
         hapticsUtils.light().catch(() => {
           // 静默处理触觉反馈错误

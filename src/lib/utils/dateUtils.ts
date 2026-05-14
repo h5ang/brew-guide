@@ -134,3 +134,102 @@ function daysBetween(dateStr1: string, dateStr2?: string): number {
   );
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
+
+export type DateGroupingMode = 'year' | 'month' | 'day';
+
+const applyTimeOfDay = (targetDate: Date, sourceDate: Date): Date => {
+  targetDate.setHours(
+    sourceDate.getHours(),
+    sourceDate.getMinutes(),
+    sourceDate.getSeconds(),
+    sourceDate.getMilliseconds()
+  );
+  return targetDate;
+};
+
+const getMonthDayCount = (year: number, monthIndex: number): number => {
+  return new Date(year, monthIndex + 1, 0).getDate();
+};
+
+const getClampedDay = (
+  year: number,
+  monthIndex: number,
+  preferredDay: number
+): number => {
+  return Math.min(preferredDay, getMonthDayCount(year, monthIndex));
+};
+
+const isValidYearMonth = (year: number, month: number): boolean => {
+  return (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    year > 0 &&
+    month >= 1 &&
+    month <= 12
+  );
+};
+
+export const resolveSelectedDateTimestamp = (
+  selectedDate: string,
+  dateGroupingMode: DateGroupingMode,
+  baseDate = new Date()
+): number | null => {
+  if (!selectedDate) return null;
+
+  if (dateGroupingMode === 'day') {
+    if (selectedDate === 'today') {
+      return baseDate.getTime();
+    }
+
+    if (selectedDate === 'yesterday' || selectedDate === 'dayBeforeYesterday') {
+      const offsetDays = selectedDate === 'yesterday' ? 1 : 2;
+      const targetDate = new Date(baseDate);
+      targetDate.setDate(targetDate.getDate() - offsetDays);
+      return targetDate.getTime();
+    }
+
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    if (
+      isValidYearMonth(year, month) &&
+      Number.isInteger(day) &&
+      day >= 1 &&
+      day <= getMonthDayCount(year, month - 1)
+    ) {
+      return applyTimeOfDay(new Date(year, month - 1, day), baseDate).getTime();
+    }
+
+    return null;
+  }
+
+  if (dateGroupingMode === 'month') {
+    const [year, month] = selectedDate.split('-').map(Number);
+    if (isValidYearMonth(year, month)) {
+      const monthIndex = month - 1;
+      return applyTimeOfDay(
+        new Date(
+          year,
+          monthIndex,
+          getClampedDay(year, monthIndex, baseDate.getDate())
+        ),
+        baseDate
+      ).getTime();
+    }
+
+    return null;
+  }
+
+  const year = Number(selectedDate);
+  if (Number.isInteger(year) && year > 0) {
+    const monthIndex = baseDate.getMonth();
+    return applyTimeOfDay(
+      new Date(
+        year,
+        monthIndex,
+        getClampedDay(year, monthIndex, baseDate.getDate())
+      ),
+      baseDate
+    ).getTime();
+  }
+
+  return null;
+};

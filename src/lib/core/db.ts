@@ -279,6 +279,7 @@ export interface AppSettings {
   experimentalBeanRecognitionModel?: string;
   experimentalBeanRecognitionPrompt?: string;
   syncNewNoteDateWithSelectedDate?: boolean;
+  syncQuickDecrementDateWithSelectedDate?: boolean;
 
   // 隐藏二维码选项
   hideGroupQRCode?: boolean;
