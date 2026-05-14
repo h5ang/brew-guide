@@ -5,7 +5,6 @@ import { Capacitor } from '@capacitor/core';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import PWAInstallGuideDrawer from '@/components/layout/PWAInstallGuideDrawer';
-import { APP_VERSION } from '@/lib/core/config';
 import {
   getDesktopDownloadUrl,
   getOnlineAndroidDownloadUrl,
@@ -63,7 +62,6 @@ const getOnboardingOpen = () => {
 export default function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [latestVersion, setLatestVersion] = useState(APP_VERSION);
   const [isVisible, setIsVisible] = useState(() => {
     if (typeof window === 'undefined') return false;
     if (Capacitor.isNativePlatform?.() === true) return false;
@@ -87,32 +85,6 @@ export default function PWAInstallBanner() {
     if (typeof window === 'undefined') return 'unknown';
     return getOnboardingOpen() ? 'open' : 'closed';
   });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadLatestVersion = async () => {
-      try {
-        const response = await fetch('/version.json', {
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) return;
-
-        const versionInfo = (await response.json()) as { version?: string };
-        if (!cancelled && typeof versionInfo.version === 'string') {
-          setLatestVersion(versionInfo.version);
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    void loadLatestVersion();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

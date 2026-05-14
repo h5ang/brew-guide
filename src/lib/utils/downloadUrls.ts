@@ -2,8 +2,7 @@ const GH_PROXY_PREFIX = 'https://gh-proxy.org/';
 const GITHUB_RELEASES_BASE =
   'https://github.com/chuthree/brew-guide/releases/download';
 const DESKTOP_DOWNLOAD_URL = 'https://chu3.top/brewguide';
-const ONLINE_ANDROID_DOWNLOAD_URL =
-  'https://gh-proxy.org/https://github.com/chuthree/brew-guide/releases/download/v1.0.0-online/BrewGuide-OL_1.0.0_android.apk';
+const ONLINE_ANDROID_VERSION = '1.0.1';
 
 const normalizeVersion = (version: string) => version.replace(/^v/i, '');
 
@@ -28,4 +27,12 @@ export const getOfflineAndroidDownloadUrl = (version: string) => {
   );
 };
 
-export const getOnlineAndroidDownloadUrl = () => ONLINE_ANDROID_DOWNLOAD_URL;
+export const getOnlineAndroidDownloadUrl = (
+  version = ONLINE_ANDROID_VERSION
+) => {
+  const normalizedVersion = normalizeVersion(version);
+  return buildGithubReleaseUrl(
+    `v${normalizedVersion}-online`,
+    `BrewGuide-OL_${normalizedVersion}_android.apk`
+  );
+};
