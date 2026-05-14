@@ -2767,9 +2767,12 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     Partial<BrewingNoteData>
   >({});
 
-  const handleAddNote = () => {
+  const handleAddNote = (draft?: Partial<BrewingNoteData>) => {
     setNoteFormDraftSource('blank');
-    setCurrentEditingNote(createBlankBrewingNoteDraft());
+    setCurrentEditingNote({
+      ...createBlankBrewingNoteDraft(),
+      ...draft,
+    });
     setShowNoteFormModal(true);
   };
 

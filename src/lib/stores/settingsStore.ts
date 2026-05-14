@@ -170,6 +170,7 @@ export const defaultSettings: AppSettings = {
   experimentalBeanRecognitionApiKey: '',
   experimentalBeanRecognitionModel: '',
   experimentalBeanRecognitionPrompt: '',
+  syncNewNoteDateWithSelectedDate: false,
 
   // 隐藏二维码选项
   hideGroupQRCode: false,

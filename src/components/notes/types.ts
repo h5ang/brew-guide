@@ -41,7 +41,7 @@ interface ToastState {
 export interface BrewingHistoryProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddNote?: () => void;
+  onAddNote?: (draft?: Partial<BrewingNoteData>) => void;
   setAlternativeHeaderContent?: (content: React.ReactNode | null) => void;
   setShowAlternativeHeader?: (show: boolean) => void;
   settings?: import('@/components/settings/Settings').SettingsOptions; // 添加可选的设置参数
@@ -113,7 +113,7 @@ export interface FilterTabsProps {
 
 // 添加笔记按钮属性
 export interface AddNoteButtonProps {
-  onAddNote: () => void;
+  onAddNote: (draft?: Partial<BrewingNoteData>) => void;
 }
 
 // 分享笔记按钮属性

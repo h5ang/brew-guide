@@ -56,7 +56,6 @@ const BeanSummaryCapacityLimitSection: React.FC<
 
   return (
     <SettingSection
-      title="容量显示"
       footer={
         !settings.enableBeanSummaryCapacityLimit
           ? '限制咖啡豆概要中的剩余容量显示上限。超过上限时，将以 1 kg+ 这类形式展示。'

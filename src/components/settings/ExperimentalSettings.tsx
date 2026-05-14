@@ -294,6 +294,17 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
           </div>
         )}
       </SettingSection>
+
+      <SettingSection title="笔记" footer="添加笔记时自动带入当前分类日期">
+        <SettingRow label="同步筛选日期" isLast>
+          <SettingToggle
+            checked={settings.syncNewNoteDateWithSelectedDate || false}
+            onChange={checked =>
+              handleChange('syncNewNoteDateWithSelectedDate', checked)
+            }
+          />
+        </SettingRow>
+      </SettingSection>
     </SettingPage>
   );
 };
