@@ -5,7 +5,7 @@ import {
   getEquipmentIdByName,
 } from '@/lib/utils/equipmentUtils';
 import type { BrewingNote } from '@/lib/core/config';
-import { SortOption, SORT_OPTIONS } from './types';
+import { SORT_OPTIONS, type SortOption, type DateGroupingMode } from './types';
 import { db } from '@/lib/core/db';
 import {
   getBeanUnitPrice,
@@ -244,6 +244,103 @@ export const formatDate = (timestamp: number): string => {
 export const formatDateAbsolute = (timestamp: number): string => {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const applyTimeOfDay = (targetDate: Date, sourceDate: Date): Date => {
+  targetDate.setHours(
+    sourceDate.getHours(),
+    sourceDate.getMinutes(),
+    sourceDate.getSeconds(),
+    sourceDate.getMilliseconds()
+  );
+  return targetDate;
+};
+
+const getMonthDayCount = (year: number, monthIndex: number): number => {
+  return new Date(year, monthIndex + 1, 0).getDate();
+};
+
+const getClampedDay = (
+  year: number,
+  monthIndex: number,
+  preferredDay: number
+): number => {
+  return Math.min(preferredDay, getMonthDayCount(year, monthIndex));
+};
+
+const isValidYearMonth = (year: number, month: number): boolean => {
+  return (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    year > 0 &&
+    month >= 1 &&
+    month <= 12
+  );
+};
+
+export const resolveSelectedDateTimestamp = (
+  selectedDate: string,
+  dateGroupingMode: DateGroupingMode,
+  baseDate = new Date()
+): number | null => {
+  if (!selectedDate) return null;
+
+  if (dateGroupingMode === 'day') {
+    if (selectedDate === 'today') {
+      return baseDate.getTime();
+    }
+
+    if (selectedDate === 'yesterday' || selectedDate === 'dayBeforeYesterday') {
+      const offsetDays = selectedDate === 'yesterday' ? 1 : 2;
+      const targetDate = new Date(baseDate);
+      targetDate.setDate(targetDate.getDate() - offsetDays);
+      return targetDate.getTime();
+    }
+
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    if (
+      isValidYearMonth(year, month) &&
+      Number.isInteger(day) &&
+      day >= 1 &&
+      day <= getMonthDayCount(year, month - 1)
+    ) {
+      return applyTimeOfDay(new Date(year, month - 1, day), baseDate).getTime();
+    }
+
+    return null;
+  }
+
+  if (dateGroupingMode === 'month') {
+    const [year, month] = selectedDate.split('-').map(Number);
+    if (isValidYearMonth(year, month)) {
+      const monthIndex = month - 1;
+      return applyTimeOfDay(
+        new Date(
+          year,
+          monthIndex,
+          getClampedDay(year, monthIndex, baseDate.getDate())
+        ),
+        baseDate
+      ).getTime();
+    }
+
+    return null;
+  }
+
+  const year = Number(selectedDate);
+  if (Number.isInteger(year) && year > 0) {
+    const monthIndex = baseDate.getMonth();
+    return applyTimeOfDay(
+      new Date(
+        year,
+        monthIndex,
+        getClampedDay(year, monthIndex, baseDate.getDate())
+      ),
+      baseDate
+    ).getTime();
+  }
+
+  return null;
 };
 
 // 辅助函数：判断是否是今天

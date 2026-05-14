@@ -55,6 +55,7 @@ import { exportSelectedNotes } from '../Share/NotesExporter';
 import {
   buildNoteSearchableTexts,
   getNoteDeleteDisplay,
+  resolveSelectedDateTimestamp,
   scoreSearchMatch,
   sortNotes,
   splitSearchTerms,
@@ -677,9 +678,22 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
 
   // 处理添加笔记
   const handleAddNote = () => {
-    if (onAddNote) {
-      onAddNote();
+    if (!onAddNote) {
+      return;
     }
+
+    const syncedTimestamp =
+      settings?.syncNewNoteDateWithSelectedDate &&
+      filterMode === 'date' &&
+      selectedDate
+        ? resolveSelectedDateTimestamp(selectedDate, dateGroupingMode)
+        : null;
+
+    onAddNote(
+      typeof syncedTimestamp === 'number'
+        ? { timestamp: syncedTimestamp }
+        : undefined
+    );
   };
 
   // 处理排序选项变化
