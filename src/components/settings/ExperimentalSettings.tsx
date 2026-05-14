@@ -295,8 +295,11 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
         )}
       </SettingSection>
 
-      <SettingSection title="笔记" footer="添加笔记时自动带入当前分类日期">
-        <SettingRow label="同步筛选日期" isLast>
+      <SettingSection title="笔记" footer="添加笔记和快捷扣除时，使用分类栏选中的日期。">
+        <SettingRow
+          label="同步筛选日期"
+          isLast={!settings.syncNewNoteDateWithSelectedDate}
+        >
           <SettingToggle
             checked={settings.syncNewNoteDateWithSelectedDate || false}
             onChange={checked =>
@@ -304,6 +307,16 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
             }
           />
         </SettingRow>
+        {settings.syncNewNoteDateWithSelectedDate && (
+          <SettingRow label="快捷扣除" isSubSetting isLast>
+            <SettingToggle
+              checked={settings.syncQuickDecrementDateWithSelectedDate || false}
+              onChange={checked =>
+                handleChange('syncQuickDecrementDateWithSelectedDate', checked)
+              }
+            />
+          </SettingRow>
+        )}
       </SettingSection>
     </SettingPage>
   );

@@ -55,11 +55,11 @@ import { exportSelectedNotes } from '../Share/NotesExporter';
 import {
   buildNoteSearchableTexts,
   getNoteDeleteDisplay,
-  resolveSelectedDateTimestamp,
   scoreSearchMatch,
   sortNotes,
   splitSearchTerms,
 } from '../utils';
+import { resolveSelectedDateTimestamp } from '@/lib/utils/dateUtils';
 import { useBrewingNoteStore } from '@/lib/stores/brewingNoteStore';
 import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { useCustomEquipmentStore } from '@/lib/stores/customEquipmentStore';
