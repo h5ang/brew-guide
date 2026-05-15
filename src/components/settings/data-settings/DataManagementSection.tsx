@@ -40,6 +40,8 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
           type: 'success',
           message: '已打开系统分享，请选择保存位置或发送给其他应用',
         });
+      } else if (exportResult.mode === 'android-document') {
+        setStatus({ type: 'success', message: '数据导出成功，文件已保存' });
       } else {
         setStatus({ type: 'success', message: '数据导出成功，文件已下载' });
       }
