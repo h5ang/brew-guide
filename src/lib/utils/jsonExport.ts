@@ -3,7 +3,10 @@
 import { Capacitor } from '@capacitor/core';
 import { TempFileManager } from '@/lib/utils/tempFileManager';
 
-export type JsonExportMode = 'web-download' | 'native-share';
+export type JsonExportMode =
+  | 'web-download'
+  | 'android-document'
+  | 'native-share';
 
 export interface JsonExportResult {
   mode: JsonExportMode;
@@ -61,6 +64,14 @@ export async function exportJsonFile({
     downloadJsonInWeb(jsonData, normalizedFileName);
     return {
       mode: 'web-download',
+      fileName: normalizedFileName,
+    };
+  }
+
+  if (Capacitor.getPlatform() === 'android') {
+    await TempFileManager.saveJsonFile(jsonData, normalizedFileName);
+    return {
+      mode: 'android-document',
       fileName: normalizedFileName,
     };
   }

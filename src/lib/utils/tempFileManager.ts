@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { saveImageToAndroidGallery } from './nativeGallerySaver';
+import { saveFileWithAndroidDocumentPicker } from './nativeDocumentSaver';
 
 /**
  * 分享选项接口
@@ -19,6 +20,7 @@ interface ShareOptions {
 export class TempFileManager {
   private static readonly TEMP_FILE_PREFIX = 'brew-guide-temp-';
   private static readonly NATIVE_TEXT_CHUNK_SIZE = 128 * 1024;
+  private static readonly JSON_MIME_TYPE = 'application/json';
 
   private static createTempFileName(fileName: string): string {
     const sanitizedFileName = fileName.replace(/[\\/:*?"<>|]/g, '-');
@@ -239,6 +241,58 @@ export class TempFileManager {
       await this.shareJsonFileNative(jsonData, fileName, shareOptions);
     } else {
       await this.shareJsonFileWeb(jsonData, fileName);
+    }
+  }
+
+  /**
+   * 保存JSON文件到用户选择的位置。Android 使用系统文件创建器，避免依赖分享面板。
+   */
+  static async saveJsonFile(jsonData: string, fileName: string): Promise<void> {
+    if (!Capacitor.isNativePlatform()) {
+      await this.shareJsonFileWeb(jsonData, fileName);
+      return;
+    }
+
+    if (Capacitor.getPlatform() === 'android') {
+      await this.saveJsonFileWithAndroidDocumentPicker(jsonData, fileName);
+      return;
+    }
+
+    await this.shareJsonFileNative(jsonData, fileName, {
+      title: '导出数据',
+      text: '请选择保存位置',
+      dialogTitle: '导出数据',
+    });
+  }
+
+  private static async saveJsonFileWithAndroidDocumentPicker(
+    jsonData: string,
+    fileName: string
+  ): Promise<void> {
+    const fullFileName = this.createTempFileName(fileName);
+
+    try {
+      await this.writeUtf8TextFile(fullFileName, jsonData);
+
+      const uriResult = await Filesystem.getUri({
+        path: fullFileName,
+        directory: Directory.Cache,
+      });
+
+      await saveFileWithAndroidDocumentPicker({
+        sourceUri: uriResult.uri,
+        fileName,
+        mimeType: this.JSON_MIME_TYPE,
+      });
+
+      await this.cleanupTempFile(fullFileName);
+    } catch (error) {
+      try {
+        await this.cleanupTempFile(fullFileName);
+      } catch (cleanupError) {
+        console.warn('清理临时文件失败:', cleanupError);
+      }
+      throw error;
     }
   }
 
