@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   defaultSettings,
@@ -43,36 +49,13 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isOpen !== undefined ? isOpen : internalOpen;
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
-  const [decrementValues, setDecrementValues] = useState<number[]>(
-    defaultSettings.decrementPresets
-  );
-  const [enableAllOption, setEnableAllOption] = useState<boolean>(
-    defaultSettings.enableAllDecrementOption
-  );
-  const [enableCustomInput, setEnableCustomInput] = useState<boolean>(
-    defaultSettings.enableCustomDecrementInput
-  );
   const [customValue, setCustomValue] = useState<string>('');
-  const [hapticEnabled, setHapticEnabled] = useState<boolean>(
-    defaultSettings.hapticFeedback
-  );
 
   // 引用管理
   const popoverRef = useRef<HTMLDivElement>(null);
   const isMounted = useRef(false);
   const safeTargetRef = useRef<HTMLElement | null>(null);
   const _isExiting = useRef(false);
-
-  // 安全的状态更新函数
-  const safeSetState = <T,>(
-    setter: React.Dispatch<React.SetStateAction<T>>
-  ) => {
-    return (value: T) => {
-      if (isMounted.current) {
-        setter(value);
-      }
-    };
-  };
 
   // 组件挂载和卸载处理
   useEffect(() => {
@@ -102,50 +85,68 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
 
   // 从 settingsStore 获取设置
   const storeSettings = useSettingsStore(state => state.settings);
+  const settings = storeSettings as SettingsOptions;
+  const isGreenBean = coffeeBean?.beanState === 'green';
 
-  // 加载设置（预设值 + 功能开关）
-  // 根据咖啡豆类型（生豆/熟豆）加载不同的预设值
-  useEffect(() => {
-    const isGreenBean = coffeeBean?.beanState === 'green';
-    const settings = storeSettings as SettingsOptions;
-
-    // 根据咖啡豆类型选择预设值
+  const rawDecrementValues = useMemo(() => {
     if (isGreenBean) {
-      // 生豆模式：使用生豆烘焙预设值
-      if (settings.greenBeanRoastPresets?.length > 0) {
-        safeSetState(setDecrementValues)(settings.greenBeanRoastPresets);
-      } else {
-        safeSetState(setDecrementValues)(defaultSettings.greenBeanRoastPresets);
-      }
-      safeSetState(setEnableAllOption)(
-        settings.enableAllGreenBeanRoastOption ??
-          defaultSettings.enableAllGreenBeanRoastOption
-      );
-      safeSetState(setEnableCustomInput)(
-        settings.enableCustomGreenBeanRoastInput ??
-          defaultSettings.enableCustomGreenBeanRoastInput
-      );
-    } else {
-      // 熟豆模式：使用库存扣除预设值
-      if (settings.decrementPresets?.length > 0) {
-        safeSetState(setDecrementValues)(settings.decrementPresets);
-      } else {
-        safeSetState(setDecrementValues)(defaultSettings.decrementPresets);
-      }
-      safeSetState(setEnableAllOption)(
-        settings.enableAllDecrementOption ??
-          defaultSettings.enableAllDecrementOption
-      );
-      safeSetState(setEnableCustomInput)(
-        settings.enableCustomDecrementInput ??
-          defaultSettings.enableCustomDecrementInput
-      );
+      return settings.greenBeanRoastPresets?.length
+        ? settings.greenBeanRoastPresets
+        : defaultSettings.greenBeanRoastPresets;
     }
 
-    safeSetState(setHapticEnabled)(
-      settings.hapticFeedback ?? defaultSettings.hapticFeedback
-    );
-  }, [coffeeBean?.beanState, storeSettings]);
+    return settings.decrementPresets?.length
+      ? settings.decrementPresets
+      : defaultSettings.decrementPresets;
+  }, [isGreenBean, settings.decrementPresets, settings.greenBeanRoastPresets]);
+
+  const enableAllOption = isGreenBean
+    ? (settings.enableAllGreenBeanRoastOption ??
+      defaultSettings.enableAllGreenBeanRoastOption)
+    : (settings.enableAllDecrementOption ??
+      defaultSettings.enableAllDecrementOption);
+
+  const enableCustomInput = isGreenBean
+    ? (settings.enableCustomGreenBeanRoastInput ??
+      defaultSettings.enableCustomGreenBeanRoastInput)
+    : (settings.enableCustomDecrementInput ??
+      defaultSettings.enableCustomDecrementInput);
+
+  const hapticEnabled =
+    settings.hapticFeedback ?? defaultSettings.hapticFeedback;
+
+  const remainingAmount = useMemo(() => {
+    if (!coffeeBean) return null;
+
+    const parsed = parseFloat(coffeeBean.remaining || '0');
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  }, [coffeeBean]);
+
+  const decrementOptions = useMemo(() => {
+    const seen = new Set<string>();
+
+    return rawDecrementValues.reduce<number[]>((options, value) => {
+      if (!Number.isFinite(value) || value <= 0) return options;
+
+      const normalizedValue =
+        remainingAmount === null ? value : Math.min(value, remainingAmount);
+      if (normalizedValue <= 0) return options;
+
+      const key = normalizedValue.toFixed(1);
+      if (seen.has(key)) return options;
+
+      seen.add(key);
+      options.push(normalizedValue);
+      return options;
+    }, []);
+  }, [rawDecrementValues, remainingAmount]);
+
+  const formatDecrementLabel = useCallback((value: number) => {
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }, []);
+
+  const showAllButton =
+    enableAllOption && remainingAmount !== null && remainingAmount > 0;
 
   // 添加键盘事件处理
   useEffect(() => {
@@ -343,10 +344,12 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
   const performQuickDecrement = async (value: number) => {
     if (!isMounted.current || !coffeeBean) return;
     try {
+      const currentRemaining = remainingAmount ?? 0;
+      if (currentRemaining <= 0) return;
+
       setOpen(false);
-      const currentRemaining = parseFloat(coffeeBean.remaining || '0');
       const actualDecrementAmount = Math.min(value, currentRemaining);
-      onQuickDecrement(value);
+      onQuickDecrement(actualDecrementAmount);
       await createAutoNote(actualDecrementAmount);
       if (hapticEnabled) {
         hapticsUtils.light().catch(() => {
@@ -367,11 +370,7 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
   // ALL 扣除点击
   const handleAllClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!coffeeBean) return;
-    const currentRemaining = Math.max(
-      0,
-      parseFloat(coffeeBean.remaining || '0')
-    );
+    const currentRemaining = remainingAmount ?? 0;
     if (currentRemaining > 0) {
       await performQuickDecrement(currentRemaining);
     }
@@ -407,18 +406,18 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
         >
           <div className="flex flex-wrap items-center gap-1">
             {/* 预设值按钮 */}
-            {decrementValues.map(value => (
+            {decrementOptions.map(value => (
               <button
                 key={value}
                 className="h-6 rounded-sm bg-neutral-100 px-2 text-[10px] text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
                 onClick={e => handleDecrementClick(e, value)}
               >
-                -{value}
+                -{formatDecrementLabel(value)}
               </button>
             ))}
 
             {/* ALL按钮 */}
-            {enableAllOption && (
+            {showAllButton && (
               <button
                 className="h-6 rounded-sm bg-neutral-100 px-2 text-[10px] text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
                 onClick={handleAllClick}
