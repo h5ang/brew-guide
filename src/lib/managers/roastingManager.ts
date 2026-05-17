@@ -9,6 +9,7 @@ import {
   getNextAvailableNumber,
 } from '@/lib/utils/beanRepurchaseUtils';
 import { formatBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
+import { mergeBeanWithStoredImages } from '@/lib/coffee-beans/imageRepository';
 
 // 辅助函数：格式化数字
 function formatNumber(value: number): string {
@@ -70,10 +71,12 @@ export const RoastingManager = {
   }> {
     try {
       // 1. 获取生豆信息
-      const greenBean = await getCoffeeBeanStore().getBeanById(greenBeanId);
-      if (!greenBean) {
+      const storedGreenBean =
+        await getCoffeeBeanStore().getBeanById(greenBeanId);
+      if (!storedGreenBean) {
         return { success: false, error: '找不到生豆记录' };
       }
+      const greenBean = await mergeBeanWithStoredImages(storedGreenBean);
 
       // 确认是生豆
       const beanState = greenBean.beanState || 'roasted';
@@ -137,6 +140,7 @@ export const RoastingManager = {
           remaining: formatNumber(userRemaining),
           // 继承生豆的其他属性
           image: roastedBeanData.image || greenBean.image,
+          backImage: roastedBeanData.backImage || greenBean.backImage,
           roastLevel: roastedBeanData.roastLevel ?? greenBean.roastLevel,
           roastDate: roastedBeanData.roastDate,
           flavor: roastedBeanData.flavor || greenBean.flavor,
@@ -560,11 +564,12 @@ export const RoastingManager = {
       const { Storage } = await import('@/lib/core/storage');
 
       // 1. 获取原熟豆信息
-      const originalBean =
+      const storedOriginalBean =
         await getCoffeeBeanStore().getBeanById(roastedBeanId);
-      if (!originalBean) {
+      if (!storedOriginalBean) {
         return { success: false, error: '找不到咖啡豆记录' };
       }
+      const originalBean = await mergeBeanWithStoredImages(storedOriginalBean);
 
       // 确认是熟豆
       const beanState = originalBean.beanState || 'roasted';
@@ -636,6 +641,7 @@ export const RoastingManager = {
           capacity: originalBean.capacity,
           remaining: originalBean.remaining,
           image: originalBean.image,
+          backImage: originalBean.backImage,
           roastLevel: originalBean.roastLevel,
           flavor: originalBean.flavor,
           notes: originalBean.notes,
@@ -683,6 +689,7 @@ export const RoastingManager = {
         capacity: originalBean.capacity,
         remaining: originalBean.remaining,
         image: originalBean.image,
+        backImage: originalBean.backImage,
         roastLevel: originalBean.roastLevel,
         flavor: originalBean.flavor,
         notes: originalBean.notes,
@@ -716,6 +723,7 @@ export const RoastingManager = {
         capacity: formatNumber(roastedAmount),
         remaining: formatNumber(newRoastedRemaining),
         image: originalBean.image,
+        backImage: originalBean.backImage,
         roastLevel: originalBean.roastLevel,
         roastDate: originalBean.roastDate, // 保留原熟豆的烘焙日期
         flavor: originalBean.flavor,
