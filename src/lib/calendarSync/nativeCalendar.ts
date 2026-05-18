@@ -10,7 +10,8 @@ const isNativeCalendarSupported = (): boolean => {
   const platform = Capacitor.getPlatform();
   return (
     Capacitor.isNativePlatform() &&
-    (platform === 'ios' || platform === 'android')
+    (platform === 'ios' || platform === 'android') &&
+    Capacitor.isPluginAvailable('CapacitorCalendar')
   );
 };
 
