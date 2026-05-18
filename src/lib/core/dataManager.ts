@@ -615,6 +615,7 @@ export const DataManager = {
       await db.brewingNotes.clear();
       await db.coffeeBeans.clear();
       await db.coffeeBeanImages.clear();
+      await db.coffeeBeanImageThumbnails.clear();
       await db.customEquipments.clear();
       await db.customMethods.clear();
       await db.grinders.clear();

@@ -9,6 +9,11 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { BrewingNote } from '@/lib/core/config';
 import { db } from '@/lib/core/db';
 import { nanoid } from 'nanoid';
+import {
+  cleanupEmbeddedCoffeeBeansFromNotes,
+  stripEmbeddedCoffeeBeanFromNote,
+} from '@/lib/notes/cleanup';
+import { recordCrashCheckpoint } from '@/lib/app/crashDiagnostics';
 
 interface BrewingNoteStore {
   notes: BrewingNote[];
@@ -45,7 +50,11 @@ export const useBrewingNoteStore = create<BrewingNoteStore>()(
       if (get().isLoading) return;
       set({ isLoading: true, error: null });
       try {
+        await cleanupEmbeddedCoffeeBeansFromNotes();
         const notes = await db.brewingNotes.toArray();
+        recordCrashCheckpoint('brewing-notes:loaded', {
+          noteCount: notes.length,
+        });
         set({ notes, isLoading: false, initialized: true });
       } catch {
         set({ error: '加载笔记失败', isLoading: false, initialized: true });
@@ -56,12 +65,12 @@ export const useBrewingNoteStore = create<BrewingNoteStore>()(
       const inputNote = noteData as BrewingNote;
       const now = Date.now();
       const timestamp = inputNote.timestamp || now;
-      const newNote: BrewingNote = {
+      const newNote = stripEmbeddedCoffeeBeanFromNote({
         ...noteData,
         id: inputNote.id || nanoid(),
         timestamp,
         updatedAt: inputNote.updatedAt || timestamp, // 创建时也设置 updatedAt，与 timestamp 相同
-      };
+      } as BrewingNote).note;
 
       await db.brewingNotes.put(newNote);
       set(state => ({ notes: [newNote, ...state.notes] }));
@@ -89,7 +98,7 @@ export const useBrewingNoteStore = create<BrewingNoteStore>()(
       const shouldRemoveChangeRecord =
         'changeRecord' in updates && updates.changeRecord === undefined;
 
-      const updatedNote: BrewingNote = {
+      const updatedNote = stripEmbeddedCoffeeBeanFromNote({
         ...existingNote,
         ...updates,
         id,
@@ -99,7 +108,7 @@ export const useBrewingNoteStore = create<BrewingNoteStore>()(
             ? updates.timestamp
             : existingNote.timestamp,
         updatedAt: Date.now(), // 更新时间用于同步
-      };
+      } as BrewingNote).note;
 
       // 移除变动记录字段
       if (shouldRemoveSource) delete (updatedNote as any).source;
@@ -140,15 +149,24 @@ export const useBrewingNoteStore = create<BrewingNoteStore>()(
       }
     },
 
-    setNotes: notes => set({ notes, initialized: true }),
+    setNotes: notes =>
+      set({
+        notes: notes.map(note => stripEmbeddedCoffeeBeanFromNote(note).note),
+        initialized: true,
+      }),
 
     upsertNote: async note => {
-      await db.brewingNotes.put(note);
+      const cleanNote = stripEmbeddedCoffeeBeanFromNote(note).note;
+      await db.brewingNotes.put(cleanNote);
       set(state => {
-        const exists = state.notes.some(n => n.id === note.id);
+        const exists = state.notes.some(n => n.id === cleanNote.id);
         return exists
-          ? { notes: state.notes.map(n => (n.id === note.id ? note : n)) }
-          : { notes: [note, ...state.notes] };
+          ? {
+              notes: state.notes.map(n =>
+                n.id === cleanNote.id ? cleanNote : n
+              ),
+            }
+          : { notes: [cleanNote, ...state.notes] };
       });
     },
 

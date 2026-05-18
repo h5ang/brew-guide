@@ -12,6 +12,10 @@ type CoffeeBeanDataChangedDetail = {
   bean?: { id?: string };
 };
 
+type CoffeeBeanImageThumbnailChangedDetail = {
+  beanId?: string;
+};
+
 export function useCoffeeBeanImage(
   beanId: string | undefined,
   options: {
@@ -68,12 +72,32 @@ export function useCoffeeBeanImage(
       setRefreshKey(key => key + 1);
     };
 
+    const handleThumbnailChanged = (event: Event) => {
+      const detail = (
+        event as CustomEvent<CoffeeBeanImageThumbnailChangedDetail>
+      ).detail;
+
+      if (detail?.beanId && detail.beanId !== beanId) {
+        return;
+      }
+
+      setRefreshKey(key => key + 1);
+    };
+
     window.addEventListener('coffeeBeanDataChanged', handleBeanDataChanged);
+    window.addEventListener(
+      'coffeeBeanImageThumbnailChanged',
+      handleThumbnailChanged
+    );
 
     return () => {
       window.removeEventListener(
         'coffeeBeanDataChanged',
         handleBeanDataChanged
+      );
+      window.removeEventListener(
+        'coffeeBeanImageThumbnailChanged',
+        handleThumbnailChanged
       );
     };
   }, [beanId]);

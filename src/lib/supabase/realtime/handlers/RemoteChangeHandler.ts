@@ -106,6 +106,7 @@ export class RemoteChangeHandler {
       await dbTable.delete(recordId);
       if (table === SYNC_TABLES.COFFEE_BEANS) {
         await db.coffeeBeanImages.delete(recordId);
+        await db.coffeeBeanImageThumbnails.delete(recordId);
       }
       await notifyStoreDelete(table, recordId);
     }

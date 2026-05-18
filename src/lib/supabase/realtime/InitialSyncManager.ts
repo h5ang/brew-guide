@@ -403,6 +403,7 @@ export class InitialSyncManager {
               'rw',
               db.coffeeBeans,
               db.coffeeBeanImages,
+              db.coffeeBeanImageThumbnails,
               async () => {
                 for (const record of validRecords as CoffeeBean[]) {
                   const beanForStore = await persistCoffeeBeanImagesFromBean(
@@ -436,6 +437,7 @@ export class InitialSyncManager {
         await dbTable.bulkDelete(toDeleteLocal);
         if (table === SYNC_TABLES.COFFEE_BEANS) {
           await db.coffeeBeanImages.bulkDelete(toDeleteLocal);
+          await db.coffeeBeanImageThumbnails.bulkDelete(toDeleteLocal);
         }
       }
 

@@ -617,6 +617,7 @@ export const StorageUtils = {
       } else if (key === 'coffeeBeans') {
         await db.coffeeBeans.clear();
         await db.coffeeBeanImages.clear();
+        await db.coffeeBeanImageThumbnails.clear();
       } else {
         // 其他使用IndexedDB的键
         await db.settings.delete(key);

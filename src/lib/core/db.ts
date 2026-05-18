@@ -5,6 +5,7 @@ import { CoffeeBean } from '@/types/app';
 import { normalizeCoffeeBeans } from '@/lib/utils/coffeeBeanUtils';
 import {
   type CoffeeBeanImageRecord,
+  type CoffeeBeanImageThumbnailRecord,
   splitCoffeeBeanImages,
 } from '@/lib/coffee-beans/imageRecords';
 
@@ -348,12 +349,17 @@ export type SettingsOptions = AppSettings;
  * - v2: 添加 coffeeBeans 表
  * - v3: 添加 customEquipments, customMethods 表
  * - v4: 重构 - 添加 grinders, yearlyReports, appSettings 表，统一数据管理
+ * - v7: 咖啡豆缩略图拆分到独立表，避免读取缩略图时反序列化原图
  */
 export class BrewGuideDB extends Dexie {
   // 核心数据表
   brewingNotes!: Dexie.Table<BrewingNote, string>;
   coffeeBeans!: Dexie.Table<CoffeeBean, string>;
   coffeeBeanImages!: Dexie.Table<CoffeeBeanImageRecord, string>;
+  coffeeBeanImageThumbnails!: Dexie.Table<
+    CoffeeBeanImageThumbnailRecord,
+    string
+  >;
 
   // 器具与方案表
   customEquipments!: Dexie.Table<CustomEquipment, string>;
@@ -448,6 +454,21 @@ export class BrewGuideDB extends Dexie {
       brewingNotes: 'id, timestamp, equipment, method',
       coffeeBeans: 'id, timestamp, name, type',
       coffeeBeanImages: 'beanId, updatedAt',
+      settings: 'key',
+      customEquipments: 'id, name',
+      customMethods: 'equipmentId',
+      grinders: 'id, name',
+      yearlyReports: 'id, year, createdAt',
+      appSettings: 'id',
+      pendingOperations: 'id, table, recordId, timestamp',
+    });
+
+    // 版本7：缩略图独立存储，读取列表缩略图时不再加载原图 payload
+    this.version(7).stores({
+      brewingNotes: 'id, timestamp, equipment, method',
+      coffeeBeans: 'id, timestamp, name, type',
+      coffeeBeanImages: 'beanId, updatedAt',
+      coffeeBeanImageThumbnails: 'beanId, updatedAt',
       settings: 'key',
       customEquipments: 'id, name',
       customMethods: 'equipmentId',
@@ -805,6 +826,7 @@ export const dbUtils = {
         'rw',
         db.coffeeBeans,
         db.coffeeBeanImages,
+        db.coffeeBeanImageThumbnails,
         async () => {
           await db.coffeeBeans.each(async bean => {
             const split = splitCoffeeBeanImages(bean);
@@ -818,6 +840,17 @@ export const dbUtils = {
               imageThumbnail: existingRecord?.imageThumbnail,
               backImageThumbnail: existingRecord?.backImageThumbnail,
             });
+            if (
+              existingRecord?.imageThumbnail ||
+              existingRecord?.backImageThumbnail
+            ) {
+              await db.coffeeBeanImageThumbnails.put({
+                beanId: bean.id,
+                imageThumbnail: existingRecord.imageThumbnail,
+                backImageThumbnail: existingRecord.backImageThumbnail,
+                updatedAt: existingRecord.updatedAt || Date.now(),
+              });
+            }
             await db.coffeeBeans.put(split.bean);
             migratedBeanCount += 1;
           });
@@ -952,6 +985,7 @@ export const dbUtils = {
       await db.brewingNotes.clear();
       await db.coffeeBeans.clear();
       await db.coffeeBeanImages.clear();
+      await db.coffeeBeanImageThumbnails.clear();
       await db.customEquipments.clear();
       await db.customMethods.clear();
       await db.grinders.clear();
@@ -987,6 +1021,7 @@ export const dbUtils = {
       const grinderCount = await db.grinders.count();
       const equipmentCount = await db.customEquipments.count();
       const beanImageCount = await db.coffeeBeanImages.count();
+      const beanThumbnailCount = await db.coffeeBeanImageThumbnails.count();
 
       console.warn(`IndexedDB 存储信息:`);
       console.warn(
@@ -996,6 +1031,7 @@ export const dbUtils = {
         `- 咖啡豆数量: ${beanCount}, 大小: ${beansSizeInBytes} 字节 (${beansSizeInKB} KB, ${beansSizeInMB} MB)`
       );
       console.warn(`- 咖啡豆图片数量: ${beanImageCount}`);
+      console.warn(`- 咖啡豆缩略图数量: ${beanThumbnailCount}`);
       console.warn(`- 磨豆机数量: ${grinderCount}`);
       console.warn(`- 自定义器具数量: ${equipmentCount}`);
       console.warn(

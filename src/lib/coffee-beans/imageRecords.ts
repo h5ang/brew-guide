@@ -9,6 +9,13 @@ export interface CoffeeBeanImageRecord {
   updatedAt: number;
 }
 
+export interface CoffeeBeanImageThumbnailRecord {
+  beanId: string;
+  imageThumbnail?: string;
+  backImageThumbnail?: string;
+  updatedAt: number;
+}
+
 export interface SplitCoffeeBeanImagesResult {
   bean: CoffeeBean;
   imageRecord?: CoffeeBeanImageRecord;

@@ -175,9 +175,11 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
           'rw',
           db.coffeeBeans,
           db.coffeeBeanImages,
+          db.coffeeBeanImageThumbnails,
           async () => {
             await db.coffeeBeans.delete(id);
             await db.coffeeBeanImages.delete(id);
+            await db.coffeeBeanImageThumbnails.delete(id);
           }
         );
         set(state => ({
@@ -234,9 +236,11 @@ export const useCoffeeBeanStore = create<CoffeeBeanStore>()(
           'rw',
           db.coffeeBeans,
           db.coffeeBeanImages,
+          db.coffeeBeanImageThumbnails,
           async () => {
             await db.coffeeBeans.delete(id);
             await db.coffeeBeanImages.delete(id);
+            await db.coffeeBeanImageThumbnails.delete(id);
           }
         );
         set(state => ({ beans: state.beans.filter(b => b.id !== id) }));

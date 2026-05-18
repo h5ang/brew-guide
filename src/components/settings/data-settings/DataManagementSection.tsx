@@ -101,6 +101,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
                 Storage.set('coffeeBeans', JSON.stringify([])),
                 db.coffeeBeans.clear(),
                 db.coffeeBeanImages.clear(),
+                db.coffeeBeanImageThumbnails.clear(),
                 Storage.set('brewingNotes', JSON.stringify([])),
                 db.brewingNotes.clear(),
               ]);

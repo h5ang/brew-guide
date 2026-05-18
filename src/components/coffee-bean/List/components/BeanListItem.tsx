@@ -101,11 +101,6 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
     fallback: bean.image,
     preferThumbnail: true,
   });
-  const beanBackImage = useCoffeeBeanImage(bean.id, {
-    side: 'back',
-    fallback: bean.backImage,
-    preferThumbnail: false,
-  });
 
   const roasterLogo = useMemo(() => {
     if (!bean.name || beanImage) {
@@ -137,20 +132,19 @@ const BeanListItem: React.FC<BeanListItemProps> = ({
               preferThumbnail: false,
             }),
           ])
-        : [undefined, beanBackImage];
+        : [undefined, undefined];
 
       openImageViewer({
         url: frontImage || imageSource,
         alt: isBeanImage
           ? bean.name || '咖啡豆图片'
           : `${roasterName} 烘焙商图标`,
-        backUrl: backImage || beanBackImage,
+        backUrl: backImage,
       });
     })();
   }, [
     bean.id,
     bean.name,
-    beanBackImage,
     beanImage,
     hasImageError,
     imageSource,
