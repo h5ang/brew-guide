@@ -159,6 +159,7 @@ export const defaultSettings: AppSettings = {
   showRatingDimensionsEntry: false,
   showUnitPriceInNote: false,
   showBeanAgingDaysInNote: false,
+  showFlavorInNote: true,
   showNoteTimeInNote: true,
   showCapacityAdjustmentRecords: true,
   useClassicNotesListStyle: false,

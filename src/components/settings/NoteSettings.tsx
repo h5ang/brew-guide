@@ -5,12 +5,10 @@ import React from 'react';
 import { SettingsOptions } from './Settings';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
-import {
-  SettingPage,
-  SettingSection,
-  SettingRow,
-  SettingToggle,
-} from './atomic';
+import SettingPage from './atomic/SettingPage';
+import SettingSection from './atomic/SettingSection';
+import SettingRow from './atomic/SettingRow';
+import SettingToggle from './atomic/SettingToggle';
 
 interface NoteSettingsProps {
   settings: SettingsOptions;
@@ -36,27 +34,22 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
       key: K,
       value: SettingsOptions[K]
     ) => {
-      await updateSettings({ [key]: value } as any);
+      await updateSettings({ [key]: value } as Partial<SettingsOptions>);
     },
     [updateSettings]
   );
 
   // 控制动画状态
-  const [shouldRender, setShouldRender] = React.useState(true);
   const [isVisible, setIsVisible] = React.useState(false);
-
-  // 用于保存最新的 onClose 引用
-  const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
 
   // 关闭处理函数（带动画）
   const handleCloseWithAnimation = React.useCallback(() => {
     setIsVisible(false);
     window.dispatchEvent(new CustomEvent('subSettingsClosing'));
     setTimeout(() => {
-      onCloseRef.current();
+      onClose();
     }, 350);
-  }, []);
+  }, [onClose]);
 
   // 使用统一的历史栈管理系统
   useModalHistory({
@@ -78,8 +71,6 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
       });
     });
   }, []);
-
-  if (!shouldRender) return null;
 
   return (
     <SettingPage title="笔记" isVisible={isVisible} onClose={handleClose}>
@@ -120,6 +111,12 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
             onChange={checked =>
               handleChange('showBeanAgingDaysInNote', checked)
             }
+          />
+        </SettingRow>
+        <SettingRow label="风味">
+          <SettingToggle
+            checked={settings.showFlavorInNote ?? true}
+            onChange={checked => handleChange('showFlavorInNote', checked)}
           />
         </SettingRow>
         <SettingRow label="时间" isLast>

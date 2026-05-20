@@ -52,6 +52,62 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, children }) => (
   </div>
 );
 
+interface NoteDetailSection {
+  id: string;
+  isVisible: boolean;
+  content: React.ReactNode;
+}
+
+const NoteDetailDivider: React.FC = () => (
+  <div className="border-t border-dashed border-neutral-200/50 dark:border-neutral-800/50" />
+);
+
+const NoteDetailSectionList: React.FC<{ sections: NoteDetailSection[] }> = ({
+  sections,
+}) => {
+  const visibleSections = sections.filter(section => section.isVisible);
+
+  return (
+    <>
+      {visibleSections.map((section, index) => (
+        <React.Fragment key={section.id}>
+          {index > 0 && <NoteDetailDivider />}
+          {section.content}
+        </React.Fragment>
+      ))}
+    </>
+  );
+};
+
+const getCupPriceDisplay = (
+  note: BrewingNote | null,
+  bean: CoffeeBean | null,
+  enabled: boolean
+): string | null => {
+  if (!enabled || !bean?.price || !bean.capacity) {
+    return null;
+  }
+
+  const priceMatch = bean.price.match(/(\d+(?:\.\d+)?)/);
+  const capacityMatch = bean.capacity.match(/(\d+(?:\.\d+)?)/);
+  if (!priceMatch || !capacityMatch) {
+    return null;
+  }
+
+  const price = parseFloat(priceMatch[0]);
+  const capacity = parseFloat(capacityMatch[0]);
+  if (Number.isNaN(price) || Number.isNaN(capacity) || capacity <= 0) {
+    return null;
+  }
+
+  const unitPrice = price / capacity;
+  const coffeeMatch = note?.params?.coffee?.match(/(\d+(?:\.\d+)?)/);
+  const coffeeWeight = coffeeMatch ? parseFloat(coffeeMatch[0]) : 0;
+  const cupPrice = coffeeWeight * unitPrice;
+
+  return `${cupPrice.toFixed(2)}元（${unitPrice.toFixed(2)}元/克）`;
+};
+
 interface BeanTitleLinkProps {
   title: string;
   bean: CoffeeBean | null;
@@ -118,6 +174,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   );
   const showBeanAgingDaysInNote = useSettingsStore(
     state => state.settings.showBeanAgingDaysInNote ?? false
+  );
+  const showFlavorInNote = useSettingsStore(
+    state => state.settings.showFlavorInNote ?? true
   );
   const showNoteTimeInNote = useSettingsStore(
     state => state.settings.showNoteTimeInNote ?? true
@@ -209,11 +268,12 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   const [currentHeight, setCurrentHeight] = useState<number | 'auto'>('auto');
 
   // 获取笔记图片列表 - 提前声明以便在效果中使用
-  const noteImages = useMemo(() => {
-    if (note?.images && note.images.length > 0) return note.images;
-    if (note?.image) return [note.image];
-    return [];
-  }, [note?.images, note?.image]);
+  const noteImages =
+    note?.images && note.images.length > 0
+      ? note.images
+      : note?.image
+        ? [note.image]
+        : [];
 
   // 是否有多图
   const hasMultiImages = noteImages.length > 1;
@@ -345,11 +405,12 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   // 保存备注的函数
   const handleSaveNotes = useCallback(
     async (newNotes: string) => {
-      if (!note?.id) return;
+      const noteId = note?.id;
+      if (!noteId) return;
 
       try {
         // 更新备注 - 保留换行符，不使用 trim()
-        await useBrewingNoteStore.getState().updateNote(note.id, {
+        await useBrewingNoteStore.getState().updateNote(noteId, {
           notes: newNotes,
         });
 
@@ -358,7 +419,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
           new CustomEvent('brewingNoteDataChanged', {
             detail: {
               action: 'update',
-              noteId: note.id,
+              noteId,
             },
           })
         );
@@ -366,7 +427,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
         console.error('保存备注失败:', error);
       }
     },
-    [note?.id]
+    [note]
   );
 
   // 处理备注内容变化
@@ -438,20 +499,6 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
     modalHistory.back();
   }, []);
 
-  // 判断是否为意式咖啡笔记 - 必须在所有 hooks 调用后，在条件返回前
-  const isEspresso = React.useMemo(() => {
-    if (!note) return false;
-    // 检查器具ID (兼容自定义意式器具ID格式，通常包含 espresso)
-    if (
-      note.equipment &&
-      (note.equipment.toLowerCase().includes('espresso') ||
-        note.equipment.includes('意式'))
-    ) {
-      return true;
-    }
-    return false;
-  }, [note]);
-
   // 获取烘焙商相关设置
   const roasterFieldEnabled = useSettingsStore(
     state => state.settings.roasterFieldEnabled
@@ -477,34 +524,57 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
     [note, getValidTasteRatings]
   );
   const hasTasteRatings = validTasteRatings.length > 0;
-  const beanAgingDays = useMemo(() => {
-    if (!showBeanAgingDaysInNote || !note) return null;
-
-    return getNoteBeanAgingDaysForNote(note, beanInfo);
-  }, [
-    beanInfo?.roastDate,
+  const beanAgingDays =
+    showBeanAgingDaysInNote && note
+      ? getNoteBeanAgingDaysForNote(note, beanInfo)
+      : null;
+  const cupPriceDisplay = getCupPriceDisplay(
     note,
-    note?.coffeeBeanInfo?.roastDate,
-    showBeanAgingDaysInNote,
-  ]);
+    beanInfo,
+    showUnitPriceInNote
+  );
+  const beanFlavorTags = showFlavorInNote
+    ? (beanInfo?.flavor || []).filter(flavor => flavor.trim().length > 0)
+    : [];
+  const shouldShowBeanSection =
+    cupPriceDisplay !== null ||
+    beanAgingDays !== null ||
+    beanFlavorTags.length > 0;
+  const shouldShowBrewingSection =
+    schemeParts.length > 0 ||
+    paramParts.length > 0 ||
+    hasTasteRatings ||
+    (note?.rating ?? 0) > 0;
+  const shouldShowNoteSection = showNoteTimeInNote || Boolean(note?.notes);
 
   // 获取该咖啡豆的所有有风味评分的笔记（用于对比）
   const compareNotes = useMemo(() => {
     if (!note?.beanId) return [];
-    return allNotes
-      .filter(
-        n =>
-          n.beanId === note.beanId &&
-          n.taste &&
-          Object.values(n.taste).some(v => v > 0)
-      )
-      .map(n => ({
-        id: n.id,
-        timestamp: n.timestamp,
-        taste: n.taste,
-        method: n.method,
-      }));
-  }, [note?.beanId, allNotes]);
+
+    return allNotes.reduce<
+      {
+        id: string;
+        timestamp: number;
+        taste: NonNullable<BrewingNote['taste']>;
+        method: BrewingNote['method'];
+      }[]
+    >((matches, n) => {
+      if (
+        n.beanId === note.beanId &&
+        n.taste &&
+        Object.values(n.taste).some(v => v > 0)
+      ) {
+        matches.push({
+          id: n.id,
+          timestamp: n.timestamp,
+          taste: n.taste,
+          method: n.method,
+        });
+      }
+
+      return matches;
+    }, []);
+  }, [note, allNotes]);
 
   const deleteDisplay = useMemo(
     () =>
@@ -518,7 +588,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   );
 
   // 构建标题文本 - 仅在有咖啡豆时显示
-  const titleText = useMemo(() => (beanName ? beanName : ''), [beanName]);
+  const titleText = beanName || '';
 
   // 编辑按钮点击处理
   const handleEditClick = useCallback(() => {
@@ -600,9 +670,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
           {/* 左侧关闭按钮 */}
           <button
             onClick={handleClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
           >
-            <ChevronLeft className="-ml-px h-4.5 w-4.5 text-neutral-600 dark:text-neutral-400" />
+            <ChevronLeft className="-ml-px size-4.5 text-neutral-600 dark:text-neutral-400" />
           </button>
 
           {/* 居中标题 - 当原标题不可见时显示 */}
@@ -637,9 +707,9 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
               {onEdit && (
                 <button
                   onClick={handleEditClick}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+                  className="flex size-8 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                 >
-                  <Pen className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" />
+                  <Pen className="size-3.5 text-neutral-600 dark:text-neutral-400" />
                 </button>
               )}
 
@@ -648,7 +718,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                 <ActionMenu
                   items={actionMenuItems}
                   useMorphingAnimation={true}
-                  triggerClassName="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                  triggerClassName="size-8 rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                 />
               )}
             </div>
@@ -897,189 +967,165 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
 
           {note ? (
             <div className="space-y-3 px-6">
-              {/* 咖啡豆信息：克价和风味 */}
-              {beanInfo && (
-                <>
-                  {/* 价格 - 计算这杯咖啡的价格和克价 */}
-                  {showUnitPriceInNote &&
-                    (() => {
-                      if (beanInfo.price && beanInfo.capacity) {
-                        const priceMatch =
-                          beanInfo.price.match(/(\d+(?:\.\d+)?)/);
-                        const capacityMatch =
-                          beanInfo.capacity.match(/(\d+(?:\.\d+)?)/);
-                        if (priceMatch && capacityMatch) {
-                          const price = parseFloat(priceMatch[0]);
-                          const capacity = parseFloat(capacityMatch[0]);
-                          if (
-                            !isNaN(price) &&
-                            !isNaN(capacity) &&
-                            capacity > 0
-                          ) {
-                            const unitPrice = price / capacity;
-                            const coffeeMatch =
-                              note.params?.coffee?.match(/(\d+(?:\.\d+)?)/);
-                            const coffeeWeight = coffeeMatch
-                              ? parseFloat(coffeeMatch[0])
-                              : 0;
-                            const cupPrice = coffeeWeight * unitPrice;
-                            return (
-                              <InfoRow label="价格">
-                                <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                                  {cupPrice.toFixed(2)}元（
-                                  {unitPrice.toFixed(2)}元/克）
-                                </div>
-                              </InfoRow>
-                            );
-                          }
-                        }
-                      }
-                      return null;
-                    })()}
+              <NoteDetailSectionList
+                sections={[
+                  {
+                    id: 'bean',
+                    isVisible: shouldShowBeanSection,
+                    content: (
+                      <>
+                        {cupPriceDisplay && (
+                          <InfoRow label="价格">
+                            <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                              {cupPriceDisplay}
+                            </div>
+                          </InfoRow>
+                        )}
 
-                  {beanAgingDays !== null && (
-                    <InfoRow label="养豆">
-                      <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                        {beanAgingDays} 天
-                      </div>
-                    </InfoRow>
-                  )}
+                        {beanAgingDays !== null && (
+                          <InfoRow label="养豆">
+                            <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                              {beanAgingDays} 天
+                            </div>
+                          </InfoRow>
+                        )}
 
-                  {/* 风味 */}
-                  {beanInfo.flavor && beanInfo.flavor.length > 0 && (
-                    <InfoRow label="风味">
-                      <div className="-mt-0.5 flex flex-wrap items-center gap-1">
-                        {beanInfo.flavor.map(
-                          (flavor: string, index: number) => (
-                            <span
-                              key={index}
-                              className="bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
+                        {beanFlavorTags.length > 0 && (
+                          <InfoRow label="风味">
+                            <div className="-mt-0.5 flex flex-wrap items-center gap-1">
+                              {beanFlavorTags.map(flavor => (
+                                <span
+                                  key={flavor}
+                                  className="bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
+                                >
+                                  {flavor}
+                                </span>
+                              ))}
+                            </div>
+                          </InfoRow>
+                        )}
+                      </>
+                    ),
+                  },
+                  {
+                    id: 'brewing',
+                    isVisible: shouldShowBrewingSection,
+                    content: (
+                      <>
+                        {schemeParts.length > 0 && (
+                          <InfoRow label="方案">
+                            <div className="space-x-1 text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                              {schemeParts.map((part, index) => (
+                                <React.Fragment key={`scheme-${part}`}>
+                                  <span>{part}</span>
+                                  {index < schemeParts.length - 1 && (
+                                    <span className="text-neutral-400 dark:text-neutral-600">
+                                      ·
+                                    </span>
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </InfoRow>
+                        )}
+
+                        {paramParts.length > 0 && (
+                          <InfoRow label="参数">
+                            <div className="flex flex-col">
+                              <div className="space-x-1 text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                                {paramParts.map((param, index) => (
+                                  <React.Fragment key={`param-${param}`}>
+                                    <span>{param}</span>
+                                    {index < paramParts.length - 1 && (
+                                      <span className="text-neutral-400 dark:text-neutral-600">
+                                        ·
+                                      </span>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </div>
+                          </InfoRow>
+                        )}
+
+                        {hasTasteRatings && (
+                          <InfoRow label="评分">
+                            {validTasteRatings.length > 4 ? (
+                              <button
+                                onClick={() => setShowRatingRadar(true)}
+                                className="-mt-0.5 flex cursor-pointer flex-wrap items-center gap-1 text-left"
+                              >
+                                {validTasteRatings.map(rating => (
+                                  <span
+                                    key={rating.id}
+                                    className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
+                                  >
+                                    {rating.label}
+                                    {rating.value}
+                                  </span>
+                                ))}
+                              </button>
+                            ) : (
+                              <div className="-mt-0.5 flex flex-wrap items-center gap-1">
+                                {validTasteRatings.map(rating => (
+                                  <span
+                                    key={rating.id}
+                                    className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
+                                  >
+                                    {rating.label}
+                                    {rating.value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </InfoRow>
+                        )}
+
+                        {note.rating > 0 && (
+                          <InfoRow label="总评">
+                            <span className="-mt-0.5 bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300">
+                              {note.rating}/5
+                            </span>
+                          </InfoRow>
+                        )}
+                      </>
+                    ),
+                  },
+                  {
+                    id: 'note',
+                    isVisible: shouldShowNoteSection,
+                    content: (
+                      <>
+                        {showNoteTimeInNote && (
+                          <InfoRow label="时间">
+                            <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
+                              {formatDate(note.timestamp)}
+                            </div>
+                          </InfoRow>
+                        )}
+
+                        {note.notes && (
+                          <InfoRow label="笔记">
+                            <div
+                              ref={notesRef}
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={handleNotesInput}
+                              className="cursor-text text-xs font-medium whitespace-pre-wrap text-neutral-800 outline-none dark:text-neutral-100"
+                              style={{
+                                minHeight: '1.5em',
+                                wordBreak: 'break-word',
+                              }}
                             >
-                              {flavor}
-                            </span>
-                          )
+                              {note.notes}
+                            </div>
+                          </InfoRow>
                         )}
-                      </div>
-                    </InfoRow>
-                  )}
-
-                  {/* 分割线 */}
-                  <div className="border-t border-dashed border-neutral-200/50 dark:border-neutral-800/50"></div>
-                </>
-              )}
-
-              {/* 方案 */}
-              {schemeParts.length > 0 && (
-                <InfoRow label="方案">
-                  <div className="space-x-1 text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                    {schemeParts.map((part, index) => (
-                      <React.Fragment key={`${part}-${index}`}>
-                        <span>{part}</span>
-                        {index < schemeParts.length - 1 && (
-                          <span className="text-neutral-400 dark:text-neutral-600">
-                            ·
-                          </span>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </InfoRow>
-              )}
-
-              {/* 参数信息 */}
-              {paramParts.length > 0 && (
-                <InfoRow label="参数">
-                  <div className="flex flex-col">
-                    <div className="space-x-1 text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                      {paramParts.map((param, index) => (
-                        <React.Fragment key={`${param}-${index}`}>
-                          <span>{param}</span>
-                          {index < paramParts.length - 1 && (
-                            <span className="text-neutral-400 dark:text-neutral-600">
-                              ·
-                            </span>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                </InfoRow>
-              )}
-
-              {/* 风味评分 - 5个及以上维度时可点击展开雷达图 */}
-              {hasTasteRatings && (
-                <InfoRow label="评分">
-                  {validTasteRatings.length > 4 ? (
-                    <button
-                      onClick={() => setShowRatingRadar(true)}
-                      className="-mt-0.5 flex cursor-pointer flex-wrap items-center gap-1 text-left"
-                    >
-                      {validTasteRatings.map(rating => (
-                        <span
-                          key={rating.id}
-                          className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
-                        >
-                          {rating.label}
-                          {rating.value}
-                        </span>
-                      ))}
-                    </button>
-                  ) : (
-                    <div className="-mt-0.5 flex flex-wrap items-center gap-1">
-                      {validTasteRatings.map(rating => (
-                        <span
-                          key={rating.id}
-                          className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300"
-                        >
-                          {rating.label}
-                          {rating.value}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </InfoRow>
-              )}
-
-              {/* 总体评分 */}
-              {note.rating > 0 && (
-                <InfoRow label="总评">
-                  <span className="-mt-0.5 bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800/40 dark:text-neutral-300">
-                    {note.rating}/5
-                  </span>
-                </InfoRow>
-              )}
-
-              {(showNoteTimeInNote || note.notes) && (
-                <div className="border-t border-dashed border-neutral-200/50 dark:border-neutral-800/50"></div>
-              )}
-
-              {/* 时间 */}
-              {showNoteTimeInNote && (
-                <InfoRow label="时间">
-                  <div className="text-xs font-medium text-neutral-800 dark:text-neutral-100">
-                    {formatDate(note.timestamp)}
-                  </div>
-                </InfoRow>
-              )}
-
-              {/* 笔记信息 */}
-              {note.notes && (
-                <InfoRow label="笔记">
-                  <div
-                    ref={notesRef}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={handleNotesInput}
-                    className="cursor-text text-xs font-medium whitespace-pre-wrap text-neutral-800 outline-none dark:text-neutral-100"
-                    style={{
-                      minHeight: '1.5em',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {note.notes}
-                  </div>
-                </InfoRow>
-              )}
+                      </>
+                    ),
+                  },
+                ]}
+              />
             </div>
           ) : null}
         </div>
