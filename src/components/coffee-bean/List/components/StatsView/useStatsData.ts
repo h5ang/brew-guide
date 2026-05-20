@@ -28,6 +28,8 @@ export interface StatsMetadata {
   totalNotes: number; // 总记录数
   validNotes: number; // 有效记录数（排除容量调整等）
   actualDays: number; // 实际统计天数
+  averageConsumptionPeriods: number; // 平均消耗使用的统计周期数
+  averageConsumptionUnit: '天' | '月'; // 平均消耗的统计单位
   beansWithPrice: number; // 有价格信息的咖啡豆数量
   beansTotal: number; // 参与计算的咖啡豆总数
   todayNotes: number; // 今日记录数
@@ -99,6 +101,12 @@ const calculateNoteCost = (
   return (amount * price) / capacity;
 };
 
+/** 判断咖啡豆是否具备可用于克价计算的价格与容量 */
+const hasBeanPrice = (bean: ExtendedCoffeeBean | null): boolean => {
+  if (!bean?.price || !bean?.capacity) return false;
+  return parseNum(bean.price) > 0 && parseNum(bean.capacity) > 0;
+};
+
 /** 获取日期键（用于趋势图分组） */
 const getDateKey = (
   timestamp: number,
@@ -141,6 +149,18 @@ const calculateDaysBetween = (startMs: number, endMs: number): number => {
   const days =
     Math.floor((endDay.getTime() - startDay.getTime()) / 86400000) + 1;
   return Math.max(1, days);
+};
+
+/** 计算日历月份数（包含首尾月份） */
+const calculateMonthsBetween = (startMs: number, endMs: number): number => {
+  const startDate = new Date(startMs);
+  const endDate = new Date(endMs);
+  const months =
+    (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+    endDate.getMonth() -
+    startDate.getMonth() +
+    1;
+  return Math.max(1, months);
 };
 
 // ============================================================================
@@ -364,6 +384,7 @@ export const useStatsData = (
     // ═══════════════════════════════════════════════════════════════════════
     let beanBasedConsumption = 0;
     let beanBasedCost = 0;
+    let beanBasedPricedConsumption = 0;
     let earliestBeanTime = Infinity;
     const beanBasedTypeConsumption: Record<BeanType, number> = {
       espresso: 0,
@@ -371,6 +392,11 @@ export const useStatsData = (
       omni: 0,
     };
     const beanBasedTypeCost: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
+    const beanBasedTypePricedConsumption: Record<BeanType, number> = {
       espresso: 0,
       filter: 0,
       omni: 0,
@@ -393,6 +419,7 @@ export const useStatsData = (
           if (capacity > 0 && price > 0) {
             consumedCost = (consumed * price) / capacity;
             beanBasedCost += consumedCost;
+            beanBasedPricedConsumption += consumed;
           }
 
           // 按类型统计
@@ -400,6 +427,9 @@ export const useStatsData = (
           if (beanType && beanType in beanBasedTypeConsumption) {
             beanBasedTypeConsumption[beanType] += consumed;
             beanBasedTypeCost[beanType] += consumedCost;
+            if (consumedCost > 0) {
+              beanBasedTypePricedConsumption[beanType] += consumed;
+            }
           }
         }
 
@@ -417,6 +447,7 @@ export const useStatsData = (
     // ═══════════════════════════════════════════════════════════════════════
     let noteBasedConsumption = 0;
     let noteBasedCost = 0;
+    let noteBasedPricedConsumption = 0;
     let todayConsumption = 0;
     let todayCost = 0;
     let firstNoteTime = Infinity;
@@ -425,6 +456,11 @@ export const useStatsData = (
     let todayNotesCount = 0; // 今日记录数
     const beansUsed = new Set<string>(); // 参与计算的咖啡豆
     const noteBasedTypeConsumption: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
+    const noteBasedTypePricedConsumption: Record<BeanType, number> = {
       espresso: 0,
       filter: 0,
       omni: 0,
@@ -476,18 +512,25 @@ export const useStatsData = (
 
         const bean = findBeanForNote(note, roastedBeans);
         const cost = calculateNoteCost(amount, bean);
+        const isPriced = hasBeanPrice(bean);
 
         validNotesCount++;
 
         // 记录口径：全部/历史视图都统一按有效冲煮记录累计
         noteBasedConsumption += amount;
         noteBasedCost += cost;
+        if (isPriced) {
+          noteBasedPricedConsumption += amount;
+        }
 
         // 按类型统计：用于库存预测的日均消耗计算（基于实际冲煮记录）
         const beanType = bean?.beanType;
         if (beanType && beanType in noteBasedTypeConsumption) {
           noteBasedTypeConsumption[beanType] += amount;
           noteBasedTypeCost[beanType] += cost;
+          if (isPriced) {
+            noteBasedTypePricedConsumption[beanType] += amount;
+          }
         }
 
         // 记录参与计算的咖啡豆
@@ -567,8 +610,10 @@ export const useStatsData = (
     // ─────────────────────────────────────────────────────────────────────────
     let totalConsumption: number;
     let totalCost: number;
+    let pricedConsumption: number;
     let typeConsumption: Record<BeanType, number>;
     let typeCost: Record<BeanType, number>;
+    let typePricedConsumption: Record<BeanType, number>;
     let effectiveDateRange: { start: number; end: number } | null = null;
     let actualDays = 1;
 
@@ -576,8 +621,10 @@ export const useStatsData = (
       // 历史视图：始终使用笔记统计
       totalConsumption = noteBasedConsumption;
       totalCost = noteBasedCost;
+      pricedConsumption = noteBasedPricedConsumption;
       typeConsumption = noteBasedTypeConsumption;
       typeCost = noteBasedTypeCost;
+      typePricedConsumption = noteBasedTypePricedConsumption;
 
       if (firstNoteTime !== Infinity) {
         const rangeEnd = endTime - 1; // endTime 是开区间
@@ -594,8 +641,10 @@ export const useStatsData = (
       // 全部视图：优先使用笔记累计，保证与月/日统计口径一致
       totalConsumption = noteBasedConsumption;
       totalCost = noteBasedCost;
+      pricedConsumption = noteBasedPricedConsumption;
       typeConsumption = noteBasedTypeConsumption;
       typeCost = noteBasedTypeCost;
+      typePricedConsumption = noteBasedTypePricedConsumption;
 
       if (firstNoteTime !== Infinity) {
         effectiveDateRange = { start: firstNoteTime, end: now };
@@ -605,8 +654,10 @@ export const useStatsData = (
       // 备选：完全没有有效记录时，回退到库存差值估算
       totalConsumption = beanBasedConsumption;
       totalCost = beanBasedCost;
+      pricedConsumption = beanBasedPricedConsumption;
       typeConsumption = beanBasedTypeConsumption;
       typeCost = beanBasedTypeCost;
+      typePricedConsumption = beanBasedTypePricedConsumption;
 
       if (earliestBeanTime !== Infinity) {
         effectiveDateRange = { start: earliestBeanTime, end: now };
@@ -641,16 +692,30 @@ export const useStatsData = (
     brewingDetails.sort((a, b) => b.timestamp - a.timestamp);
     todayBrewingDetails.sort((a, b) => b.timestamp - a.timestamp);
 
+    const averageConsumptionUnit: '天' | '月' =
+      selectedDate && dateGroupingMode === 'year' ? '月' : '天';
+    const averageConsumptionPeriods =
+      averageConsumptionUnit === '月' && effectiveDateRange
+        ? calculateMonthsBetween(
+            effectiveDateRange.start,
+            effectiveDateRange.end
+          )
+        : actualDays;
+
     return {
       totalConsumption,
       totalCost,
+      pricedConsumption,
       todayConsumption,
       todayCost,
       typeConsumption,
       typeCost,
+      typePricedConsumption,
       todayTypeConsumption,
       todayTypeCost,
       actualDays,
+      averageConsumptionPeriods,
+      averageConsumptionUnit,
       effectiveDateRange,
       trendData,
       brewingDetails,
@@ -672,13 +737,22 @@ export const useStatsData = (
     const {
       totalConsumption,
       totalCost,
+      pricedConsumption,
       actualDays,
+      averageConsumptionPeriods,
       typeConsumption,
       typeCost,
+      typePricedConsumption,
     } = computedData;
 
     const dailyConsumption = actualDays > 0 ? totalConsumption / actualDays : 0;
     const dailyCost = actualDays > 0 ? totalCost / actualDays : 0;
+    const averageConsumption =
+      averageConsumptionPeriods > 0
+        ? totalConsumption / averageConsumptionPeriods
+        : 0;
+    const averagePricePerGram =
+      pricedConsumption > 0 ? totalCost / pricedConsumption : 0;
 
     // 库存预测使用基于笔记的消耗（排除容量调整等不计入统计的记录）
     // 而不是基于容量差值的消耗（会包含容量调整）
@@ -700,23 +774,29 @@ export const useStatsData = (
       overview: {
         consumption: totalConsumption,
         cost: totalCost,
+        pricedConsumption,
         dailyConsumption,
         dailyCost,
+        averageConsumption,
+        averagePricePerGram,
       },
       byType: {
         espresso: {
           consumption: typeConsumption.espresso,
           cost: typeCost.espresso,
+          pricedConsumption: typePricedConsumption.espresso,
           percentage: 0,
         },
         filter: {
           consumption: typeConsumption.filter,
           cost: typeCost.filter,
+          pricedConsumption: typePricedConsumption.filter,
           percentage: 0,
         },
         omni: {
           consumption: typeConsumption.omni,
           cost: typeCost.omni,
+          pricedConsumption: typePricedConsumption.omni,
           percentage: 0,
         },
       },
@@ -755,6 +835,8 @@ export const useStatsData = (
       totalNotes: computedData.totalNotesCount,
       validNotes: computedData.validNotesCount,
       actualDays: computedData.actualDays,
+      averageConsumptionPeriods: computedData.averageConsumptionPeriods,
+      averageConsumptionUnit: computedData.averageConsumptionUnit,
       beansWithPrice: computedData.beansWithPrice,
       beansTotal: roastedBeans.length, // 使用熟豆的总数
       todayNotes: computedData.todayNotesCount,
