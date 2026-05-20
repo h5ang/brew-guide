@@ -14,7 +14,7 @@ interface EmptyBeanTipDrawerProps {
   isOpen: boolean;
   /** 关闭抽屉的回调 */
   onClose: () => void;
-  /** 开启【包含已用完】筛选的回调 */
+  /** 开启【展示已用完】筛选的回调 */
   onEnableShowEmptyBeans: () => void;
 }
 
@@ -44,11 +44,11 @@ export const markEmptyBeanTipShown = async (): Promise<void> => {
  * 当用户第一次用完咖啡豆后显示，提示用户：
  * - 用完的咖啡豆被归档
  * - 可在咖啡豆分类栏点击筛选图标进入筛选
- * - 开启【包含已用完】查看已用完的咖啡豆
+ * - 开启【展示已用完】查看已用完的咖啡豆
  *
  * 提供两个操作：
  * - 明白了：关闭提示
- * - 帮我开启：自动开启【包含已用完】筛选
+ * - 帮我开启：自动开启【展示已用完】筛选
  */
 const EmptyBeanTipDrawer: React.FC<EmptyBeanTipDrawerProps> = ({
   isOpen,
@@ -93,7 +93,7 @@ const EmptyBeanTipDrawer: React.FC<EmptyBeanTipDrawerProps> = ({
         </span>{' '}
         进入筛选，并开启
         <span className="text-neutral-800 dark:text-neutral-200">
-          【包含已用完】
+          【展示已用完】
         </span>
         。
       </p>

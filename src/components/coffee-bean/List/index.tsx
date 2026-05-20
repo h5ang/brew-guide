@@ -1031,7 +1031,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
 
   // 处理咖啡豆用完事件 - 显示提示抽屉
   const handleBeanReducedToZero = useCallback(() => {
-    // 只在库存视图、未开启【包含已用完】、且未显示过提示时显示
+    // 只在库存视图、未开启【展示已用完】、且未显示过提示时显示
     if (
       viewMode === VIEW_OPTIONS.INVENTORY &&
       !showEmptyBeans &&
@@ -1375,7 +1375,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     setIsExportingPreview(true);
 
     try {
-      // 根据【包含已用完】选择情况和搜索状态，获取正确的豆子列表
+      // 根据【展示已用完】选择情况和搜索状态，获取正确的豆子列表
       const normalBeans = isSearching
         ? searchFilteredBeans
         : inventoryFilteredBeans;
