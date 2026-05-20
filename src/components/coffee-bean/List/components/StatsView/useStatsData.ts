@@ -6,6 +6,7 @@ import {
   UnifiedStatsData,
   InventoryStats,
   TypeInventoryStats,
+  ConsumptionStats,
   BeanType,
   BrewingDetailItem,
 } from './types';
@@ -36,7 +37,11 @@ export interface StatsMetadata {
 interface UseStatsDataResult {
   availableDates: string[];
   stats: UnifiedStatsData;
-  todayStats: { consumption: number; cost: number } | null;
+  todayStats: {
+    consumption: number;
+    cost: number;
+    byType: Record<BeanType, Pick<ConsumptionStats, 'consumption' | 'cost'>>;
+  } | null;
   trendData: TrendDataPoint[];
   isHistoricalView: boolean;
   effectiveDateRange: { start: number; end: number } | null;
@@ -365,6 +370,11 @@ export const useStatsData = (
       filter: 0,
       omni: 0,
     };
+    const beanBasedTypeCost: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
 
     // 仅在全部视图时，计算基于容量变化的消耗
     if (!selectedDate) {
@@ -379,14 +389,17 @@ export const useStatsData = (
 
           // 计算花费
           const price = parseNum(bean.price);
+          let consumedCost = 0;
           if (capacity > 0 && price > 0) {
-            beanBasedCost += (consumed * price) / capacity;
+            consumedCost = (consumed * price) / capacity;
+            beanBasedCost += consumedCost;
           }
 
           // 按类型统计
           const beanType = bean.beanType;
           if (beanType && beanType in beanBasedTypeConsumption) {
             beanBasedTypeConsumption[beanType] += consumed;
+            beanBasedTypeCost[beanType] += consumedCost;
           }
         }
 
@@ -412,6 +425,21 @@ export const useStatsData = (
     let todayNotesCount = 0; // 今日记录数
     const beansUsed = new Set<string>(); // 参与计算的咖啡豆
     const noteBasedTypeConsumption: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
+    const noteBasedTypeCost: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
+    const todayTypeConsumption: Record<BeanType, number> = {
+      espresso: 0,
+      filter: 0,
+      omni: 0,
+    };
+    const todayTypeCost: Record<BeanType, number> = {
       espresso: 0,
       filter: 0,
       omni: 0,
@@ -459,6 +487,7 @@ export const useStatsData = (
         const beanType = bean?.beanType;
         if (beanType && beanType in noteBasedTypeConsumption) {
           noteBasedTypeConsumption[beanType] += amount;
+          noteBasedTypeCost[beanType] += cost;
         }
 
         // 记录参与计算的咖啡豆
@@ -504,6 +533,12 @@ export const useStatsData = (
           todayCost += cost;
           todayNotesCount++;
 
+          const beanType = bean?.beanType;
+          if (beanType && beanType in todayTypeConsumption) {
+            todayTypeConsumption[beanType] += amount;
+            todayTypeCost[beanType] += cost;
+          }
+
           // 收集今日冲煮明细
           // 格式化咖啡豆名称（包含烘焙商）
           const displayName = bean
@@ -533,6 +568,7 @@ export const useStatsData = (
     let totalConsumption: number;
     let totalCost: number;
     let typeConsumption: Record<BeanType, number>;
+    let typeCost: Record<BeanType, number>;
     let effectiveDateRange: { start: number; end: number } | null = null;
     let actualDays = 1;
 
@@ -541,6 +577,7 @@ export const useStatsData = (
       totalConsumption = noteBasedConsumption;
       totalCost = noteBasedCost;
       typeConsumption = noteBasedTypeConsumption;
+      typeCost = noteBasedTypeCost;
 
       if (firstNoteTime !== Infinity) {
         const rangeEnd = endTime - 1; // endTime 是开区间
@@ -558,6 +595,7 @@ export const useStatsData = (
       totalConsumption = noteBasedConsumption;
       totalCost = noteBasedCost;
       typeConsumption = noteBasedTypeConsumption;
+      typeCost = noteBasedTypeCost;
 
       if (firstNoteTime !== Infinity) {
         effectiveDateRange = { start: firstNoteTime, end: now };
@@ -568,6 +606,7 @@ export const useStatsData = (
       totalConsumption = beanBasedConsumption;
       totalCost = beanBasedCost;
       typeConsumption = beanBasedTypeConsumption;
+      typeCost = beanBasedTypeCost;
 
       if (earliestBeanTime !== Infinity) {
         effectiveDateRange = { start: earliestBeanTime, end: now };
@@ -608,6 +647,9 @@ export const useStatsData = (
       todayConsumption,
       todayCost,
       typeConsumption,
+      typeCost,
+      todayTypeConsumption,
+      todayTypeCost,
       actualDays,
       effectiveDateRange,
       trendData,
@@ -627,8 +669,13 @@ export const useStatsData = (
   // Layer 4: 组装最终数据
   // ─────────────────────────────────────────────────────────────────────────
   const stats = useMemo((): UnifiedStatsData => {
-    const { totalConsumption, totalCost, actualDays, typeConsumption } =
-      computedData;
+    const {
+      totalConsumption,
+      totalCost,
+      actualDays,
+      typeConsumption,
+      typeCost,
+    } = computedData;
 
     const dailyConsumption = actualDays > 0 ? totalConsumption / actualDays : 0;
     const dailyCost = actualDays > 0 ? totalCost / actualDays : 0;
@@ -659,11 +706,19 @@ export const useStatsData = (
       byType: {
         espresso: {
           consumption: typeConsumption.espresso,
-          cost: 0,
+          cost: typeCost.espresso,
           percentage: 0,
         },
-        filter: { consumption: typeConsumption.filter, cost: 0, percentage: 0 },
-        omni: { consumption: typeConsumption.omni, cost: 0, percentage: 0 },
+        filter: {
+          consumption: typeConsumption.filter,
+          cost: typeCost.filter,
+          percentage: 0,
+        },
+        omni: {
+          consumption: typeConsumption.omni,
+          cost: typeCost.omni,
+          percentage: 0,
+        },
       },
       inventory,
       inventoryByType,
@@ -674,7 +729,24 @@ export const useStatsData = (
     if (isHistoricalView) return null;
     const { todayConsumption, todayCost } = computedData;
     if (todayConsumption <= 0) return null;
-    return { consumption: todayConsumption, cost: todayCost };
+    return {
+      consumption: todayConsumption,
+      cost: todayCost,
+      byType: {
+        espresso: {
+          consumption: computedData.todayTypeConsumption.espresso,
+          cost: computedData.todayTypeCost.espresso,
+        },
+        filter: {
+          consumption: computedData.todayTypeConsumption.filter,
+          cost: computedData.todayTypeCost.filter,
+        },
+        omni: {
+          consumption: computedData.todayTypeConsumption.omni,
+          cost: computedData.todayTypeCost.omni,
+        },
+      },
+    };
   }, [computedData, isHistoricalView]);
 
   // 组装元数据

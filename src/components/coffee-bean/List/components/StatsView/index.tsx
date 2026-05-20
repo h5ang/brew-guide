@@ -7,6 +7,7 @@ import {
   DateGroupingMode,
   TypeInventoryStats,
   BrewingDetailItem,
+  BeanType,
 } from './types';
 import { formatNumber } from './utils';
 import {
@@ -39,6 +40,105 @@ import CoffeeOriginMap from './CoffeeOriginMap';
 const fmtWeight = (v: number) => (v > 0 ? `${formatNumber(v)}g` : '-');
 const fmtCost = (v: number) => (v > 0 ? `¥${formatNumber(v)}` : '-');
 const fmtDays = (v: number) => (v > 0 ? `${v}天` : '-');
+const fmtDetailWeight = (v: number) => `${formatNumber(v)}g`;
+const fmtDetailCost = (v: number) => `¥${formatNumber(v)}`;
+const parseBeanNumber = (value: string | number | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  const parsed = parseFloat(value.toString().replace(/[^\d.]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const BEAN_TYPE_ORDER: BeanType[] = ['espresso', 'filter', 'omni'];
+const BEAN_TYPE_LABELS: Record<BeanType, string> = {
+  espresso: '意式豆',
+  filter: '手冲豆',
+  omni: '全能豆',
+};
+
+type BeanTypeSummary = Record<
+  BeanType,
+  {
+    label: string;
+    totalCount: number;
+    remainingCount: number;
+    totalCapacity: number;
+    totalValue: number;
+    remaining: number;
+    remainingValue: number;
+  }
+>;
+
+const createEmptyTypeSummary = (): BeanTypeSummary => ({
+  espresso: {
+    label: BEAN_TYPE_LABELS.espresso,
+    totalCount: 0,
+    remainingCount: 0,
+    totalCapacity: 0,
+    totalValue: 0,
+    remaining: 0,
+    remainingValue: 0,
+  },
+  filter: {
+    label: BEAN_TYPE_LABELS.filter,
+    totalCount: 0,
+    remainingCount: 0,
+    totalCapacity: 0,
+    totalValue: 0,
+    remaining: 0,
+    remainingValue: 0,
+  },
+  omni: {
+    label: BEAN_TYPE_LABELS.omni,
+    totalCount: 0,
+    remainingCount: 0,
+    totalCapacity: 0,
+    totalValue: 0,
+    remaining: 0,
+    remainingValue: 0,
+  },
+});
+
+const summarizeBeansByType = (beans: ExtendedCoffeeBean[]): BeanTypeSummary => {
+  const summary = createEmptyTypeSummary();
+
+  for (const bean of beans) {
+    const type = bean.beanType;
+    if (!type || !(type in summary)) continue;
+
+    const capacity = parseBeanNumber(bean.capacity);
+    const remaining = parseBeanNumber(bean.remaining);
+    const price = parseBeanNumber(bean.price);
+    const remainingValue = capacity > 0 ? (remaining * price) / capacity : 0;
+
+    summary[type].totalCount += 1;
+    summary[type].remainingCount += remaining > 0 ? 1 : 0;
+    summary[type].totalCapacity += capacity;
+    summary[type].totalValue += price;
+    summary[type].remaining += remaining;
+    summary[type].remainingValue += remainingValue;
+  }
+
+  return summary;
+};
+
+const getOwnedBeanTypes = (typeSummary: BeanTypeSummary): BeanType[] =>
+  BEAN_TYPE_ORDER.filter(type => typeSummary[type].totalCount > 0);
+
+const createTypeRows = (
+  typeSummary: BeanTypeSummary,
+  getValue: (type: BeanType) => string | number
+): StatsExplanation['rows'] => {
+  const ownedTypes = getOwnedBeanTypes(typeSummary);
+
+  if (ownedTypes.length === 0) {
+    return [{ label: '未分类', value: getValue('omni') }];
+  }
+
+  return ownedTypes.map(type => ({
+    label: typeSummary[type].label,
+    value: getValue(type),
+  }));
+};
 
 // 统计项的唯一标识
 type StatsKey =
@@ -59,7 +159,9 @@ const createExplanation = (
   key: StatsKey,
   value: string,
   stats: ReturnType<typeof useStatsData>['stats'],
+  todayStats: ReturnType<typeof useStatsData>['todayStats'],
   metadata: StatsMetadata,
+  typeSummary: BeanTypeSummary,
   isHistoricalView: boolean,
   dateRangeLabel?: string
 ): StatsExplanation | null => {
@@ -71,6 +173,7 @@ const createExplanation = (
     todayNotes,
     useFallbackStats,
   } = metadata;
+  const normalizedDays = Math.max(1, actualDays);
 
   switch (key) {
     case 'totalConsumption':
@@ -91,6 +194,9 @@ const createExplanation = (
               { label: '咖啡豆数量', value: `${beansTotal} 款` },
               { label: '统计天数', value: `${actualDays} 天` },
             ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailWeight(stats.byType[type].consumption)
+        ),
         note: isHistoricalView
           ? validNotes < 5
             ? '记录较少，数据仅供参考'
@@ -124,6 +230,9 @@ const createExplanation = (
                 value: `${beansWithPrice}/${beansTotal} 款`,
               },
             ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailCost(stats.byType[type].cost)
+        ),
         note:
           beansWithPrice < beansTotal
             ? `${beansTotal - beansWithPrice} 款咖啡豆缺少价格信息，未计入花费`
@@ -143,6 +252,9 @@ const createExplanation = (
           { label: '总消耗', value: fmtWeight(stats.overview.consumption) },
           { label: '统计天数', value: `${actualDays} 天` },
         ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailWeight(stats.byType[type].consumption / normalizedDays)
+        ),
         note: actualDays < 7 ? '统计周期较短，日均值可能波动较大' : undefined,
       };
 
@@ -155,6 +267,9 @@ const createExplanation = (
           { label: '总花费', value: fmtCost(stats.overview.cost) },
           { label: '统计天数', value: `${actualDays} 天` },
         ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailCost(stats.byType[type].cost / normalizedDays)
+        ),
         note:
           beansWithPrice < beansTotal
             ? '部分咖啡豆缺少价格，实际花费可能更高'
@@ -167,6 +282,9 @@ const createExplanation = (
         value,
         formula: '∑ 今日冲煮记录的咖啡用量',
         dataSource: [{ label: '今日冲煮记录', value: `${todayNotes} 条` }],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailWeight(todayStats?.byType[type].consumption ?? 0)
+        ),
       };
 
     case 'todayCost':
@@ -181,6 +299,9 @@ const createExplanation = (
             value: `${beansWithPrice}/${beansTotal} 款`,
           },
         ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailCost(todayStats?.byType[type].cost ?? 0)
+        ),
       };
 
     case 'remaining':
@@ -189,6 +310,9 @@ const createExplanation = (
         value,
         formula: '∑ 每款咖啡豆的剩余量',
         dataSource: [{ label: '咖啡豆数量', value: `${beansTotal} 款` }],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailWeight(typeSummary[type].remaining)
+        ),
       };
 
     case 'remainingValue':
@@ -200,6 +324,9 @@ const createExplanation = (
           { label: '咖啡豆数量', value: `${beansTotal} 款` },
           { label: '有价格信息', value: `${beansWithPrice} 款` },
         ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailCost(typeSummary[type].remainingValue)
+        ),
         note:
           beansWithPrice < beansTotal
             ? '部分咖啡豆缺少价格信息，未计入价值'
@@ -212,6 +339,9 @@ const createExplanation = (
         value,
         formula: '∑ 每款咖啡豆的购买容量',
         dataSource: [{ label: '咖啡豆数量', value: `${beansTotal} 款` }],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailWeight(typeSummary[type].totalCapacity)
+        ),
         note: '所有咖啡豆购买时的容量总和',
       };
 
@@ -224,6 +354,9 @@ const createExplanation = (
           { label: '咖啡豆数量', value: `${beansTotal} 款` },
           { label: '有价格信息', value: `${beansWithPrice} 款` },
         ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtDetailCost(typeSummary[type].totalValue)
+        ),
         note:
           beansWithPrice < beansTotal
             ? '部分咖啡豆缺少价格信息，未计入总价值'
@@ -239,6 +372,11 @@ const createExplanation = (
           { label: '总数', value: '拥有的咖啡豆总数量' },
           { label: '未用完', value: '剩余量 > 0 的咖啡豆数量' },
         ],
+        rows: createTypeRows(
+          typeSummary,
+          type =>
+            `${typeSummary[type].remainingCount} / ${typeSummary[type].totalCount}`
+        ),
         note: dateRangeLabel
           ? `基于咖啡豆添加日期的筛选范围进行统计`
           : '基于咖啡豆添加日期的筛选范围进行统计',
@@ -254,7 +392,11 @@ interface ClickableStatsBlockProps {
   title: string;
   value: string;
   statsKey: StatsKey;
-  onExplain: (key: StatsKey, rect: DOMRect) => void;
+  onExplain: (
+    key: StatsKey,
+    rect: DOMRect,
+    typeSummary?: BeanTypeSummary
+  ) => void;
 }
 
 const ClickableStatsBlock: React.FC<ClickableStatsBlockProps> = ({
@@ -546,51 +688,31 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
 // 咖啡豆数量统计组件
 interface BeanCountStatsProps {
   beans: ExtendedCoffeeBean[];
-  onExplain: (key: StatsKey, rect: DOMRect) => void;
+  onExplain: (
+    key: StatsKey,
+    rect: DOMRect,
+    typeSummary?: BeanTypeSummary
+  ) => void;
 }
 
 const BeanCountStats: React.FC<BeanCountStatsProps> = ({
   beans,
   onExplain,
 }) => {
-  // 按类型统计数量和未用完数量
-  const countByType = useMemo(() => {
-    const counts = {
-      espresso: { total: 0, remaining: 0 },
-      filter: { total: 0, remaining: 0 },
-      omni: { total: 0, remaining: 0 },
-    };
-
-    beans.forEach(bean => {
-      if (bean.beanType && bean.beanType in counts) {
-        const type = bean.beanType as keyof typeof counts;
-        counts[type].total++;
-
-        // 判断是否还有剩余（剩余量大于0）
-        const remaining = parseFloat(
-          bean.remaining?.toString().replace(/[^\d.]/g, '') || '0'
-        );
-        if (remaining > 0) {
-          counts[type].remaining++;
-        }
-      }
-    });
-
-    return counts;
-  }, [beans]);
+  const typeSummary = useMemo(() => summarizeBeansByType(beans), [beans]);
 
   const total =
-    countByType.espresso.total +
-    countByType.filter.total +
-    countByType.omni.total;
+    typeSummary.espresso.totalCount +
+    typeSummary.filter.totalCount +
+    typeSummary.omni.totalCount;
   const totalRemaining =
-    countByType.espresso.remaining +
-    countByType.filter.remaining +
-    countByType.omni.remaining;
+    typeSummary.espresso.remainingCount +
+    typeSummary.filter.remainingCount +
+    typeSummary.omni.remainingCount;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    onExplain('beanCount', rect);
+    onExplain('beanCount', rect, typeSummary);
   };
 
   if (total === 0) return null;
@@ -608,27 +730,29 @@ const BeanCountStats: React.FC<BeanCountStatsProps> = ({
       </div>
       {/* 数据行 */}
       <div className="space-y-1.5">
-        {countByType.espresso.total > 0 && (
+        {typeSummary.espresso.totalCount > 0 && (
           <div className="grid grid-cols-[1fr_auto] gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
             <div>意式豆</div>
             <div className="text-right">
-              {countByType.espresso.remaining} / {countByType.espresso.total}
+              {typeSummary.espresso.remainingCount} /{' '}
+              {typeSummary.espresso.totalCount}
             </div>
           </div>
         )}
-        {countByType.filter.total > 0 && (
+        {typeSummary.filter.totalCount > 0 && (
           <div className="grid grid-cols-[1fr_auto] gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
             <div>手冲豆</div>
             <div className="text-right">
-              {countByType.filter.remaining} / {countByType.filter.total}
+              {typeSummary.filter.remainingCount} /{' '}
+              {typeSummary.filter.totalCount}
             </div>
           </div>
         )}
-        {countByType.omni.total > 0 && (
+        {typeSummary.omni.totalCount > 0 && (
           <div className="grid grid-cols-[1fr_auto] gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
             <div>全能豆</div>
             <div className="text-right">
-              {countByType.omni.remaining} / {countByType.omni.total}
+              {typeSummary.omni.remainingCount} / {typeSummary.omni.totalCount}
             </div>
           </div>
         )}
@@ -649,7 +773,11 @@ interface BeanAttributeStatsProps {
   beans: ExtendedCoffeeBean[];
   selectedDate: string | null;
   dateGroupingMode: DateGroupingMode;
-  onExplain: (key: StatsKey, rect: DOMRect) => void;
+  onExplain: (
+    key: StatsKey,
+    rect: DOMRect,
+    typeSummary?: BeanTypeSummary
+  ) => void;
 }
 
 const BeanAttributeStats: React.FC<BeanAttributeStatsProps> = ({
@@ -767,6 +895,16 @@ const BeanAttributeStats: React.FC<BeanAttributeStatsProps> = ({
     return Array.from(flavorCount.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredBeans]);
 
+  // 计算产地数量映射（用于地图上显示不同大小的点）
+  const originCountMap = useMemo(() => {
+    return new Map(originStats);
+  }, [originStats]);
+
+  // 获取所有产地名称（用于地图）
+  const originNames = useMemo(() => {
+    return originStats.map(([name]) => name);
+  }, [originStats]);
+
   // 如果所有统计都为空，不显示
   if (
     originStats.length === 0 &&
@@ -778,16 +916,6 @@ const BeanAttributeStats: React.FC<BeanAttributeStatsProps> = ({
   ) {
     return null;
   }
-
-  // 计算产地数量映射（用于地图上显示不同大小的点）
-  const originCountMap = useMemo(() => {
-    return new Map(originStats);
-  }, [originStats]);
-
-  // 获取所有产地名称（用于地图）
-  const originNames = useMemo(() => {
-    return originStats.map(([name]) => name);
-  }, [originStats]);
 
   return (
     <div className="w-full">
@@ -837,7 +965,11 @@ interface StatsCardProps {
   chart?: React.ReactNode;
   stats: Array<{ title: string; value: string; key: StatsKey }>;
   extra?: React.ReactNode;
-  onExplain: (key: StatsKey, rect: DOMRect) => void;
+  onExplain: (
+    key: StatsKey,
+    rect: DOMRect,
+    typeSummary?: BeanTypeSummary
+  ) => void;
 }
 
 const StatsCard: React.FC<StatsCardProps> = ({
@@ -937,6 +1069,15 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
     brewingDetails,
   } = useStatsData(beans, dateGroupingMode, selectedDate);
 
+  const roastedBeans = useMemo(() => {
+    return beans.filter(bean => (bean.beanState || 'roasted') === 'roasted');
+  }, [beans]);
+
+  const typeSummary = useMemo(
+    () => summarizeBeansByType(roastedBeans),
+    [roastedBeans]
+  );
+
   // 生成日期范围标签（基于实际数据范围）
   const dateRangeLabel = useMemo(() => {
     if (!effectiveDateRange) return '';
@@ -973,7 +1114,7 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
 
   // 处理点击解释
   const handleExplain = useCallback(
-    (key: StatsKey, rect: DOMRect) => {
+    (key: StatsKey, rect: DOMRect, typeSummaryOverride?: BeanTypeSummary) => {
       // 如果点击的是当前已展开的同一个卡片，则关闭
       if (activeKey === key) {
         setExplanation(null);
@@ -1024,7 +1165,9 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
         key,
         value,
         stats,
+        todayStats,
         metadata,
+        typeSummaryOverride ?? typeSummary,
         isHistoricalView,
         dateRangeLabel
       );
@@ -1032,7 +1175,15 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
       setAnchorRect(rect);
       setActiveKey(key);
     },
-    [stats, todayStats, metadata, isHistoricalView, activeKey, dateRangeLabel]
+    [
+      stats,
+      todayStats,
+      metadata,
+      typeSummary,
+      isHistoricalView,
+      activeKey,
+      dateRangeLabel,
+    ]
   );
 
   // 关闭解释弹窗
@@ -1104,11 +1255,6 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
       setSelectedDate(null);
     }
   }, [availableDates, selectedDate, isContentMode]);
-
-  // 空状态 - 只检查熟豆
-  const roastedBeans = useMemo(() => {
-    return beans.filter(bean => (bean.beanState || 'roasted') === 'roasted');
-  }, [beans]);
 
   if (roastedBeans.length === 0) {
     return (

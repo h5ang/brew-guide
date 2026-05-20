@@ -5,8 +5,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 export interface StatsExplanation {
   title: string;
   value: string;
-  formula: string;
-  dataSource: {
+  rows?: {
+    label: string;
+    value: string | number;
+  }[];
+  formula?: string;
+  dataSource?: {
     label: string;
     value: string | number;
   }[];
@@ -36,7 +40,7 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
   // 计算位置
   const calculatePosition = useCallback((rect: DOMRect) => {
     const popoverWidth = 200;
-    const popoverHeight = 120;
+    const popoverHeight = 188;
     const padding = 12;
     const arrowSize = 6;
     const viewportWidth = window.innerWidth;
@@ -69,31 +73,39 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
   // 处理显示/隐藏
   useEffect(() => {
     if (explanation && anchorRect) {
-      // 有新数据要显示
-      if (displayState === 'hidden') {
-        // 直接进入
-        setCurrentData({ explanation, anchorRect });
-        setDisplayState('entering');
-        requestAnimationFrame(() => {
+      setCurrentData({ explanation, anchorRect });
+      setDisplayState(previousState => {
+        if (previousState === 'hidden') {
           requestAnimationFrame(() => {
-            setDisplayState('visible');
+            requestAnimationFrame(() => {
+              setDisplayState('visible');
+            });
           });
-        });
-      } else if (displayState === 'visible' || displayState === 'entering') {
-        // 直接切换内容（不做动画）
-        setCurrentData({ explanation, anchorRect });
-      }
-    } else {
-      // 需要关闭
-      if (displayState === 'visible' || displayState === 'entering') {
-        setDisplayState('leaving');
-        setTimeout(() => {
+          return 'entering';
+        }
+
+        return previousState === 'leaving' ? 'visible' : previousState;
+      });
+      return;
+    }
+
+    let leaveTimer: ReturnType<typeof setTimeout> | undefined;
+    setDisplayState(previousState => {
+      if (previousState === 'visible' || previousState === 'entering') {
+        leaveTimer = setTimeout(() => {
           setDisplayState('hidden');
           setCurrentData(null);
         }, 120);
+        return 'leaving';
       }
-    }
-  }, [explanation, anchorRect, displayState]);
+
+      return previousState;
+    });
+
+    return () => {
+      if (leaveTimer) clearTimeout(leaveTimer);
+    };
+  }, [explanation, anchorRect]);
 
   // 点击外部关闭
   useEffect(() => {
@@ -114,6 +126,8 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
 
   const position = calculatePosition(currentData.anchorRect);
   const isVisible = displayState === 'visible';
+  const rows =
+    currentData.explanation.rows ?? currentData.explanation.dataSource ?? [];
 
   return (
     <div
@@ -149,29 +163,58 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
       <div className="w-[200px] rounded-lg border border-neutral-200/50 bg-white shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
         <div className="space-y-1.5 px-3 py-2.5">
           {/* 公式 */}
-          <div className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-            {currentData.explanation.formula}
-          </div>
+          {currentData.explanation.formula && (
+            <div className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+              {currentData.explanation.formula}
+            </div>
+          )}
 
           {/* 分隔线 */}
-          <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
+          {currentData.explanation.formula && rows.length > 0 && (
+            <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
+          )}
 
           {/* 数据来源 */}
-          <div className="space-y-0.5">
-            {currentData.explanation.dataSource.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between text-[11px]"
-              >
-                <span className="text-neutral-400 dark:text-neutral-500">
-                  {item.label}
-                </span>
-                <span className="font-medium text-neutral-600 dark:text-neutral-300">
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
+          {currentData.explanation.dataSource && (
+            <div className="space-y-0.5">
+              {currentData.explanation.dataSource.map(item => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between text-[11px]"
+                >
+                  <span className="text-neutral-400 dark:text-neutral-500">
+                    {item.label}
+                  </span>
+                  <span className="font-medium text-neutral-600 tabular-nums dark:text-neutral-300">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 豆种补充 */}
+          {currentData.explanation.rows &&
+            currentData.explanation.rows.length > 0 && (
+              <>
+                <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
+                <div className="space-y-0.5">
+                  {currentData.explanation.rows.map(item => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between text-[11px]"
+                    >
+                      <span className="text-neutral-400 dark:text-neutral-500">
+                        {item.label}
+                      </span>
+                      <span className="font-medium text-neutral-700 tabular-nums dark:text-neutral-200">
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
           {/* 备注 */}
           {currentData.explanation.note && (
