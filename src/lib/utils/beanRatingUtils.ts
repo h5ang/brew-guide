@@ -31,7 +31,7 @@ export interface BeanRatingInfo {
  */
 export function calculateBeanAutoRating(
   beanId: string,
-  notes: BrewingNoteData[]
+  notes: NoteWithTaste[]
 ): { rating: number; noteCount: number } | undefined {
   // 筛选该咖啡豆的有效评分笔记
   const beanNotes = notes.filter(
@@ -61,7 +61,7 @@ export function calculateBeanAutoRating(
  */
 export function getBeanRatingInfo(
   bean: CoffeeBean,
-  notes: BrewingNoteData[]
+  notes: NoteWithTaste[]
 ): BeanRatingInfo {
   const manualRating =
     bean.overallRating && bean.overallRating > 0
@@ -117,7 +117,7 @@ export function formatBeanRating(ratingInfo: BeanRatingInfo): string {
  */
 export function hasBeanRating(
   bean: CoffeeBean,
-  notes: BrewingNoteData[]
+  notes: NoteWithTaste[]
 ): boolean {
   // 有手动评分
   if (bean.overallRating && bean.overallRating > 0) {

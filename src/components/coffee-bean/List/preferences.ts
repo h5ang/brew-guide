@@ -393,6 +393,89 @@ export const getStatsBeanStatePreference = () =>
 export const saveStatsBeanStatePreference = (v: StatsBeanStateType) =>
   saveStringState(MODULE_NAME, 'statsBeanState', v);
 
+export type StatsViewSectionPreference = {
+  key: string;
+  visible: boolean;
+};
+
+const normalizeStatsViewSections = (
+  stored: unknown,
+  defaults: StatsViewSectionPreference[]
+): StatsViewSectionPreference[] => {
+  const defaultKeys = new Set(defaults.map(item => item.key));
+  const defaultByKey = new Map(defaults.map(item => [item.key, item]));
+  const defaultIndexByKey = new Map(
+    defaults.map((item, index) => [item.key, index])
+  );
+  const normalized: StatsViewSectionPreference[] = [];
+  const seen = new Set<string>();
+
+  if (Array.isArray(stored)) {
+    stored.forEach(item => {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        !('key' in item) ||
+        typeof item.key !== 'string' ||
+        !defaultKeys.has(item.key) ||
+        seen.has(item.key)
+      ) {
+        return;
+      }
+
+      normalized.push({
+        key: item.key,
+        visible:
+          typeof item.visible === 'boolean'
+            ? item.visible
+            : (defaultByKey.get(item.key)?.visible ?? true),
+      });
+      seen.add(item.key);
+    });
+  }
+
+  defaults.forEach(item => {
+    if (seen.has(item.key)) return;
+
+    const defaultIndex = defaultIndexByKey.get(item.key) ?? 0;
+    let insertIndex = normalized.length;
+
+    for (let i = defaultIndex - 1; i >= 0; i--) {
+      const previousKey = defaults[i]?.key;
+      const previousIndex = normalized.findIndex(
+        section => section.key === previousKey
+      );
+      if (previousIndex >= 0) {
+        insertIndex = previousIndex + 1;
+        break;
+      }
+    }
+
+    normalized.splice(insertIndex, 0, item);
+    seen.add(item.key);
+  });
+
+  return normalized;
+};
+
+export const getStatsViewSectionsPreference = (
+  scope: StatsBeanStateType,
+  defaults: StatsViewSectionPreference[]
+) =>
+  normalizeStatsViewSections(
+    getObjectState<StatsViewSectionPreference[]>(
+      MODULE_NAME,
+      `statsViewSections_${scope}`,
+      defaults
+    ),
+    defaults
+  );
+
+export const saveStatsViewSectionsPreference = (
+  scope: StatsBeanStateType,
+  sections: StatsViewSectionPreference[]
+) => saveObjectState(MODULE_NAME, `statsViewSections_${scope}`, sections);
+
 // 搜索历史
 export const getSearchHistoryPreference = (): string[] => {
   const history = getObjectState<string[]>(MODULE_NAME, 'searchHistory', []);
@@ -494,6 +577,7 @@ const initGlobalCache = () => {
     month: getSelectedDateByModePreference('month'),
     day: getSelectedDateByModePreference('day'),
   };
+  globalCache.statsBeanState = getStatsBeanStatePreference();
 };
 
 initGlobalCache();

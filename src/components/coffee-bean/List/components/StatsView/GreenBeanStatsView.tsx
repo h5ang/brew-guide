@@ -1,18 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  StatsViewProps,
-  DateGroupingMode,
-  TypeInventoryStats,
-  BeanType,
-} from './types';
+import { DateGroupingMode, TypeInventoryStats } from './types';
 import { formatNumber } from './utils';
 import {
   globalCache,
   saveDateGroupingModePreference,
   saveSelectedDatePreference,
   saveSelectedDateByModePreference,
+  getStatsViewSectionsPreference,
+  saveStatsViewSectionsPreference,
+  StatsViewSectionPreference,
 } from '../../preferences';
 import StatsFilterBar from './StatsFilterBar';
 import ConsumptionTrendChart from './ConsumptionTrendChart';
@@ -29,6 +27,9 @@ import {
   getBeanProcesses,
 } from '@/lib/utils/beanVarietyUtils';
 import { ExtendedCoffeeBean } from '../../types';
+import StatsSectionEditorDrawer, {
+  StatsSectionOption,
+} from './StatsSectionEditorDrawer';
 
 // 格式化辅助函数
 const fmtWeight = (v: number) => (v > 0 ? `${formatNumber(v)}g` : '-');
@@ -50,6 +51,39 @@ type GreenBeanStatsKey =
   | 'totalValue'
   | 'conversionRate'
   | 'beanCount';
+
+type GreenStatsSectionKey =
+  | 'beanCount'
+  | 'origin'
+  | 'estate'
+  | 'variety'
+  | 'process';
+
+const GREEN_STATS_SECTION_DEFAULTS: StatsSectionOption[] = [
+  { key: 'beanCount', label: '生豆', visible: true },
+  { key: 'origin', label: '产地', visible: true },
+  { key: 'estate', label: '庄园', visible: true },
+  { key: 'variety', label: '品种', visible: true },
+  { key: 'process', label: '处理法', visible: true },
+];
+
+const hydrateStatsSectionOptions = (
+  preferences: StatsViewSectionPreference[],
+  defaults: StatsSectionOption[]
+): StatsSectionOption[] => {
+  const defaultsByKey = new Map(defaults.map(item => [item.key, item]));
+
+  return preferences.flatMap(item => {
+    const defaultItem = defaultsByKey.get(item.key);
+    if (!defaultItem) return [];
+    return [{ ...defaultItem, visible: item.visible }];
+  });
+};
+
+const toStatsSectionPreferences = (
+  sections: StatsSectionOption[]
+): StatsViewSectionPreference[] =>
+  sections.map(({ key, visible }) => ({ key, visible }));
 
 // 生成解释内容
 const createGreenBeanExplanation = (
@@ -506,6 +540,15 @@ const GreenBeanAttributeStats: React.FC<GreenBeanAttributeStatsProps> = ({
   dateGroupingMode,
   onExplain,
 }) => {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [sectionOptions, setSectionOptions] = useState<StatsSectionOption[]>(
+    () =>
+      hydrateStatsSectionOptions(
+        getStatsViewSectionsPreference('green', GREEN_STATS_SECTION_DEFAULTS),
+        GREEN_STATS_SECTION_DEFAULTS
+      )
+  );
+
   // 过滤生豆
   const greenBeans = useMemo(() => {
     return beans.filter(bean => bean.beanState === 'green');
@@ -586,26 +629,96 @@ const GreenBeanAttributeStats: React.FC<GreenBeanAttributeStatsProps> = ({
     return Array.from(processCount.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredBeans]);
 
-  if (
-    originStats.length === 0 &&
-    estateStats.length === 0 &&
-    varietyStats.length === 0 &&
-    processStats.length === 0
-  ) {
-    return null;
-  }
+  const handleSectionOptionsChange = useCallback(
+    (nextSections: StatsSectionOption[]) => {
+      setSectionOptions(nextSections);
+      saveStatsViewSectionsPreference(
+        'green',
+        toStatsSectionPreferences(nextSections)
+      );
+    },
+    []
+  );
+
+  const sectionNodes = useMemo(() => {
+    return new Map<GreenStatsSectionKey, React.ReactNode>([
+      [
+        'beanCount',
+        <BeanCountStats
+          key="beanCount"
+          beans={filteredBeans}
+          onExplain={onExplain}
+        />,
+      ],
+      [
+        'origin',
+        originStats.length > 0 ? (
+          <AttributeCard key="origin" title="产地" data={originStats} />
+        ) : null,
+      ],
+      [
+        'estate',
+        estateStats.length > 0 ? (
+          <AttributeCard key="estate" title="庄园" data={estateStats} />
+        ) : null,
+      ],
+      [
+        'variety',
+        varietyStats.length > 0 ? (
+          <AttributeCard key="variety" title="品种" data={varietyStats} />
+        ) : null,
+      ],
+      [
+        'process',
+        processStats.length > 0 ? (
+          <AttributeCard key="process" title="处理法" data={processStats} />
+        ) : null,
+      ],
+    ]);
+  }, [
+    estateStats,
+    filteredBeans,
+    onExplain,
+    originStats,
+    processStats,
+    varietyStats,
+  ]);
+
+  const visibleSections = sectionOptions.flatMap(section => {
+    if (!section.visible) return [];
+    const node = sectionNodes.get(section.key as GreenStatsSectionKey);
+    return node
+      ? [<React.Fragment key={section.key}>{node}</React.Fragment>]
+      : [];
+  });
+
+  const hasAnyStats = Array.from(sectionNodes.values()).some(Boolean);
+
+  if (!hasAnyStats) return null;
 
   return (
     <div className="w-full">
       <div className="space-y-3">
-        <BeanCountStats beans={filteredBeans} onExplain={onExplain} />
-        <AttributeCard title="产地" data={originStats} />
-        {estateStats.length > 0 && (
-          <AttributeCard title="庄园" data={estateStats} />
-        )}
-        <AttributeCard title="品种" data={varietyStats} />
-        <AttributeCard title="处理法" data={processStats} />
+        {visibleSections}
+
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            onClick={() => setIsEditorOpen(true)}
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-full bg-neutral-100 px-4 text-xs font-medium text-neutral-600 transition-[background-color,transform] active:scale-[0.96] active:bg-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-300 dark:active:bg-neutral-700/70"
+          >
+            编辑
+          </button>
+        </div>
       </div>
+
+      <StatsSectionEditorDrawer
+        isOpen={isEditorOpen}
+        title="统计模块"
+        sections={sectionOptions}
+        onClose={() => setIsEditorOpen(false)}
+        onChange={handleSectionOptionsChange}
+      />
     </div>
   );
 };
