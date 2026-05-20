@@ -54,6 +54,20 @@ export interface BrewingDetailItem {
   cost: number; // 花费（元）
 }
 
+// 基于当前统计范围评分聚合出的咖啡豆亮点
+export interface BeanRatingHighlight {
+  beanId: string;
+  beanName: string;
+  averageRating: number; // 平均评分
+  noteCount: number; // 参与评分的笔记数量
+  latestTimestamp: number; // 最近一条评分笔记时间
+}
+
+export interface BeanRatingHighlights {
+  best: BeanRatingHighlight[];
+  worst: BeanRatingHighlight[];
+}
+
 // 统一的统计数据结构
 export interface UnifiedStatsData {
   // 概览：总消耗数据
@@ -69,4 +83,6 @@ export interface UnifiedStatsData {
   inventory: InventoryStats | null;
   // 按类型分类的库存预测（仅实时视图有效）
   inventoryByType: TypeInventoryStats[] | null;
+  // 全部/年/月视图下的评分最高和最低咖啡豆
+  ratingHighlights: BeanRatingHighlights | null;
 }

@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import {
   StatsViewProps,
   DateGroupingMode,
   TypeInventoryStats,
   BrewingDetailItem,
   BeanType,
+  BeanRatingHighlights,
 } from './types';
 import { formatNumber } from './utils';
 import {
@@ -18,6 +18,9 @@ import {
   saveStatsBeanStatePreference,
   getStatsBeanStatePreference,
   StatsBeanStateType,
+  getStatsViewSectionsPreference,
+  saveStatsViewSectionsPreference,
+  StatsViewSectionPreference,
 } from '../../preferences';
 import StatsFilterBar from './StatsFilterBar';
 import ConsumptionTrendChart from './ConsumptionTrendChart';
@@ -27,6 +30,7 @@ import StatsExplainer, { StatsExplanation } from './StatsExplainer';
 import {
   extractUniqueOrigins,
   extractUniqueVarieties,
+  formatBeanDisplayName,
   getBeanProcesses,
   getBeanFlavors,
   getBeanEstates,
@@ -35,6 +39,9 @@ import {
 import { ExtendedCoffeeBean } from '../../types';
 import GreenBeanStatsView from './GreenBeanStatsView';
 import CoffeeOriginMap from './CoffeeOriginMap';
+import StatsSectionEditorDrawer, {
+  StatsSectionOption,
+} from './StatsSectionEditorDrawer';
 
 // 格式化辅助函数
 const fmtWeight = (v: number) => (v > 0 ? `${formatNumber(v)}g` : '-');
@@ -45,12 +52,14 @@ const fmtAverageWeight = (v: number, unit: '天' | '月') =>
 const fmtPricePerGram = (v: number) => (v > 0 ? `¥${formatNumber(v)}/g` : '-');
 const fmtDetailWeight = (v: number) => `${formatNumber(v)}g`;
 const fmtDetailCost = (v: number) => `¥${formatNumber(v)}`;
+const fmtRating = (v: number) => (v > 0 ? `${formatNumber(v)} / 5` : '-');
 const parseBeanNumber = (value: string | number | undefined | null): number => {
   if (value === undefined || value === null) return 0;
   const parsed = parseFloat(value.toString().replace(/[^\d.]/g, ''));
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const BEAN_PRICE_HIGHLIGHT_MAX_COUNT = 15;
 const BEAN_TYPE_ORDER: BeanType[] = ['espresso', 'filter', 'omni'];
 const BEAN_TYPE_LABELS: Record<BeanType, string> = {
   espresso: '意式豆',
@@ -70,6 +79,65 @@ type BeanTypeSummary = Record<
     remainingValue: number;
   }
 >;
+
+interface BeanPriceHighlight {
+  beanId: string;
+  beanName: string;
+  pricePerGram: number;
+}
+
+interface BeanPriceHighlights {
+  averagePricePerGram: number;
+  expensive: BeanPriceHighlight[];
+  cheap: BeanPriceHighlight[];
+}
+
+type RoastedStatsSectionKey =
+  | 'beanCount'
+  | 'bestBeans'
+  | 'worstBeans'
+  | 'expensiveBeans'
+  | 'cheapBeans'
+  | 'roaster'
+  | 'originMap'
+  | 'origin'
+  | 'estate'
+  | 'variety'
+  | 'process'
+  | 'flavor';
+
+const ROASTED_STATS_SECTION_DEFAULTS: StatsSectionOption[] = [
+  { key: 'beanCount', label: '咖啡豆', visible: true },
+  { key: 'bestBeans', label: '最夯豆子', visible: true },
+  { key: 'worstBeans', label: '最拉豆子', visible: true },
+  { key: 'expensiveBeans', label: '最贵豆子', visible: true },
+  { key: 'cheapBeans', label: '最便宜豆子', visible: true },
+  { key: 'roaster', label: '烘焙商', visible: true },
+  { key: 'originMap', label: '咖啡产区地图', visible: true },
+  { key: 'origin', label: '产地', visible: true },
+  { key: 'estate', label: '庄园', visible: true },
+  { key: 'variety', label: '品种', visible: true },
+  { key: 'process', label: '处理法', visible: true },
+  { key: 'flavor', label: '风味', visible: true },
+];
+
+const hydrateStatsSectionOptions = (
+  preferences: StatsViewSectionPreference[],
+  defaults: StatsSectionOption[]
+): StatsSectionOption[] => {
+  const defaultsByKey = new Map(defaults.map(item => [item.key, item]));
+
+  return preferences.flatMap(item => {
+    const defaultItem = defaultsByKey.get(item.key);
+    if (!defaultItem) return [];
+    return [{ ...defaultItem, visible: item.visible }];
+  });
+};
+
+const toStatsSectionPreferences = (
+  sections: StatsSectionOption[]
+): StatsViewSectionPreference[] =>
+  sections.map(({ key, visible }) => ({ key, visible }));
 
 const createEmptyTypeSummary = (): BeanTypeSummary => ({
   espresso: {
@@ -126,6 +194,57 @@ const summarizeBeansByType = (beans: ExtendedCoffeeBean[]): BeanTypeSummary => {
 
 const getOwnedBeanTypes = (typeSummary: BeanTypeSummary): BeanType[] =>
   BEAN_TYPE_ORDER.filter(type => typeSummary[type].totalCount > 0);
+
+const getBeanPricePerGram = (bean: ExtendedCoffeeBean): number => {
+  const price = parseBeanNumber(bean.price);
+  const capacity = parseBeanNumber(bean.capacity);
+
+  if (price <= 0 || capacity <= 0) return 0;
+  return price / capacity;
+};
+
+const buildBeanPriceHighlights = (
+  beans: ExtendedCoffeeBean[]
+): BeanPriceHighlights | null => {
+  const pricedBeans = beans.flatMap(bean => {
+    const pricePerGram = getBeanPricePerGram(bean);
+    if (pricePerGram <= 0) return [];
+
+    return [
+      {
+        beanId: bean.id,
+        beanName: formatBeanDisplayName(bean),
+        pricePerGram,
+      },
+    ];
+  });
+
+  if (pricedBeans.length === 0) return null;
+
+  const averagePricePerGram =
+    pricedBeans.reduce((sum, bean) => sum + bean.pricePerGram, 0) /
+    pricedBeans.length;
+
+  return {
+    averagePricePerGram,
+    expensive: pricedBeans
+      .filter(bean => bean.pricePerGram > averagePricePerGram)
+      .sort(
+        (a, b) =>
+          b.pricePerGram - a.pricePerGram ||
+          a.beanName.localeCompare(b.beanName)
+      )
+      .slice(0, BEAN_PRICE_HIGHLIGHT_MAX_COUNT),
+    cheap: pricedBeans
+      .filter(bean => bean.pricePerGram <= averagePricePerGram)
+      .sort(
+        (a, b) =>
+          a.pricePerGram - b.pricePerGram ||
+          a.beanName.localeCompare(b.beanName)
+      )
+      .slice(0, BEAN_PRICE_HIGHLIGHT_MAX_COUNT),
+  };
+};
 
 const createTypeRows = (
   typeSummary: BeanTypeSummary,
@@ -558,23 +677,46 @@ const BrewingDetails: React.FC<{ data: BrewingDetailItem[] }> = ({ data }) => {
 // 咖啡豆属性统计项组件
 interface BeanAttributeItemProps {
   label: string;
-  count: number;
+  value: string | number;
 }
 
 const BeanAttributeItem: React.FC<BeanAttributeItemProps> = ({
   label,
-  count,
+  value,
 }) => (
   <div className="grid grid-cols-[1fr_auto] gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
     <div className="truncate">{label}</div>
-    <div className="text-right">{count}</div>
+    <div className="text-right tabular-nums">{value}</div>
   </div>
 );
+
+interface AttributeCardRow {
+  key: string;
+  label: string;
+  value: string | number;
+}
+
+type AttributeCardItem = readonly [string, string | number] | AttributeCardRow;
+
+const isAttributeCardRow = (
+  item: AttributeCardItem
+): item is AttributeCardRow => !Array.isArray(item);
+
+const getAttributeCardItemKey = (item: AttributeCardItem): string =>
+  isAttributeCardRow(item) ? item.key : item[0];
+
+const getAttributeCardItemLabel = (item: AttributeCardItem): string =>
+  isAttributeCardRow(item) ? item.label : item[0];
+
+const getAttributeCardItemValue = (
+  item: AttributeCardItem
+): string | number => (isAttributeCardRow(item) ? item.value : item[1]);
 
 // 单个属性统计卡片组件（支持展开/收起）
 interface AttributeCardProps {
   title: string;
-  data: [string, number][];
+  data: AttributeCardItem[];
+  valueLabel?: string;
   initialLimit?: number;
   displayMode?: 'list' | 'tags'; // 新增：显示模式
 }
@@ -582,6 +724,7 @@ interface AttributeCardProps {
 const AttributeCard: React.FC<AttributeCardProps> = ({
   title,
   data,
+  valueLabel = '数量',
   initialLimit = 5,
   displayMode = 'list',
 }) => {
@@ -687,19 +830,24 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
               : 'none',
           }}
         >
-          {data.map(([label, count]) => (
+          {data.map(item => {
+            const label = getAttributeCardItemLabel(item);
+            const value = getAttributeCardItemValue(item);
+
+            return (
             <div
-              key={label}
+              key={getAttributeCardItemKey(item)}
               className="inline-flex items-center gap-1.5 rounded-full bg-neutral-200/50 px-3 py-1.5 dark:bg-neutral-800/50"
             >
               <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">
                 {label}
               </span>
               <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                {count}
+                {value}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
         {/* 渐变遮罩 */}
         {hasMore && !isExpanded && (
@@ -718,7 +866,7 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
       {/* 表头 */}
       <div className="mb-2 grid grid-cols-[1fr_auto] gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
         <div>{title}</div>
-        <div className="text-right">数量</div>
+        <div className="text-right">{valueLabel}</div>
       </div>
       {/* 数据行容器 - 添加动画 */}
       <div
@@ -730,8 +878,12 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
             : 'none',
         }}
       >
-        {data.map(([label, count]) => (
-          <BeanAttributeItem key={label} label={label} count={count} />
+        {data.map(item => (
+          <BeanAttributeItem
+            key={getAttributeCardItemKey(item)}
+            label={getAttributeCardItemLabel(item)}
+            value={getAttributeCardItemValue(item)}
+          />
         ))}
       </div>
       {/* 渐变遮罩 */}
@@ -830,6 +982,7 @@ interface BeanAttributeStatsProps {
   beans: ExtendedCoffeeBean[];
   selectedDate: string | null;
   dateGroupingMode: DateGroupingMode;
+  ratingHighlights: BeanRatingHighlights | null;
   onExplain: (
     key: StatsKey,
     rect: DOMRect,
@@ -841,8 +994,21 @@ const BeanAttributeStats: React.FC<BeanAttributeStatsProps> = ({
   beans,
   selectedDate,
   dateGroupingMode,
+  ratingHighlights,
   onExplain,
 }) => {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [sectionOptions, setSectionOptions] = useState<StatsSectionOption[]>(
+    () =>
+      hydrateStatsSectionOptions(
+        getStatsViewSectionsPreference(
+          'roasted',
+          ROASTED_STATS_SECTION_DEFAULTS
+        ),
+        ROASTED_STATS_SECTION_DEFAULTS
+      )
+  );
+
   // 先过滤掉生豆，只统计熟豆
   const roastedBeans = useMemo(() => {
     return beans.filter(bean => (bean.beanState || 'roasted') === 'roasted');
@@ -962,56 +1128,222 @@ const BeanAttributeStats: React.FC<BeanAttributeStatsProps> = ({
     return originStats.map(([name]) => name);
   }, [originStats]);
 
-  // 如果所有统计都为空，不显示
-  if (
-    originStats.length === 0 &&
-    roasterStats.length === 0 &&
-    estateStats.length === 0 &&
-    varietyStats.length === 0 &&
-    processStats.length === 0 &&
-    flavorStats.length === 0
-  ) {
-    return null;
-  }
+  const bestBeanStats = useMemo<AttributeCardItem[]>(() => {
+    return (
+      ratingHighlights?.best.map(bean => ({
+        key: bean.beanId,
+        label: bean.beanName,
+        value: fmtRating(bean.averageRating),
+      })) ?? []
+    );
+  }, [ratingHighlights]);
+
+  const worstBeanStats = useMemo<AttributeCardItem[]>(() => {
+    return (
+      ratingHighlights?.worst.map(bean => ({
+        key: bean.beanId,
+        label: bean.beanName,
+        value: fmtRating(bean.averageRating),
+      })) ?? []
+    );
+  }, [ratingHighlights]);
+
+  const beanPriceHighlights = useMemo(
+    () => buildBeanPriceHighlights(filteredBeans),
+    [filteredBeans]
+  );
+  const expensiveBeanStats = useMemo<AttributeCardItem[]>(() => {
+    return (
+      beanPriceHighlights?.expensive.map(bean => ({
+        key: bean.beanId,
+        label: bean.beanName,
+        value: fmtPricePerGram(bean.pricePerGram),
+      })) ?? []
+    );
+  }, [beanPriceHighlights]);
+  const cheapBeanStats = useMemo<AttributeCardItem[]>(() => {
+    return (
+      beanPriceHighlights?.cheap.map(bean => ({
+        key: bean.beanId,
+        label: bean.beanName,
+        value: fmtPricePerGram(bean.pricePerGram),
+      })) ?? []
+    );
+  }, [beanPriceHighlights]);
+
+  const handleSectionOptionsChange = useCallback(
+    (nextSections: StatsSectionOption[]) => {
+      setSectionOptions(nextSections);
+      saveStatsViewSectionsPreference(
+        'roasted',
+        toStatsSectionPreferences(nextSections)
+      );
+    },
+    []
+  );
+
+  const sectionNodes = useMemo(() => {
+    const originMap =
+      originStats.length > 0 ? (
+        <div
+          key="originMap"
+          className="rounded-md bg-neutral-100 p-3 dark:bg-neutral-800/40"
+        >
+          <CoffeeOriginMap
+            origins={originNames}
+            originCounts={originCountMap}
+          />
+        </div>
+      ) : null;
+
+    return new Map<RoastedStatsSectionKey, React.ReactNode>([
+      [
+        'beanCount',
+        <BeanCountStats
+          key="beanCount"
+          beans={filteredBeans}
+          onExplain={onExplain}
+        />,
+      ],
+      [
+        'bestBeans',
+        bestBeanStats.length > 0 ? (
+          <AttributeCard
+            key="bestBeans"
+            title="最夯豆子"
+            data={bestBeanStats}
+            valueLabel="评分"
+          />
+        ) : null,
+      ],
+      [
+        'worstBeans',
+        worstBeanStats.length > 0 ? (
+          <AttributeCard
+            key="worstBeans"
+            title="最拉豆子"
+            data={worstBeanStats}
+            valueLabel="评分"
+          />
+        ) : null,
+      ],
+      [
+        'expensiveBeans',
+        expensiveBeanStats.length > 0 ? (
+          <AttributeCard
+            key="expensiveBeans"
+            title="最贵豆子"
+            data={expensiveBeanStats}
+            valueLabel="克价"
+          />
+        ) : null,
+      ],
+      [
+        'cheapBeans',
+        cheapBeanStats.length > 0 ? (
+          <AttributeCard
+            key="cheapBeans"
+            title="最便宜豆子"
+            data={cheapBeanStats}
+            valueLabel="克价"
+          />
+        ) : null,
+      ],
+      [
+        'roaster',
+        roasterStats.length > 0 ? (
+          <AttributeCard key="roaster" title="烘焙商" data={roasterStats} />
+        ) : null,
+      ],
+      ['originMap', originMap],
+      [
+        'origin',
+        originStats.length > 0 ? (
+          <AttributeCard key="origin" title="产地" data={originStats} />
+        ) : null,
+      ],
+      [
+        'estate',
+        estateStats.length > 0 ? (
+          <AttributeCard key="estate" title="庄园" data={estateStats} />
+        ) : null,
+      ],
+      [
+        'variety',
+        varietyStats.length > 0 ? (
+          <AttributeCard key="variety" title="品种" data={varietyStats} />
+        ) : null,
+      ],
+      [
+        'process',
+        processStats.length > 0 ? (
+          <AttributeCard key="process" title="处理法" data={processStats} />
+        ) : null,
+      ],
+      [
+        'flavor',
+        flavorStats.length > 0 ? (
+          <AttributeCard
+            key="flavor"
+            title="风味"
+            data={flavorStats}
+            displayMode="tags"
+          />
+        ) : null,
+      ],
+    ]);
+  }, [
+    bestBeanStats,
+    cheapBeanStats,
+    estateStats,
+    expensiveBeanStats,
+    filteredBeans,
+    flavorStats,
+    onExplain,
+    originCountMap,
+    originNames,
+    originStats,
+    processStats,
+    roasterStats,
+    varietyStats,
+    worstBeanStats,
+  ]);
+
+  const visibleSections = sectionOptions.flatMap(section => {
+    if (!section.visible) return [];
+    const node = sectionNodes.get(section.key as RoastedStatsSectionKey);
+    return node
+      ? [<React.Fragment key={section.key}>{node}</React.Fragment>]
+      : [];
+  });
+
+  const hasAnyStats = Array.from(sectionNodes.values()).some(Boolean);
+
+  if (!hasAnyStats) return null;
 
   return (
     <div className="w-full">
       <div className="space-y-3">
-        {/* 咖啡豆数量统计 */}
-        <BeanCountStats beans={filteredBeans} onExplain={onExplain} />
+        {visibleSections}
 
-        {/* 烘焙商 */}
-        {roasterStats.length > 0 && (
-          <AttributeCard title="烘焙商" data={roasterStats} />
-        )}
-
-        {/* 咖啡产区地图 */}
-        {originStats.length > 0 && (
-          <div className="rounded-md bg-neutral-100 p-3 dark:bg-neutral-800/40">
-            <CoffeeOriginMap
-              origins={originNames}
-              originCounts={originCountMap}
-            />
-          </div>
-        )}
-
-        {/* 产地 */}
-        <AttributeCard title="产地" data={originStats} />
-
-        {/* 庄园 */}
-        {estateStats.length > 0 && (
-          <AttributeCard title="庄园" data={estateStats} />
-        )}
-
-        {/* 品种 */}
-        <AttributeCard title="品种" data={varietyStats} />
-
-        {/* 处理法 */}
-        <AttributeCard title="处理法" data={processStats} />
-
-        {/* 风味 */}
-        <AttributeCard title="风味" data={flavorStats} displayMode="tags" />
+        <div className="flex justify-center mt-6">
+          <button
+            type="button"
+            onClick={() => setIsEditorOpen(true)}
+            className="inline-flex cursor-pointer items-center rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-[background-color,transform] active:scale-[0.96] active:bg-neutral-200 dark:bg-neutral-800/60 dark:text-neutral-300 dark:active:bg-neutral-700/70"
+          >
+            编辑
+          </button>
+        </div>
       </div>
+
+      <StatsSectionEditorDrawer
+        isOpen={isEditorOpen}
+        title="统计模块"
+        sections={sectionOptions}
+        onClose={() => setIsEditorOpen(false)}
+        onChange={handleSectionOptionsChange}
+      />
     </div>
   );
 };
@@ -1503,6 +1835,7 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
                   beans={beans}
                   selectedDate={selectedDate}
                   dateGroupingMode={dateGroupingMode}
+                  ratingHighlights={stats.ratingHighlights}
                   onExplain={handleExplain}
                 />
               </>

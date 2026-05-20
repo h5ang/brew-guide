@@ -9,9 +9,12 @@ import {
   ConsumptionStats,
   BeanType,
   BrewingDetailItem,
+  BeanRatingHighlight,
+  BeanRatingHighlights,
 } from './types';
 import { formatBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
 import { findCoffeeBeanByIdentity } from '@/lib/utils/coffeeBeanUtils';
+import { getBeanRatingInfo } from '@/lib/utils/beanRatingUtils';
 
 // ============================================================================
 // 类型定义
@@ -52,6 +55,14 @@ interface UseStatsDataResult {
   brewingDetails: BrewingDetailItem[]; // 冲煮明细（单日视图使用）
   todayBrewingDetails: BrewingDetailItem[]; // 今日冲煮明细（全部视图使用）
 }
+
+interface BeanRatingCandidate {
+  bean: ExtendedCoffeeBean;
+  latestTimestamp: number;
+}
+
+const BEAN_RATING_HIGHLIGHT_SCORE_BOUNDARY = 2.5;
+const BEAN_RATING_HIGHLIGHT_MAX_COUNT = 15;
 
 // ============================================================================
 // 工具函数
@@ -105,6 +116,78 @@ const calculateNoteCost = (
 const hasBeanPrice = (bean: ExtendedCoffeeBean | null): boolean => {
   if (!bean?.price || !bean?.capacity) return false;
   return parseNum(bean.price) > 0 && parseNum(bean.capacity) > 0;
+};
+
+const toBeanRatingHighlight = (
+  item: BeanRatingCandidate,
+  notes: BrewingNote[]
+): BeanRatingHighlight | null => {
+  const ratingInfo = getBeanRatingInfo(item.bean, notes);
+  if (ratingInfo.rating <= 0) return null;
+
+  return {
+    beanId: item.bean.id,
+    beanName: formatBeanDisplayName(item.bean),
+    averageRating: ratingInfo.rating,
+    noteCount: ratingInfo.noteCount,
+    latestTimestamp: item.latestTimestamp,
+  };
+};
+
+const compareBestRatedBeans = (
+  a: BeanRatingHighlight,
+  b: BeanRatingHighlight
+): number => {
+  if (b.averageRating !== a.averageRating) {
+    return b.averageRating - a.averageRating;
+  }
+  if (b.noteCount !== a.noteCount) {
+    return b.noteCount - a.noteCount;
+  }
+  if (b.latestTimestamp !== a.latestTimestamp) {
+    return b.latestTimestamp - a.latestTimestamp;
+  }
+  return a.beanName.localeCompare(b.beanName);
+};
+
+const compareWorstRatedBeans = (
+  a: BeanRatingHighlight,
+  b: BeanRatingHighlight
+): number => {
+  if (a.averageRating !== b.averageRating) {
+    return a.averageRating - b.averageRating;
+  }
+  if (b.noteCount !== a.noteCount) {
+    return b.noteCount - a.noteCount;
+  }
+  if (b.latestTimestamp !== a.latestTimestamp) {
+    return b.latestTimestamp - a.latestTimestamp;
+  }
+  return a.beanName.localeCompare(b.beanName);
+};
+
+const buildBeanRatingHighlights = (
+  candidates: Map<string, BeanRatingCandidate>,
+  notes: BrewingNote[]
+): BeanRatingHighlights | null => {
+  const ratedBeans = Array.from(candidates.values()).flatMap(candidate => {
+    const highlight = toBeanRatingHighlight(candidate, notes);
+    return highlight ? [highlight] : [];
+  });
+  if (ratedBeans.length === 0) return null;
+
+  return {
+    best: ratedBeans
+      .filter(bean => bean.averageRating > BEAN_RATING_HIGHLIGHT_SCORE_BOUNDARY)
+      .sort(compareBestRatedBeans)
+      .slice(0, BEAN_RATING_HIGHLIGHT_MAX_COUNT),
+    worst: ratedBeans
+      .filter(
+        bean => bean.averageRating <= BEAN_RATING_HIGHLIGHT_SCORE_BOUNDARY
+      )
+      .sort(compareWorstRatedBeans)
+      .slice(0, BEAN_RATING_HIGHLIGHT_MAX_COUNT),
+  };
 };
 
 /** 获取日期键（用于趋势图分组） */
@@ -493,6 +576,19 @@ export const useStatsData = (
     const trendMap = new Map<string, number>();
     const groupBy = dateGroupingMode === 'year' ? 'month' : 'day';
 
+    // 评分亮点（全部/年/月视图）
+    const needBeanRatingHighlights = !isSingleDayView;
+    const beanRatingCandidates = new Map<string, BeanRatingCandidate>();
+
+    if (needBeanRatingHighlights && !selectedDate) {
+      for (const bean of roastedBeans) {
+        beanRatingCandidates.set(bean.id, {
+          bean,
+          latestTimestamp: bean.timestamp || 0,
+        });
+      }
+    }
+
     // 遍历笔记
     for (const note of notes) {
       // 跳过容量调整记录和烘焙记录（烘焙记录属于生豆统计）
@@ -507,10 +603,23 @@ export const useStatsData = (
 
       // 范围内的笔记（历史视图用于计算总消耗，全部视图用于明细）
       if (ts >= startTime && ts < endTime) {
+        const bean = findBeanForNote(note, roastedBeans);
+
+        if (needBeanRatingHighlights && bean) {
+          const existing = beanRatingCandidates.get(bean.id);
+          if (existing) {
+            existing.latestTimestamp = Math.max(existing.latestTimestamp, ts);
+          } else {
+            beanRatingCandidates.set(bean.id, {
+              bean,
+              latestTimestamp: ts,
+            });
+          }
+        }
+
         const amount = parseNoteConsumption(note);
         if (amount <= 0) continue;
 
-        const bean = findBeanForNote(note, roastedBeans);
         const cost = calculateNoteCost(amount, bean);
         const isPriced = hasBeanPrice(bean);
 
@@ -713,6 +822,7 @@ export const useStatsData = (
       typePricedConsumption,
       todayTypeConsumption,
       todayTypeCost,
+      ratingHighlights: buildBeanRatingHighlights(beanRatingCandidates, notes),
       actualDays,
       averageConsumptionPeriods,
       averageConsumptionUnit,
@@ -743,6 +853,7 @@ export const useStatsData = (
       typeConsumption,
       typeCost,
       typePricedConsumption,
+      ratingHighlights,
     } = computedData;
 
     const dailyConsumption = actualDays > 0 ? totalConsumption / actualDays : 0;
@@ -802,6 +913,7 @@ export const useStatsData = (
       },
       inventory,
       inventoryByType,
+      ratingHighlights,
     };
   }, [computedData, roastedBeans, isHistoricalView]);
 
