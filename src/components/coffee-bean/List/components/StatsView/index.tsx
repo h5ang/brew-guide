@@ -40,6 +40,9 @@ import CoffeeOriginMap from './CoffeeOriginMap';
 const fmtWeight = (v: number) => (v > 0 ? `${formatNumber(v)}g` : '-');
 const fmtCost = (v: number) => (v > 0 ? `¥${formatNumber(v)}` : '-');
 const fmtDays = (v: number) => (v > 0 ? `${v}天` : '-');
+const fmtAverageWeight = (v: number, unit: '天' | '月') =>
+  v > 0 ? `${formatNumber(v)}g/${unit}` : '-';
+const fmtPricePerGram = (v: number) => (v > 0 ? `¥${formatNumber(v)}/g` : '-');
 const fmtDetailWeight = (v: number) => `${formatNumber(v)}g`;
 const fmtDetailCost = (v: number) => `¥${formatNumber(v)}`;
 const parseBeanNumber = (value: string | number | undefined | null): number => {
@@ -144,6 +147,8 @@ const createTypeRows = (
 type StatsKey =
   | 'totalConsumption'
   | 'totalCost'
+  | 'averageConsumption'
+  | 'averagePricePerGram'
   | 'dailyConsumption'
   | 'dailyCost'
   | 'todayConsumption'
@@ -168,6 +173,8 @@ const createExplanation = (
   const {
     validNotes,
     actualDays,
+    averageConsumptionPeriods,
+    averageConsumptionUnit,
     beansWithPrice,
     beansTotal,
     todayNotes,
@@ -273,6 +280,56 @@ const createExplanation = (
         note:
           beansWithPrice < beansTotal
             ? '部分咖啡豆缺少价格，实际花费可能更高'
+            : undefined,
+      };
+
+    case 'averageConsumption':
+      return {
+        title: '平均消耗',
+        value,
+        formula: `总消耗 ÷ 统计${averageConsumptionUnit}数`,
+        dataSource: [
+          { label: '总消耗', value: fmtWeight(stats.overview.consumption) },
+          {
+            label: `统计${averageConsumptionUnit}数`,
+            value: `${averageConsumptionPeriods} ${averageConsumptionUnit}`,
+          },
+        ],
+        rows: createTypeRows(typeSummary, type =>
+          fmtAverageWeight(
+            stats.byType[type].consumption / averageConsumptionPeriods,
+            averageConsumptionUnit
+          )
+        ),
+        note:
+          averageConsumptionUnit === '月'
+            ? '按有效统计范围覆盖的日历月份计算'
+            : actualDays < 7
+              ? '统计周期较短，平均值可能波动较大'
+              : undefined,
+      };
+
+    case 'averagePricePerGram':
+      return {
+        title: '平均克价',
+        value,
+        formula: '已计价花费 ÷ 已计价消耗',
+        dataSource: [
+          { label: '已计价花费', value: fmtCost(stats.overview.cost) },
+          {
+            label: '已计价消耗',
+            value: fmtWeight(stats.overview.pricedConsumption ?? 0),
+          },
+        ],
+        rows: createTypeRows(typeSummary, type => {
+          const consumption = stats.byType[type].pricedConsumption ?? 0;
+          return fmtPricePerGram(
+            consumption > 0 ? stats.byType[type].cost / consumption : 0
+          );
+        }),
+        note:
+          beansWithPrice < beansTotal
+            ? '部分咖啡豆缺少价格，平均克价仅基于已计入花费的数据'
             : undefined,
       };
 
@@ -1132,6 +1189,15 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
         case 'totalCost':
           value = fmtCost(stats.overview.cost);
           break;
+        case 'averageConsumption':
+          value = fmtAverageWeight(
+            stats.overview.averageConsumption,
+            metadata.averageConsumptionUnit
+          );
+          break;
+        case 'averagePricePerGram':
+          value = fmtPricePerGram(stats.overview.averagePricePerGram);
+          break;
         case 'dailyConsumption':
           value = fmtWeight(stats.overview.dailyConsumption);
           break;
@@ -1269,6 +1335,25 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
 
   // 是否为单日视图（按日筛选且选中了某一天）
   const isSingleDayView = dateGroupingMode === 'day' && selectedDate !== null;
+  const showPeriodAverages =
+    selectedDate !== null && dateGroupingMode !== 'day';
+  const averageStats = showPeriodAverages
+    ? [
+        {
+          title: '平均消耗',
+          value: fmtAverageWeight(
+            stats.overview.averageConsumption,
+            metadata.averageConsumptionUnit
+          ),
+          key: 'averageConsumption' as StatsKey,
+        },
+        {
+          title: '平均克价',
+          value: fmtPricePerGram(stats.overview.averagePricePerGram),
+          key: 'averagePricePerGram' as StatsKey,
+        },
+      ]
+    : [];
 
   // 概览统计：单日视图只显示消耗和花费，其他视图显示全部
   const overviewStats = isSingleDayView
@@ -1311,6 +1396,7 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
           value: fmtCost(stats.overview.cost),
           key: 'totalCost' as StatsKey,
         },
+        ...averageStats,
       ];
 
   // 今日统计（仅在非按日模式且有数据时显示）

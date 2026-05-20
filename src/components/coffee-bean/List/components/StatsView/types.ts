@@ -16,6 +16,7 @@ export type BeanType = 'espresso' | 'filter' | 'omni';
 export interface ConsumptionStats {
   consumption: number; // 消耗量（克）
   cost: number; // 花费（元）
+  pricedConsumption?: number; // 有价格信息并计入花费的消耗量（克）
   percentage?: number; // 占比（百分比，仅类型统计使用）
 }
 
@@ -59,6 +60,8 @@ export interface UnifiedStatsData {
   overview: ConsumptionStats & {
     dailyConsumption: number; // 日均消耗
     dailyCost: number; // 日均花费
+    averageConsumption: number; // 当前统计粒度下的平均消耗
+    averagePricePerGram: number; // 平均克价
   };
   // 按类型分类
   byType: TypeConsumptionStats;
