@@ -462,12 +462,6 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   // 处理删除笔记 - 统一数据流避免竞态条件，并恢复咖啡豆容量
   const handleDelete = async (noteId: string) => {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-      const savedNotes = await Storage.get('brewingNotes');
-      if (!savedNotes) return;
-
-      const notes = JSON.parse(savedNotes) as BrewingNote[];
-
       // 找到要删除的笔记
       const noteToDelete = notes.find(note => note.id === noteId);
       if (!noteToDelete) {
@@ -490,11 +484,6 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   // 执行删除笔记
   const executeDeleteNote = async (noteId: string) => {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-      const savedNotes = await Storage.get('brewingNotes');
-      if (!savedNotes) return;
-
-      const notes = JSON.parse(savedNotes) as BrewingNote[];
       const noteToDelete = notes.find(note => note.id === noteId);
       if (!noteToDelete) return;
 
@@ -573,11 +562,6 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   // 处理复制笔记 - 打开编辑界面让用户修改后保存，不包含图片
   const handleCopyNote = async (noteId: string) => {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-      const savedNotes = await Storage.get('brewingNotes');
-      if (!savedNotes) return;
-
-      const notes = JSON.parse(savedNotes) as BrewingNote[];
       const noteToCopy = notes.find(note => note.id === noteId);
 
       if (!noteToCopy) {

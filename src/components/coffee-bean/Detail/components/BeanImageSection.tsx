@@ -16,6 +16,10 @@ import {
   useSettingsStore,
 } from '@/lib/stores/settingsStore';
 import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
+import {
+  getCoffeeBeanImageSource,
+  type CoffeeBeanImageSide,
+} from '@/lib/coffee-beans/imageRepository';
 
 // 获取烘焙商名称用于 alt 文本的辅助函数
 const getRoasterAltText = (
@@ -135,12 +139,12 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
   );
   const storedFrontImage = useCoffeeBeanImage(bean?.id, {
     fallback: bean?.image,
-    preferThumbnail: false,
+    preferThumbnail: true,
   });
   const storedBackImage = useCoffeeBeanImage(bean?.id, {
     side: 'back',
     fallback: bean?.backImage,
-    preferThumbnail: false,
+    preferThumbnail: true,
   });
   const viewBean = useMemo(
     () =>
@@ -175,6 +179,52 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
       tempBean,
     ]
   );
+
+  const getOriginalImage = async (
+    side: CoffeeBeanImageSide,
+    fallback?: string
+  ): Promise<string | undefined> => {
+    if (!bean?.id) {
+      return fallback;
+    }
+
+    try {
+      return (
+        (await getCoffeeBeanImageSource(bean.id, {
+          side,
+          preferThumbnail: false,
+        })) || fallback
+      );
+    } catch (error) {
+      console.warn('[BeanImageSection] 加载咖啡豆原图失败:', error);
+      return fallback;
+    }
+  };
+
+  const handleStoredImageClick = async (side: CoffeeBeanImageSide) => {
+    if (!viewBean) return;
+
+    const primaryFallback =
+      side === 'front' ? viewBean.image : viewBean.backImage;
+    const secondaryFallback =
+      side === 'front' ? viewBean.backImage : viewBean.image;
+
+    const [primaryImage, secondaryImage] = await Promise.all([
+      getOriginalImage(side, primaryFallback),
+      getOriginalImage(side === 'front' ? 'back' : 'front', secondaryFallback),
+    ]);
+
+    if (primaryImage) {
+      onImageClick(primaryImage, secondaryImage);
+    }
+  };
+
+  const handleRoasterLogoClick = async () => {
+    if (!roasterLogo) return;
+
+    const backImage = await getOriginalImage('back', viewBean?.backImage);
+    onImageClick(roasterLogo, backImage);
+  };
 
   // 处理图片选择
   const handleImageSelect = async (
@@ -244,7 +294,8 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
             roasterLogo={roasterLogo}
             imageError={imageError}
             setImageError={setImageError}
-            onImageClick={onImageClick}
+            onStoredImageClick={handleStoredImageClick}
+            onRoasterLogoClick={handleRoasterLogoClick}
             roasterSettings={roasterSettings}
           />
         )}
@@ -381,8 +432,9 @@ const AddModeImages: React.FC<{
   if (!tempBean.image && roasterLogo) {
     return (
       <>
-        <div
-          className="relative h-32 cursor-pointer overflow-hidden bg-neutral-100 dark:bg-neutral-800"
+        <button
+          type="button"
+          className="relative block h-32 cursor-pointer overflow-hidden bg-neutral-100 p-0 dark:bg-neutral-800"
           onClick={() => handleImageSelect('gallery', 'front')}
           title="点击替换为自定义图片"
         >
@@ -397,7 +449,7 @@ const AddModeImages: React.FC<{
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity hover:opacity-100">
             <Camera className="h-6 w-6 text-white drop-shadow-md" />
           </div>
-        </div>
+        </button>
         {tempBean.backImage ? (
           <div className="relative h-20 shrink-0 self-end overflow-hidden bg-neutral-100 dark:bg-neutral-800">
             <Image
@@ -516,14 +568,16 @@ const ViewModeImages: React.FC<{
   roasterLogo: string | null;
   imageError: boolean;
   setImageError: (error: boolean) => void;
-  onImageClick: (imageUrl: string, backImageUrl?: string) => void;
+  onStoredImageClick: (side: CoffeeBeanImageSide) => void;
+  onRoasterLogoClick: () => void;
   roasterSettings: RoasterSettings;
 }> = ({
   bean,
   roasterLogo,
   imageError,
   setImageError,
-  onImageClick,
+  onStoredImageClick,
+  onRoasterLogoClick,
   roasterSettings,
 }) => {
   if (bean?.image && !imageError) {
@@ -539,7 +593,7 @@ const ViewModeImages: React.FC<{
             onError={() => setImageError(true)}
             onClick={() => {
               if (!imageError && bean.image) {
-                onImageClick(bean.image, bean.backImage);
+                onStoredImageClick('front');
               }
             }}
           />
@@ -555,7 +609,7 @@ const ViewModeImages: React.FC<{
               onError={() => setImageError(true)}
               onClick={() => {
                 if (!imageError && bean.backImage) {
-                  onImageClick(bean.backImage, bean.image);
+                  onStoredImageClick('back');
                 }
               }}
             />
@@ -578,7 +632,7 @@ const ViewModeImages: React.FC<{
             onError={() => setImageError(true)}
             onClick={() => {
               if (!imageError && roasterLogo) {
-                onImageClick(roasterLogo, bean?.backImage);
+                onRoasterLogoClick();
               }
             }}
           />
@@ -594,7 +648,7 @@ const ViewModeImages: React.FC<{
               onError={() => setImageError(true)}
               onClick={() => {
                 if (!imageError && bean.backImage) {
-                  onImageClick(bean.backImage, roasterLogo);
+                  onStoredImageClick('back');
                 }
               }}
             />

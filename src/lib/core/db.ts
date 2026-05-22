@@ -358,6 +358,7 @@ export type SettingsOptions = AppSettings;
  * - v3: 添加 customEquipments, customMethods 表
  * - v4: 重构 - 添加 grinders, yearlyReports, appSettings 表，统一数据管理
  * - v7: 咖啡豆缩略图拆分到独立表，避免读取缩略图时反序列化原图
+ * - v8: 为冲煮记录增加 beanId 索引，详情页按咖啡豆懒查询关联记录
  */
 export class BrewGuideDB extends Dexie {
   // 核心数据表
@@ -474,6 +475,22 @@ export class BrewGuideDB extends Dexie {
     // 版本7：缩略图独立存储，读取列表缩略图时不再加载原图 payload
     this.version(7).stores({
       brewingNotes: 'id, timestamp, equipment, method',
+      coffeeBeans: 'id, timestamp, name, type',
+      coffeeBeanImages: 'beanId, updatedAt',
+      coffeeBeanImageThumbnails: 'beanId, updatedAt',
+      settings: 'key',
+      customEquipments: 'id, name',
+      customMethods: 'equipmentId',
+      grinders: 'id, name',
+      yearlyReports: 'id, year, createdAt',
+      appSettings: 'id',
+      pendingOperations: 'id, table, recordId, timestamp',
+    });
+
+    // 版本8：详情页按 beanId 查询关联记录，避免为单个详情页加载全量笔记
+    this.version(8).stores({
+      brewingNotes:
+        'id, timestamp, equipment, method, beanId, [beanId+timestamp]',
       coffeeBeans: 'id, timestamp, name, type',
       coffeeBeanImages: 'beanId, updatedAt',
       coffeeBeanImageThumbnails: 'beanId, updatedAt',

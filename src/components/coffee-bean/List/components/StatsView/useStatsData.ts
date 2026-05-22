@@ -15,6 +15,7 @@ import {
 import { formatBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
 import { findCoffeeBeanByIdentity } from '@/lib/utils/coffeeBeanUtils';
 import { getBeanRatingInfo } from '@/lib/utils/beanRatingUtils';
+import { getBrewingNotes } from '@/lib/notes/relatedNotes';
 
 // ============================================================================
 // 类型定义
@@ -388,14 +389,7 @@ export const useStatsData = (
   useEffect(() => {
     const loadNotes = async () => {
       try {
-        const { Storage } = await import('@/lib/core/storage');
-        const notesStr = await Storage.get('brewingNotes');
-        if (notesStr) {
-          const parsed = JSON.parse(notesStr);
-          if (Array.isArray(parsed)) {
-            setNotes(parsed);
-          }
-        }
+        setNotes(await getBrewingNotes());
       } catch (error) {
         console.error('加载笔记数据失败:', error);
       } finally {

@@ -1,8 +1,11 @@
 import { CoffeeBean, BrewingNoteData } from '@/types/app';
+import type { BrewingNote } from '@/lib/core/config';
 import {
   getCoffeeBeanStore,
   increaseBeanRemaining,
 } from '@/lib/stores/coffeeBeanStore';
+import { db } from '@/lib/core/db';
+import { getBrewingNoteStore } from '@/lib/stores/brewingNoteStore';
 import { nanoid } from 'nanoid';
 import {
   parseBeanName,
@@ -15,6 +18,40 @@ import { mergeBeanWithStoredImages } from '@/lib/coffee-beans/imageRepository';
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? value.toString() : value.toFixed(1);
 }
+
+const notifyBrewingNotesUpdated = (): void => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('brewingNotesUpdated'));
+};
+
+const getAllBrewingNotes = async (): Promise<BrewingNoteData[]> =>
+  (await db.brewingNotes.toArray()) as BrewingNoteData[];
+
+const getBrewingNoteById = async (
+  noteId: string
+): Promise<BrewingNoteData | undefined> =>
+  (await db.brewingNotes.get(noteId)) as BrewingNoteData | undefined;
+
+const addBrewingNote = async (note: BrewingNoteData): Promise<void> => {
+  await getBrewingNoteStore().addNote(note as BrewingNote);
+};
+
+const deleteBrewingNote = async (noteId: string): Promise<void> => {
+  await getBrewingNoteStore().deleteNote(noteId);
+};
+
+const replaceBrewingNotes = async (
+  notes: BrewingNoteData[]
+): Promise<void> => {
+  await db.transaction('rw', db.brewingNotes, async () => {
+    await db.brewingNotes.clear();
+    if (notes.length > 0) {
+      await db.brewingNotes.bulkPut(notes as BrewingNote[]);
+    }
+  });
+
+  getBrewingNoteStore().setNotes(notes as BrewingNote[]);
+};
 
 /**
  * 烘焙管理器 - 处理生豆到熟豆的转换
@@ -175,12 +212,7 @@ export const RoastingManager = {
             quickDecrementAmount: decrementAmount,
           };
 
-          // 保存变动记录
-          const { Storage } = await import('@/lib/core/storage');
-          const notesStr = await Storage.get('brewingNotes');
-          const notes: BrewingNoteData[] = notesStr ? JSON.parse(notesStr) : [];
-          notes.unshift(decrementNote);
-          await Storage.set('brewingNotes', JSON.stringify(notes));
+          await addBrewingNote(decrementNote);
         }
       }
 
@@ -213,16 +245,10 @@ export const RoastingManager = {
       };
 
       // 6. 保存烘焙记录
-      const { Storage } = await import('@/lib/core/storage');
-      const notesStr = await Storage.get('brewingNotes');
-      const notes: BrewingNoteData[] = notesStr ? JSON.parse(notesStr) : [];
-      notes.unshift(roastingNote);
-      await Storage.set('brewingNotes', JSON.stringify(notes));
+      await addBrewingNote(roastingNote);
 
       // 7. 触发更新事件
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('brewingNotesUpdated'));
-      }
+      notifyBrewingNotesUpdated();
 
       return {
         success: true,
@@ -330,11 +356,7 @@ export const RoastingManager = {
    * @returns 烘焙记录列表
    */
   async getRoastingRecords(greenBeanId: string): Promise<BrewingNoteData[]> {
-    const { Storage } = await import('@/lib/core/storage');
-    const notesStr = await Storage.get('brewingNotes');
-    if (!notesStr) return [];
-
-    const notes: BrewingNoteData[] = JSON.parse(notesStr);
+    const notes = await getAllBrewingNotes();
     return notes.filter(
       note =>
         note.source === 'roasting' &&
@@ -359,22 +381,11 @@ export const RoastingManager = {
     error?: string;
   }> {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-
       // 1. 获取烘焙记录
-      const notesStr = await Storage.get('brewingNotes');
-      if (!notesStr) {
-        return { success: false, error: '找不到笔记数据' };
-      }
-
-      const notes: BrewingNoteData[] = JSON.parse(notesStr);
-      const noteIndex = notes.findIndex(n => n.id === noteId);
-
-      if (noteIndex === -1) {
+      const note = await getBrewingNoteById(noteId);
+      if (!note) {
         return { success: false, error: '找不到烘焙记录' };
       }
-
-      const note = notes[noteIndex];
 
       // 确认是烘焙记录
       if (note.source !== 'roasting') {
@@ -423,8 +434,7 @@ export const RoastingManager = {
       }
 
       // 4. 删除烘焙记录
-      notes.splice(noteIndex, 1);
-      await Storage.set('brewingNotes', JSON.stringify(notes));
+      await deleteBrewingNote(noteId);
 
       // 5. 触发更新事件
       if (typeof window !== 'undefined') {
@@ -454,11 +464,7 @@ export const RoastingManager = {
    */
   async onRoastedBeanDeleted(roastedBeanId: string): Promise<void> {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-      const notesStr = await Storage.get('brewingNotes');
-      if (!notesStr) return;
-
-      const notes: BrewingNoteData[] = JSON.parse(notesStr);
+      const notes = await getAllBrewingNotes();
       let updated = false;
 
       // 查找并清理关联的烘焙记录
@@ -474,10 +480,8 @@ export const RoastingManager = {
       }
 
       if (updated) {
-        await Storage.set('brewingNotes', JSON.stringify(notes));
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('brewingNotesUpdated'));
-        }
+        await replaceBrewingNotes(notes);
+        notifyBrewingNotesUpdated();
       }
     } catch (error) {
       console.error('清理熟豆关联的烘焙记录失败:', error);
@@ -503,11 +507,7 @@ export const RoastingManager = {
       }
 
       // 2. 清除烘焙记录中的 greenBeanId
-      const { Storage } = await import('@/lib/core/storage');
-      const notesStr = await Storage.get('brewingNotes');
-      if (!notesStr) return;
-
-      const notes: BrewingNoteData[] = JSON.parse(notesStr);
+      const notes = await getAllBrewingNotes();
       let updated = false;
 
       for (const note of notes) {
@@ -525,7 +525,7 @@ export const RoastingManager = {
       }
 
       if (updated) {
-        await Storage.set('brewingNotes', JSON.stringify(notes));
+        await replaceBrewingNotes(notes);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('brewingNotesUpdated'));
           window.dispatchEvent(new CustomEvent('coffeeBeansUpdated'));
@@ -561,8 +561,6 @@ export const RoastingManager = {
     error?: string;
   }> {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-
       // 1. 获取原熟豆信息
       const storedOriginalBean =
         await getCoffeeBeanStore().getBeanById(roastedBeanId);
@@ -586,8 +584,7 @@ export const RoastingManager = {
       }
 
       // 2. 获取所有关联笔记
-      const notesStr = await Storage.get('brewingNotes');
-      const allNotes: BrewingNoteData[] = notesStr ? JSON.parse(notesStr) : [];
+      const allNotes = await getAllBrewingNotes();
 
       // 筛选与原熟豆关联的笔记
       const relatedNotes = allNotes.filter(
@@ -659,7 +656,7 @@ export const RoastingManager = {
           const updatedNotes = allNotes.filter(
             n => !recordIdsToDelete.has(n.id)
           );
-          await Storage.set('brewingNotes', JSON.stringify(updatedNotes));
+          await replaceBrewingNotes(updatedNotes);
         }
 
         // 删除原熟豆 - 使用 store 的 deleteBean 方法确保触发同步事件
@@ -792,7 +789,7 @@ export const RoastingManager = {
       updatedNotes.unshift(roastingNote);
 
       // 保存笔记
-      await Storage.set('brewingNotes', JSON.stringify(updatedNotes));
+      await replaceBrewingNotes(updatedNotes);
 
       // 9. 删除原熟豆 - 使用 store 的 deleteBean 方法确保触发同步事件
       await getCoffeeBeanStore().deleteBean(roastedBeanId);
@@ -850,8 +847,6 @@ export const RoastingManager = {
     error?: string;
   }> {
     try {
-      const { Storage } = await import('@/lib/core/storage');
-
       // 获取原熟豆信息
       const originalBean =
         await getCoffeeBeanStore().getBeanById(roastedBeanId);
@@ -872,8 +867,7 @@ export const RoastingManager = {
       }
 
       // 获取所有关联笔记
-      const notesStr = await Storage.get('brewingNotes');
-      const allNotes: BrewingNoteData[] = notesStr ? JSON.parse(notesStr) : [];
+      const allNotes = await getAllBrewingNotes();
       const relatedNotes = allNotes.filter(
         note => note.beanId === roastedBeanId
       );

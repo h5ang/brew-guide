@@ -8,6 +8,7 @@ import {
   TypeInventoryStats,
 } from './types';
 import { getTimeRange, TrendDataPoint } from './useStatsData';
+import { getBrewingNotes } from '@/lib/notes/relatedNotes';
 
 // ============================================================================
 // 类型定义
@@ -214,14 +215,7 @@ export const useGreenBeanStatsData = (
   useEffect(() => {
     const loadNotes = async () => {
       try {
-        const { Storage } = await import('@/lib/core/storage');
-        const notesStr = await Storage.get('brewingNotes');
-        if (notesStr) {
-          const parsed = JSON.parse(notesStr);
-          if (Array.isArray(parsed)) {
-            setNotes(parsed);
-          }
-        }
+        setNotes(await getBrewingNotes());
       } catch (error) {
         console.error('加载笔记数据失败:', error);
       } finally {
@@ -418,7 +412,7 @@ export const useGreenBeanStatsData = (
       : 1;
 
     // 生成趋势数据数组
-    let trendData: TrendDataPoint[] = [];
+    const trendData: TrendDataPoint[] = [];
     if (needTrend && selectedDate) {
       const { startTime: tStart, endTime: tEnd } = getTimeRange(
         selectedDate,

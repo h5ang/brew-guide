@@ -1,6 +1,7 @@
 'use client';
 
 import { Storage } from '@/lib/core/storage';
+import { hasSignificantUserData } from '@/lib/core/dataStats';
 
 /**
  * 备份提醒周期选项（天数）
@@ -85,28 +86,7 @@ export class BackupReminderUtils {
    */
   static async hasSignificantData(): Promise<boolean> {
     try {
-      // 检查冲煮笔记数量
-      const brewingNotesStr = await Storage.get('brewingNotes');
-      const brewingNotes = brewingNotesStr ? JSON.parse(brewingNotesStr) : [];
-      const notesCount = Array.isArray(brewingNotes) ? brewingNotes.length : 0;
-
-      // 检查咖啡豆数量
-      const coffeeBeansStr = await Storage.get('coffeeBeans');
-      const coffeeBeans = coffeeBeansStr ? JSON.parse(coffeeBeansStr) : [];
-      const beansCount = Array.isArray(coffeeBeans) ? coffeeBeans.length : 0;
-
-      // 检查自定义器具数量
-      const customEquipmentsStr = await Storage.get('customEquipments');
-      const customEquipments = customEquipmentsStr
-        ? JSON.parse(customEquipmentsStr)
-        : [];
-      const equipmentsCount = Array.isArray(customEquipments)
-        ? customEquipments.length
-        : 0;
-
-      // 总数据量达到阈值才认为有意义
-      const totalDataCount = notesCount + beansCount + equipmentsCount;
-      return totalDataCount >= this.MIN_DATA_FOR_BACKUP;
+      return hasSignificantUserData(this.MIN_DATA_FOR_BACKUP);
     } catch (error) {
       console.error('检查用户数据失败:', error);
       return false;

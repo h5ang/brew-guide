@@ -218,20 +218,6 @@ const AppLoader = ({
             await Storage.set('brewingNotesVersion', APP_VERSION);
           }
 
-          // 确保brewingNotes存在且格式正确
-          const notes = await Storage.get('brewingNotes');
-          if (notes && typeof notes === 'string') {
-            try {
-              const parsed = JSON.parse(notes);
-              if (!Array.isArray(parsed)) {
-                await Storage.set('brewingNotes', '[]');
-              }
-            } catch {
-              await Storage.set('brewingNotes', '[]');
-            }
-          } else {
-            await Storage.set('brewingNotes', '[]');
-          }
         } catch {
           // 静默处理错误
         }
@@ -903,16 +889,10 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         // 检查coffee beans而不是直接调用不存在的函数
         let hasCoffeeBeans = initialHasBeans;
         try {
-          const { Storage } = await import('@/lib/core/storage');
-          const beansStr = await Storage.get('coffeeBeans');
-          if (beansStr && typeof beansStr === 'string') {
-            try {
-              const beans = JSON.parse(beansStr);
-              hasCoffeeBeans = Array.isArray(beans) && beans.length > 0;
-            } catch {
-              hasCoffeeBeans = false;
-            }
-          }
+          const { hasCoffeeBeans: hasCoffeeBeansInDb } = await import(
+            '@/lib/core/dataStats'
+          );
+          hasCoffeeBeans = await hasCoffeeBeansInDb();
         } catch (error) {
           // Log error in development only
           if (process.env.NODE_ENV === 'development') {
@@ -3953,28 +3933,22 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                     beanInfo={noteDetailData.beanInfo}
                     onOpenBeanDetail={handleOpenBeanDetailFromNote}
                     onEdit={async note => {
-                      const { Storage } = await import('@/lib/core/storage');
-                      const notesStr = await Storage.get('brewingNotes');
-                      if (notesStr) {
-                        const allNotes: BrewingNote[] = JSON.parse(notesStr);
-                        const fullNote = allNotes.find(n => n.id === note.id);
-                        if (fullNote) {
-                          setBrewingNoteEditData(fullNote as BrewingNoteData);
-                          setBrewingNoteEditOpen(true);
-                        }
+                      const { getBrewingNoteById } = await import(
+                        '@/lib/notes/relatedNotes'
+                      );
+                      const fullNote = await getBrewingNoteById(note.id);
+                      if (fullNote) {
+                        setBrewingNoteEditData(fullNote as BrewingNoteData);
+                        setBrewingNoteEditOpen(true);
                       }
                     }}
                     onDelete={async noteId => {
                       setNoteDetailOpen(false);
                       try {
-                        const { Storage } = await import('@/lib/core/storage');
-                        const savedNotes = await Storage.get('brewingNotes');
-                        if (!savedNotes) return;
-
-                        const notes: BrewingNote[] = JSON.parse(savedNotes);
-                        const noteToDelete = notes.find(
-                          note => note.id === noteId
+                        const { getBrewingNoteById } = await import(
+                          '@/lib/notes/relatedNotes'
                         );
+                        const noteToDelete = await getBrewingNoteById(noteId);
                         if (!noteToDelete) {
                           console.warn('未找到要删除的笔记:', noteId);
                           return;
@@ -4079,16 +4053,14 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                     }}
                     onCopy={async noteId => {
                       setNoteDetailOpen(false);
-                      const { Storage } = await import('@/lib/core/storage');
-                      const notesStr = await Storage.get('brewingNotes');
-                      if (notesStr) {
-                        const allNotes: BrewingNote[] = JSON.parse(notesStr);
-                        const fullNote = allNotes.find(n => n.id === noteId);
-                        if (fullNote) {
-                          setBrewingNoteEditData(fullNote as BrewingNoteData);
-                          setIsBrewingNoteCopy(true);
-                          setBrewingNoteEditOpen(true);
-                        }
+                      const { getBrewingNoteById } = await import(
+                        '@/lib/notes/relatedNotes'
+                      );
+                      const fullNote = await getBrewingNoteById(noteId);
+                      if (fullNote) {
+                        setBrewingNoteEditData(fullNote as BrewingNoteData);
+                        setIsBrewingNoteCopy(true);
+                        setBrewingNoteEditOpen(true);
                       }
                     }}
                     onShare={noteId => {

@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { CoffeeBean } from '@/types/app';
+import type { BrewingNote } from '@/lib/core/config';
 import { defaultSettings } from '@/components/settings/Settings';
 import { getDefaultFlavorPeriodByRoastLevelSync } from '@/lib/utils/flavorPeriodUtils';
 import { BREWING_EVENTS } from '@/lib/brewing/constants';
@@ -30,7 +31,8 @@ import ActionDrawer from '@/components/common/ui/ActionDrawer';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import RemainingEditor from '@/components/coffee-bean/List/components/RemainingEditor';
 import { buildEquipmentNameMap } from '@/lib/notes/noteDisplay';
-import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
+import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
+import { getRelatedNotesForBean } from '@/lib/notes/relatedNotes';
 import {
   clearCoffeeBeanFormDraftSession,
   hasCoffeeBeanFormDraftContent,
@@ -182,13 +184,9 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   ]);
 
   const bean = isFormMode ? (tempBean as CoffeeBean) : persistedBean;
-  const beanOriginalImage = useCoffeeBeanImage(bean?.id, {
-    fallback: bean?.image,
-    preferThumbnail: false,
-  });
   const allBeans = useCoffeeBeanStore(state => state.beans);
   const allNotes = useBrewingNoteStore(state => state.notes);
-  const loadNotes = useBrewingNoteStore(state => state.loadNotes);
+  const notesInitialized = useBrewingNoteStore(state => state.initialized);
   const customEquipments = useCustomEquipmentStore(state => state.equipments);
   const customEquipmentInitialized = useCustomEquipmentStore(
     state => state.initialized
@@ -208,14 +206,20 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   // 状态
   const [imageError, setImageError] = useState(false);
   const [roasterLogo, setRoasterLogo] = useState<string | null>(null);
+  const [lazyRelatedNotes, setLazyRelatedNotes] = useState<BrewingNote[]>([]);
   const relatedNotes = useMemo(
-    () =>
-      bean?.id
-        ? [...allNotes.filter(note => note.beanId === bean.id)].sort(
-            (a, b) => b.timestamp - a.timestamp
-          )
-        : [],
-    [allNotes, bean?.id]
+    () => {
+      if (!bean?.id) return [];
+
+      if (!notesInitialized) {
+        return lazyRelatedNotes.filter(note => note.beanId === bean.id);
+      }
+
+      return [...allNotes.filter(note => note.beanId === bean.id)].sort(
+        (a, b) => b.timestamp - a.timestamp
+      );
+    },
+    [allNotes, bean?.id, lazyRelatedNotes, notesInitialized]
   );
   const equipmentNames = useMemo(
     () => buildEquipmentNameMap(customEquipments),
@@ -435,20 +439,55 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    if (allNotes.length === 0) {
-      void loadNotes();
-    }
-
     if (!customEquipmentInitialized) {
       void loadEquipments();
     }
-  }, [
-    allNotes.length,
-    customEquipmentInitialized,
-    isOpen,
-    loadEquipments,
-    loadNotes,
-  ]);
+  }, [customEquipmentInitialized, isOpen, loadEquipments]);
+
+  useEffect(() => {
+    if (!isOpen || !bean?.id || notesInitialized) {
+      setLazyRelatedNotes([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRelatedNotes = async () => {
+      try {
+        const notes = await getRelatedNotesForBean(bean.id);
+        if (!cancelled) {
+          setLazyRelatedNotes(notes);
+        }
+      } catch (error) {
+        console.warn('[BeanDetailModal] 加载关联记录失败:', error);
+        if (!cancelled) {
+          setLazyRelatedNotes([]);
+        }
+      }
+    };
+
+    setLazyRelatedNotes([]);
+    void loadRelatedNotes();
+
+    if (typeof window === 'undefined') {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const handleNotesChanged = () => {
+      void loadRelatedNotes();
+    };
+
+    window.addEventListener('brewingNoteDataChanged', handleNotesChanged);
+    window.addEventListener('brewingNotesUpdated', handleNotesChanged);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('brewingNoteDataChanged', handleNotesChanged);
+      window.removeEventListener('brewingNotesUpdated', handleNotesChanged);
+    };
+  }, [bean?.id, isOpen, notesInitialized]);
 
   // 图片错误重置
   useEffect(() => {
@@ -803,9 +842,19 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
     }, 360);
   };
 
-  const handleGoToRoast = () => {
+  const handleGoToRoast = async () => {
     if (!bean || !onRoast) return;
 
+    const [frontImage, backImage] = await Promise.all([
+      getCoffeeBeanImageSource(bean.id, {
+        side: 'front',
+        preferThumbnail: false,
+      }),
+      getCoffeeBeanImageSource(bean.id, {
+        side: 'back',
+        preferThumbnail: false,
+      }),
+    ]);
     const today = new Date().toISOString().split('T')[0];
     const roastedBeanTemplate: Omit<CoffeeBean, 'id' | 'timestamp'> = {
       name: bean.name,
@@ -814,7 +863,8 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       beanType: bean.beanType,
       capacity: '',
       remaining: '',
-      image: beanOriginalImage,
+      image: frontImage || bean.image,
+      backImage: backImage || bean.backImage,
       roastLevel: '',
       roastDate: today,
       flavor: bean.flavor,

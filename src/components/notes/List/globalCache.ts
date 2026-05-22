@@ -10,6 +10,8 @@ import {
   calculateTotalCoffeeConsumption as calculateConsumption,
   formatConsumption as formatConsumptionUtil,
 } from '../utils';
+import { db } from '@/lib/core/db';
+import { getBrewingNotes } from '@/lib/notes/relatedNotes';
 
 // 模块名称
 const MODULE_NAME = 'brewing-notes';
@@ -148,10 +150,8 @@ export const initializeGlobalCache = async (): Promise<void> => {
     globalCache.sortOption = getSortOptionPreference();
     globalCache.dateGroupingMode = getDateGroupingModePreference();
 
-    // 从存储加载数据
-    const { Storage } = await import('@/lib/core/storage');
-    const savedNotes = await Storage.get('brewingNotes');
-    const parsedNotes: BrewingNote[] = savedNotes ? JSON.parse(savedNotes) : [];
+    // 从 IndexedDB 加载，避免把带图片的笔记整包序列化成 JSON
+    const parsedNotes = await getBrewingNotes();
     globalCache.notes = parsedNotes;
 
     // 计算总消耗量
@@ -272,9 +272,12 @@ const updateBrewingNotesCache = async (
     globalCache.totalConsumption = calculateConsumption(updatedNotes);
     globalCache.initialized = true; // 🔥 标记缓存已初始化
 
-    // 保存到存储
-    const { Storage } = await import('@/lib/core/storage');
-    await Storage.set('brewingNotes', JSON.stringify(updatedNotes));
+    await db.transaction('rw', db.brewingNotes, async () => {
+      await db.brewingNotes.clear();
+      if (updatedNotes.length > 0) {
+        await db.brewingNotes.bulkPut(updatedNotes);
+      }
+    });
 
     // 触发立即更新事件，让笔记列表无延迟刷新
     window.dispatchEvent(new Event('brewingNotesDataChanged'));

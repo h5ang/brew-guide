@@ -1085,26 +1085,22 @@ const AppModals: React.FC<AppModalsProps> = ({
           beanInfo={noteDetailData.beanInfo}
           onOpenBeanDetail={onOpenBeanDetailFromNote}
           onEdit={async note => {
-            const { Storage } = await import('@/lib/core/storage');
-            const notesStr = await Storage.get('brewingNotes');
-            if (notesStr) {
-              const allNotes: BrewingNote[] = JSON.parse(notesStr);
-              const fullNote = allNotes.find(n => n.id === note.id);
-              if (fullNote) {
-                setBrewingNoteEditData(fullNote as BrewingNoteData);
-                setBrewingNoteEditOpen(true);
-              }
+            const { getBrewingNoteById } = await import(
+              '@/lib/notes/relatedNotes'
+            );
+            const fullNote = await getBrewingNoteById(note.id);
+            if (fullNote) {
+              setBrewingNoteEditData(fullNote as BrewingNoteData);
+              setBrewingNoteEditOpen(true);
             }
           }}
           onDelete={async noteId => {
             setNoteDetailOpen(false);
             try {
-              const { Storage } = await import('@/lib/core/storage');
-              const savedNotes = await Storage.get('brewingNotes');
-              if (!savedNotes) return;
-
-              const notes: BrewingNote[] = JSON.parse(savedNotes);
-              const noteToDelete = notes.find(note => note.id === noteId);
+              const { getBrewingNoteById } = await import(
+                '@/lib/notes/relatedNotes'
+              );
+              const noteToDelete = await getBrewingNoteById(noteId);
               if (!noteToDelete) {
                 console.warn('未找到要删除的笔记:', noteId);
                 return;
@@ -1201,16 +1197,14 @@ const AppModals: React.FC<AppModalsProps> = ({
           }}
           onCopy={async noteId => {
             setNoteDetailOpen(false);
-            const { Storage } = await import('@/lib/core/storage');
-            const notesStr = await Storage.get('brewingNotes');
-            if (notesStr) {
-              const allNotes: BrewingNote[] = JSON.parse(notesStr);
-              const fullNote = allNotes.find(n => n.id === noteId);
-              if (fullNote) {
-                setBrewingNoteEditData(fullNote as BrewingNoteData);
-                setIsBrewingNoteCopy(true);
-                setBrewingNoteEditOpen(true);
-              }
+            const { getBrewingNoteById } = await import(
+              '@/lib/notes/relatedNotes'
+            );
+            const fullNote = await getBrewingNoteById(noteId);
+            if (fullNote) {
+              setBrewingNoteEditData(fullNote as BrewingNoteData);
+              setIsBrewingNoteCopy(true);
+              setBrewingNoteEditOpen(true);
             }
           }}
           onShare={noteId => {

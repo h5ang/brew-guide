@@ -4,7 +4,6 @@ import { Preferences } from '@capacitor/preferences';
 import type { CoffeeBean } from '@/types/app';
 import { normalizeCoffeeBeans } from '@/lib/utils/coffeeBeanUtils';
 import {
-  exportCoffeeBeansWithImages,
   replaceCoffeeBeansWithSplitImages,
 } from '@/lib/coffee-beans/imageRepository';
 
@@ -571,7 +570,7 @@ export const StorageUtils = {
       } else if (key === 'coffeeBeans') {
         try {
           const beans = normalizeCoffeeBeans(
-            await exportCoffeeBeansWithImages(),
+            await db.coffeeBeans.toArray(),
             {
               ensureFlavorArray: true,
             }

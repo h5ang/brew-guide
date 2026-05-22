@@ -1,6 +1,10 @@
 'use client';
 
 import { Storage } from '@/lib/core/storage';
+import {
+  hasBrewingNotes,
+  hasEnoughCoffeeBeans,
+} from '@/lib/core/dataStats';
 
 /**
  * 年度回顾提醒设置接口
@@ -80,10 +84,7 @@ export class YearlyReviewReminderUtils {
    */
   static async hasEnoughBeans(): Promise<boolean> {
     try {
-      const coffeeBeansStr = await Storage.get('coffeeBeans');
-      const coffeeBeans = coffeeBeansStr ? JSON.parse(coffeeBeansStr) : [];
-      const beansCount = Array.isArray(coffeeBeans) ? coffeeBeans.length : 0;
-      return beansCount >= this.MIN_BEANS_COUNT;
+      return hasEnoughCoffeeBeans(this.MIN_BEANS_COUNT);
     } catch (error) {
       console.error('检查咖啡豆数量失败:', error);
       return false;
@@ -95,10 +96,7 @@ export class YearlyReviewReminderUtils {
    */
   static async hasBrewingNotes(): Promise<boolean> {
     try {
-      const brewingNotesStr = await Storage.get('brewingNotes');
-      const brewingNotes = brewingNotesStr ? JSON.parse(brewingNotesStr) : [];
-      const notesCount = Array.isArray(brewingNotes) ? brewingNotes.length : 0;
-      return notesCount > 0;
+      return hasBrewingNotes();
     } catch (error) {
       console.error('检查冲煮记录失败:', error);
       return false;
