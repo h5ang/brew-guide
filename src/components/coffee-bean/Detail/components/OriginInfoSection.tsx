@@ -7,7 +7,9 @@ import { BEAN_TYPES } from '../types';
 import BlendComponentTagRows from './BlendComponentTagRows';
 import { updateBlendComponentsDelimitedField } from '@/lib/utils/coffeeBeanUtils';
 import { useRoastLevelSuggestions } from '@/components/coffee-bean/Form/hooks/useCoffeeBeanFieldSuggestions';
-import SuggestionDropdown from '@/components/common/forms/SuggestionDropdown';
+import SuggestionDropdown, {
+  SUGGESTION_DROPDOWN_Z_INDEX,
+} from '@/components/common/forms/SuggestionDropdown';
 import {
   autoUpdate,
   flip,
@@ -97,7 +99,7 @@ const InlineRoastLevelSelect: React.FC<InlineRoastLevelSelectProps> = ({
             onSelect={handleSelect}
             style={{
               ...floatingStyles,
-              zIndex: 50,
+              zIndex: SUGGESTION_DROPDOWN_Z_INDEX,
               minWidth: 128,
               width:
                 refs.reference.current?.getBoundingClientRect().width ??

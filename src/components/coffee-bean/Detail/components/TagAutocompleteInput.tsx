@@ -8,7 +8,9 @@ import React, {
   useState,
 } from 'react';
 import { calcInputWidth } from '../utils';
-import SuggestionDropdown from '@/components/common/forms/SuggestionDropdown';
+import SuggestionDropdown, {
+  SUGGESTION_DROPDOWN_Z_INDEX,
+} from '@/components/common/forms/SuggestionDropdown';
 import {
   autoUpdate,
   flip,
@@ -199,7 +201,7 @@ const TagAutocompleteInput: React.FC<TagAutocompleteInputProps> = ({
             }
             style={{
               ...floatingStyles,
-              zIndex: 50,
+              zIndex: SUGGESTION_DROPDOWN_Z_INDEX,
               minWidth: 128,
             }}
             {...getFloatingProps()}

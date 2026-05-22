@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils/classNameUtils';
 import { X } from 'lucide-react';
-import SuggestionDropdown from './SuggestionDropdown';
+import SuggestionDropdown, {
+  SUGGESTION_DROPDOWN_Z_INDEX,
+} from './SuggestionDropdown';
 import {
   autoUpdate,
   flip,
@@ -179,12 +181,22 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       }
     }
 
+    const touchListenerOptions: AddEventListenerOptions = { passive: true };
+
     document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleTouchOutside);
+    document.addEventListener(
+      'touchstart',
+      handleTouchOutside,
+      touchListenerOptions
+    );
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleTouchOutside);
+      document.removeEventListener(
+        'touchstart',
+        handleTouchOutside,
+        touchListenerOptions
+      );
     };
   }, []);
 
@@ -450,7 +462,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               onClick={handleClear}
               className="absolute right-0 bottom-2 z-51 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
             >
-              <X className="h-4 w-4" />
+              <X className="size-4" />
             </button>
           )}
         </div>
@@ -480,7 +492,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               }
               style={{
                 ...floatingStyles,
-                zIndex: 50,
+                zIndex: SUGGESTION_DROPDOWN_Z_INDEX,
                 width:
                   refs.reference.current?.getBoundingClientRect().width ??
                   undefined,

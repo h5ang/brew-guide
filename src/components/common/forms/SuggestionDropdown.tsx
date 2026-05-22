@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils/classNameUtils';
 const DROPDOWN_ITEM_HEIGHT = 32;
 const DROPDOWN_MAX_HEIGHT = 280;
 const DROPDOWN_OVERSCAN = 4;
+export const SUGGESTION_DROPDOWN_Z_INDEX = 80;
 
 interface SuggestionDropdownProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onSelect'> {
@@ -70,10 +71,7 @@ const SuggestionDropdown = React.forwardRef<
       return {
         visibleSuggestions: visibleSuggestionValues
           .slice(startIndex, endIndex)
-          .map((suggestion, index) => ({
-            suggestion,
-            index: startIndex + index,
-          })),
+          .map(suggestion => ({ suggestion })),
         offsetY: startIndex * DROPDOWN_ITEM_HEIGHT,
       };
     }, [scrollTop, visibleSuggestionValues, viewportHeight]);
@@ -91,11 +89,12 @@ const SuggestionDropdown = React.forwardRef<
       <div
         {...dropdownProps}
         ref={scrollRef}
+        data-vaul-no-drag
         onTouchStart={onTouchStart}
         onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
         style={{ ...style, maxHeight: DROPDOWN_MAX_HEIGHT }}
         className={cn(
-          'overflow-auto rounded-md border border-neutral-200/50 bg-white py-1 shadow-lg dark:border-neutral-800/50 dark:bg-neutral-900',
+          'pointer-events-auto overflow-auto overscroll-contain rounded-md border border-neutral-200/50 bg-white py-1 shadow-lg dark:border-neutral-800/50 dark:bg-neutral-900',
           className
         )}
       >
@@ -104,14 +103,14 @@ const SuggestionDropdown = React.forwardRef<
             className="absolute right-0 left-0"
             style={{ transform: `translateY(${offsetY}px)` }}
           >
-            {visibleSuggestions.map(({ suggestion, index }) => {
+            {visibleSuggestions.map(({ suggestion }) => {
               const removable =
                 Boolean(onRemoveSuggestion) &&
                 isRemovableSuggestion(suggestion);
 
               return (
                 <div
-                  key={`${suggestion}-${index}`}
+                  key={suggestion}
                   style={{ height: DROPDOWN_ITEM_HEIGHT }}
                   className="flex w-full items-center text-xs font-medium text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:active:bg-neutral-700"
                 >
@@ -119,6 +118,10 @@ const SuggestionDropdown = React.forwardRef<
                     type="button"
                     onMouseDown={event => {
                       event.preventDefault();
+                    }}
+                    onClick={event => {
+                      event.preventDefault();
+                      event.stopPropagation();
                       onSelect(suggestion);
                     }}
                     onTouchStart={event => event.stopPropagation()}
@@ -134,6 +137,10 @@ const SuggestionDropdown = React.forwardRef<
                       onMouseDown={event => {
                         event.preventDefault();
                         event.stopPropagation();
+                      }}
+                      onClick={event => {
+                        event.preventDefault();
+                        event.stopPropagation();
                         setRemovedSuggestions(current => {
                           const next = new Set(current);
                           next.add(suggestion);
@@ -141,9 +148,9 @@ const SuggestionDropdown = React.forwardRef<
                         });
                         onRemoveSuggestion?.(suggestion);
                       }}
-                      className="mr-2 flex h-5 w-5 shrink-0 items-center justify-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+                      className="mr-2 flex size-5 shrink-0 items-center justify-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="size-3" />
                     </button>
                   )}
                 </div>
