@@ -26,6 +26,7 @@ export const useCalendarSync = (enabled: boolean): void => {
           roastLevel: bean.roastLevel,
           startDay: bean.startDay,
           endDay: bean.endDay,
+          remaining: bean.remaining,
           beanState: bean.beanState,
           isFrozen: bean.isFrozen,
           isInTransit: bean.isInTransit,

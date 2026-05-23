@@ -6,11 +6,6 @@ import {
   buildBeanCalendarEventCandidates,
   type CalendarEventCandidate,
 } from './eventCandidates';
-import {
-  getCalendarEventPayloadHash,
-  planCalendarSync,
-  type CalendarEventLink,
-} from './syncPlanner';
 import { getCalendarSyncSettings } from './settings';
 import {
   loadCalendarEventLinks,
@@ -26,24 +21,43 @@ import {
   updateNativeCalendarEvent,
 } from './nativeCalendar';
 
+interface CalendarEventLink {
+  stableId: string;
+  nativeEventId: string;
+  payloadHash: string;
+  calendarId?: string;
+}
+
+const getCalendarEventPayloadHash = (
+  candidate: CalendarEventCandidate
+): string =>
+  JSON.stringify({
+    title: candidate.title,
+    date: candidate.date,
+  });
+
 const buildCandidates = (
   beans: CoffeeBean[],
   settings: AppSettings
 ): CalendarEventCandidate[] => {
   const calendarSettings = getCalendarSyncSettings(settings);
 
-  return beans.flatMap(bean =>
-    buildBeanCalendarEventCandidates(bean, calendarSettings, {
-      resolvePeriod: targetBean => {
-        const roasterName = getBeanRoasterName(targetBean) || undefined;
-        return getDefaultFlavorPeriodByRoastLevelSync(
-          targetBean.roastLevel || '',
-          settings.customFlavorPeriod,
-          roasterName
-        );
-      },
-    })
-  );
+  return beans
+    .map(bean =>
+      buildBeanCalendarEventCandidates(bean, calendarSettings, {
+        resolvePeriod: targetBean => {
+          const roasterName = getBeanRoasterName(targetBean) || undefined;
+          return getDefaultFlavorPeriodByRoastLevelSync(
+            targetBean.roastLevel || '',
+            settings.customFlavorPeriod,
+            roasterName
+          );
+        },
+      })
+    )
+    .filter((candidate): candidate is CalendarEventCandidate =>
+      Boolean(candidate)
+    );
 };
 
 const createLink = (
@@ -74,47 +88,66 @@ export const syncCoffeeBeanCalendarEvents = async (
   const hasPermission = await ensureCalendarWriteAccess();
   if (!hasPermission) return;
 
-  const calendarId = await ensureBrewGuideCalendarId();
-  const plan = planCalendarSync(candidates, existingLinks, {
-    targetCalendarId: calendarId,
-  });
-
-  if (
-    plan.create.length === 0 &&
-    plan.update.length === 0 &&
-    plan.delete.length === 0
-  ) {
-    return;
-  }
-
   const nextLinks: CalendarEventLinkMap = { ...existingLinks };
+  const calendarId = await ensureBrewGuideCalendarId();
+  const candidateIds = new Set(candidates.map(candidate => candidate.stableId));
 
-  for (const item of plan.delete) {
+  for (const link of Object.values(existingLinks)) {
+    if (candidateIds.has(link.stableId)) continue;
+
     try {
-      await deleteNativeCalendarEvent(item.nativeEventId);
+      await deleteNativeCalendarEvent(link.nativeEventId);
     } catch (error) {
       console.warn('[CalendarSync] Failed to delete calendar event:', error);
     } finally {
-      delete nextLinks[item.stableId];
+      delete nextLinks[link.stableId];
     }
   }
 
-  for (const item of plan.update) {
+  for (const candidate of candidates) {
+    const existing = existingLinks[candidate.stableId];
+    const nextHash = getCalendarEventPayloadHash(candidate);
+
+    if (!existing) {
+      try {
+        const nativeEventId = await createNativeCalendarEvent(
+          candidate,
+          calendarId
+        );
+        nextLinks[candidate.stableId] = createLink(
+          candidate,
+          nativeEventId,
+          calendarId
+        );
+      } catch (error) {
+        console.warn('[CalendarSync] Failed to create calendar event:', error);
+      }
+
+      continue;
+    }
+
+    if (
+      existing.payloadHash === nextHash &&
+      existing.calendarId === calendarId
+    ) {
+      continue;
+    }
+
     try {
       await updateNativeCalendarEvent(
-        item.nativeEventId,
-        item.candidate,
+        existing.nativeEventId,
+        candidate,
         calendarId
       );
-      nextLinks[item.candidate.stableId] = createLink(
-        item.candidate,
-        item.nativeEventId,
+      nextLinks[candidate.stableId] = createLink(
+        candidate,
+        existing.nativeEventId,
         calendarId
       );
     } catch (error) {
       console.warn('[CalendarSync] Failed to update calendar event:', error);
       try {
-        await deleteNativeCalendarEvent(item.nativeEventId);
+        await deleteNativeCalendarEvent(existing.nativeEventId);
       } catch (deleteError) {
         console.warn(
           '[CalendarSync] Failed to delete stale calendar event:',
@@ -124,11 +157,11 @@ export const syncCoffeeBeanCalendarEvents = async (
 
       try {
         const nativeEventId = await createNativeCalendarEvent(
-          item.candidate,
+          candidate,
           calendarId
         );
-        nextLinks[item.candidate.stableId] = createLink(
-          item.candidate,
+        nextLinks[candidate.stableId] = createLink(
+          candidate,
           nativeEventId,
           calendarId
         );
@@ -138,22 +171,6 @@ export const syncCoffeeBeanCalendarEvents = async (
           createError
         );
       }
-    }
-  }
-
-  for (const candidate of plan.create) {
-    try {
-      const nativeEventId = await createNativeCalendarEvent(
-        candidate,
-        calendarId
-      );
-      nextLinks[candidate.stableId] = createLink(
-        candidate,
-        nativeEventId,
-        calendarId
-      );
-    } catch (error) {
-      console.warn('[CalendarSync] Failed to create calendar event:', error);
     }
   }
 

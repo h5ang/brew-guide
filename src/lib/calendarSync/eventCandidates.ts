@@ -1,26 +1,20 @@
 import type { CoffeeBean } from '../../types/app';
 import { formatCoffeeBeanDisplayName } from '../utils/coffeeBeanUtils';
 
-export type CalendarEventKind = 'aging-period' | 'flavor-period';
-
 export interface CalendarSyncSettings {
   enabled: boolean;
-  syncAgingPeriod: boolean;
-  syncFlavorPeriod: boolean;
 }
 
 export interface CalendarEventCandidate {
   stableId: string;
   beanId: string;
-  kind: CalendarEventKind;
   title: string;
-  startDate: string;
-  endDate: string;
-  description: string;
+  date: string;
 }
 
 export interface BuildCalendarEventCandidatesOptions {
   resolvePeriod?: (bean: CoffeeBean) => { startDay: number; endDay: number };
+  today?: string;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -53,6 +47,14 @@ const addDays = (date: string, days: number): string | null => {
   return new Date(timestamp + days * DAY_MS).toISOString().slice(0, 10);
 };
 
+const getLocalISODate = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const parseRemainingAmount = (remaining: string | undefined): number => {
   const match = (remaining || '').match(/-?\d+(?:\.\d+)?/);
   if (!match) return 0;
@@ -65,12 +67,12 @@ export const buildBeanCalendarEventCandidates = (
   bean: CoffeeBean,
   settings: CalendarSyncSettings,
   options: BuildCalendarEventCandidatesOptions = {}
-): CalendarEventCandidate[] => {
-  if (!settings.enabled) return [];
-  if (bean.beanState === 'green') return [];
-  if (bean.isFrozen || bean.isInTransit) return [];
-  if (!bean.roastDate) return [];
-  if (parseRemainingAmount(bean.remaining) <= 0) return [];
+): CalendarEventCandidate | null => {
+  if (!settings.enabled) return null;
+  if (bean.beanState === 'green') return null;
+  if (bean.isFrozen || bean.isInTransit) return null;
+  if (!bean.roastDate) return null;
+  if (parseRemainingAmount(bean.remaining) <= 0) return null;
 
   const beanStartDay = Number(bean.startDay || 0);
   const beanEndDay = Number(bean.endDay || 0);
@@ -81,50 +83,19 @@ export const buildBeanCalendarEventCandidates = (
   const startDay = fallbackPeriod?.startDay ?? beanStartDay;
   const endDay = fallbackPeriod?.endDay ?? beanEndDay;
 
-  if (!Number.isFinite(startDay) || !Number.isFinite(endDay)) return [];
-  if (startDay < 0 || endDay <= 0 || endDay < startDay) return [];
+  if (!Number.isFinite(startDay) || !Number.isFinite(endDay)) return null;
+  if (startDay <= 0 || endDay <= 0 || endDay < startDay) return null;
 
-  const agingStart = bean.roastDate;
   const flavorStart = addDays(bean.roastDate, startDay);
-  const agingEndDisplay = addDays(bean.roastDate, startDay - 1);
-  const flavorEndInclusive = addDays(bean.roastDate, endDay);
-  const flavorEndExclusive = addDays(bean.roastDate, endDay + 1);
-
-  if (
-    !flavorStart ||
-    !agingEndDisplay ||
-    !flavorEndInclusive ||
-    !flavorEndExclusive
-  ) {
-    return [];
-  }
+  if (!flavorStart) return null;
+  if (flavorStart < (options.today || getLocalISODate())) return null;
 
   const displayName = formatCoffeeBeanDisplayName(bean);
-  const events: CalendarEventCandidate[] = [];
 
-  if (settings.syncAgingPeriod && startDay > 0) {
-    events.push({
-      stableId: `${bean.id}:aging-period`,
-      beanId: bean.id,
-      kind: 'aging-period',
-      title: `养豆期｜${displayName}`,
-      startDate: agingStart,
-      endDate: agingEndDisplay,
-      description: `Brew Guide 自动同步：${displayName}，烘焙日期 ${bean.roastDate}，养豆期至 ${agingEndDisplay}。`,
-    });
-  }
-
-  if (settings.syncFlavorPeriod) {
-    events.push({
-      stableId: `${bean.id}:flavor-period`,
-      beanId: bean.id,
-      kind: 'flavor-period',
-      title: `赏味期｜${displayName}`,
-      startDate: flavorStart,
-      endDate: flavorEndExclusive,
-      description: `Brew Guide 自动同步：${displayName}，赏味期 ${flavorStart} 至 ${flavorEndInclusive}。`,
-    });
-  }
-
-  return events;
+  return {
+    stableId: bean.id,
+    beanId: bean.id,
+    title: displayName,
+    date: flavorStart,
+  };
 };

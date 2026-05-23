@@ -162,8 +162,6 @@ export interface AppSettings {
   // 日历同步设置（仅控制同步策略，原生日历事件 ID 存在本机本地存储）
   calendarSync?: {
     enabled: boolean;
-    syncAgingPeriod: boolean;
-    syncFlavorPeriod: boolean;
   };
 
   // 备份提醒设置

@@ -33,10 +33,9 @@ const toNativeEventPayload = (
 ) => ({
   title: candidate.title,
   calendarId,
-  startDate: toNativeCalendarDateTimestamp(candidate.startDate),
-  endDate: toNativeCalendarDateTimestamp(candidate.endDate),
+  startDate: toNativeCalendarDateTimestamp(candidate.date),
+  endDate: toNativeCalendarDateTimestamp(candidate.date),
   isAllDay: true,
-  description: candidate.description,
 });
 
 export const ensureCalendarWriteAccess = async (): Promise<boolean> => {

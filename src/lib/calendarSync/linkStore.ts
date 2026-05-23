@@ -1,7 +1,12 @@
-import type { CalendarEventLink } from './syncPlanner';
-
 const STORAGE_KEY = 'brew-guide:calendar-sync:event-links:v1';
 const CALENDAR_ID_STORAGE_KEY = 'brew-guide:calendar-sync:calendar-id:v1';
+
+export interface CalendarEventLink {
+  stableId: string;
+  nativeEventId: string;
+  payloadHash: string;
+  calendarId?: string;
+}
 
 export type CalendarEventLinkMap = Record<string, CalendarEventLink>;
 

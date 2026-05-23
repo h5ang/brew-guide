@@ -19,144 +19,82 @@ const baseBean: CoffeeBean = {
 
 const enabledSettings: CalendarSyncSettings = {
   enabled: true,
-  syncAgingPeriod: true,
-  syncFlavorPeriod: true,
 };
 
-describe('buildBeanCalendarEventCandidates', () => {
-  it('builds all-day exclusive-end range events for aging and flavor periods', () => {
-    const events = buildBeanCalendarEventCandidates(baseBean, enabledSettings);
-
-    expect(events).toEqual([
-      {
-        stableId: 'bean-1:aging-period',
-        beanId: 'bean-1',
-        kind: 'aging-period',
-        title: '养豆期｜Brew Guide 埃塞俄比亚 水洗',
-        startDate: '2026-05-01',
-        endDate: '2026-05-10',
-        description:
-          'Brew Guide 自动同步：Brew Guide 埃塞俄比亚 水洗，烘焙日期 2026-05-01，养豆期至 2026-05-10。',
-      },
-      {
-        stableId: 'bean-1:flavor-period',
-        beanId: 'bean-1',
-        kind: 'flavor-period',
-        title: '赏味期｜Brew Guide 埃塞俄比亚 水洗',
-        startDate: '2026-05-11',
-        endDate: '2026-07-01',
-        description:
-          'Brew Guide 自动同步：Brew Guide 埃塞俄比亚 水洗，赏味期 2026-05-11 至 2026-06-30。',
-      },
-    ]);
+const buildCandidate = (
+  bean: CoffeeBean,
+  options: Parameters<typeof buildBeanCalendarEventCandidates>[2] = {}
+) =>
+  buildBeanCalendarEventCandidates(bean, enabledSettings, {
+    today: '2026-05-01',
+    ...options,
   });
 
-  it('uses switches to filter generated periods', () => {
-    const events = buildBeanCalendarEventCandidates(baseBean, {
-      ...enabledSettings,
-      syncAgingPeriod: false,
-    });
+describe('buildBeanCalendarEventCandidates', () => {
+  it('builds one all-day event on the day the bean finishes aging', () => {
+    const event = buildCandidate(baseBean);
 
-    expect(events.map(event => event.kind)).toEqual(['flavor-period']);
+    expect(event).toEqual({
+      stableId: 'bean-1',
+      beanId: 'bean-1',
+      title: 'Brew Guide 埃塞俄比亚 水洗',
+      date: '2026-05-11',
+    });
   });
 
   it('does not duplicate roaster when the bean name already contains it', () => {
-    const events = buildBeanCalendarEventCandidates(
-      { ...baseBean, name: 'Brew Guide 埃塞俄比亚 水洗' },
-      enabledSettings
-    );
+    const event = buildCandidate({
+      ...baseBean,
+      name: 'Brew Guide 埃塞俄比亚 水洗',
+    });
 
-    expect(events.map(event => event.title)).toEqual([
-      '养豆期｜Brew Guide 埃塞俄比亚 水洗',
-      '赏味期｜Brew Guide 埃塞俄比亚 水洗',
-    ]);
+    expect(event?.title).toBe('Brew Guide 埃塞俄比亚 水洗');
   });
 
   it('uses the provided period resolver when bean-level period values are not set', () => {
-    const events = buildBeanCalendarEventCandidates(
+    const event = buildCandidate(
       { ...baseBean, startDay: undefined, endDay: undefined },
-      enabledSettings,
-      {
-        resolvePeriod: () => ({ startDay: 7, endDay: 30 }),
-      }
+      { resolvePeriod: () => ({ startDay: 7, endDay: 30 }) }
     );
 
-    expect(
-      events.map(event => [event.kind, event.startDate, event.endDate])
-    ).toEqual([
-      ['aging-period', '2026-05-01', '2026-05-07'],
-      ['flavor-period', '2026-05-08', '2026-06-01'],
-    ]);
-  });
-
-  it('uses the visible aging end date when flavor period sync is disabled', () => {
-    const events = buildBeanCalendarEventCandidates(baseBean, {
-      ...enabledSettings,
-      syncFlavorPeriod: false,
-    });
-
-    expect(events).toEqual([
-      {
-        stableId: 'bean-1:aging-period',
-        beanId: 'bean-1',
-        kind: 'aging-period',
-        title: '养豆期｜Brew Guide 埃塞俄比亚 水洗',
-        startDate: '2026-05-01',
-        endDate: '2026-05-10',
-        description:
-          'Brew Guide 自动同步：Brew Guide 埃塞俄比亚 水洗，烘焙日期 2026-05-01，养豆期至 2026-05-10。',
-      },
-    ]);
+    expect(event?.date).toBe('2026-05-08');
   });
 
   it('does not generate calendar events for disabled sync, green beans, frozen beans, in-transit beans, or beans without roast date', () => {
     const disabled = buildBeanCalendarEventCandidates(baseBean, {
-      ...enabledSettings,
       enabled: false,
     });
-    const green = buildBeanCalendarEventCandidates(
-      { ...baseBean, beanState: 'green' },
-      enabledSettings
-    );
-    const frozen = buildBeanCalendarEventCandidates(
-      { ...baseBean, isFrozen: true },
-      enabledSettings
-    );
-    const inTransit = buildBeanCalendarEventCandidates(
-      { ...baseBean, isInTransit: true },
-      enabledSettings
-    );
-    const missingDate = buildBeanCalendarEventCandidates(
-      { ...baseBean, roastDate: '' },
-      enabledSettings
-    );
+    const green = buildCandidate({ ...baseBean, beanState: 'green' });
+    const frozen = buildCandidate({ ...baseBean, isFrozen: true });
+    const inTransit = buildCandidate({ ...baseBean, isInTransit: true });
+    const missingDate = buildCandidate({ ...baseBean, roastDate: '' });
 
-    expect(disabled).toEqual([]);
-    expect(green).toEqual([]);
-    expect(frozen).toEqual([]);
-    expect(inTransit).toEqual([]);
-    expect(missingDate).toEqual([]);
+    expect(disabled).toBeNull();
+    expect(green).toBeNull();
+    expect(frozen).toBeNull();
+    expect(inTransit).toBeNull();
+    expect(missingDate).toBeNull();
   });
 
   it('only generates events for beans with a positive remaining amount', () => {
-    const available = buildBeanCalendarEventCandidates(
-      { ...baseBean, remaining: '12.5g' },
-      enabledSettings
-    );
-    const empty = buildBeanCalendarEventCandidates(
-      { ...baseBean, remaining: '0' },
-      enabledSettings
-    );
-    const missingRemaining = buildBeanCalendarEventCandidates(
-      { ...baseBean, remaining: '' },
-      enabledSettings
-    );
+    const available = buildCandidate({ ...baseBean, remaining: '12.5g' });
+    const empty = buildCandidate({ ...baseBean, remaining: '0' });
+    const missingRemaining = buildCandidate({ ...baseBean, remaining: '' });
 
-    expect(available.map(event => event.kind)).toEqual([
-      'aging-period',
-      'flavor-period',
-    ]);
-    expect(empty).toEqual([]);
-    expect(missingRemaining).toEqual([]);
+    expect(available?.beanId).toBe(baseBean.id);
+    expect(empty).toBeNull();
+    expect(missingRemaining).toBeNull();
+  });
+
+  it('does not generate events for dates before today', () => {
+    const past = buildBeanCalendarEventCandidates(baseBean, enabledSettings, {
+      today: '2026-05-12',
+    });
+    const today = buildBeanCalendarEventCandidates(baseBean, enabledSettings, {
+      today: '2026-05-11',
+    });
+
+    expect(past).toBeNull();
+    expect(today?.date).toBe('2026-05-11');
   });
 });

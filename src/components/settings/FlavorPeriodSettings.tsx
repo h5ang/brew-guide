@@ -1,15 +1,9 @@
 'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { SettingsOptions } from './Settings';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
 import SettingPage from './atomic/SettingPage';
-import SettingToggle from './atomic/SettingToggle';
 import SettingSection from './atomic/SettingSection';
 import SettingRow from './atomic/SettingRow';
 import {
@@ -25,12 +19,6 @@ import {
 import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { ExtendedCoffeeBean } from '@/components/coffee-bean/List/types';
 import { ChevronDown } from 'lucide-react';
-import { normalizeCalendarSyncSettings } from '@/lib/calendarSync/settings';
-import { canUseNativeCalendar } from '@/lib/calendarSync/nativeCalendar';
-
-const subscribeCalendarSyncSupport = () => () => undefined;
-const getCalendarSyncSupportSnapshot = () => canUseNativeCalendar();
-const getUnsupportedCalendarSyncSnapshot = () => false;
 
 interface FlavorPeriodSettingsProps {
   settings: SettingsOptions;
@@ -60,40 +48,6 @@ const FlavorPeriodSettings: React.FC<FlavorPeriodSettingsProps> = ({
     },
     [updateSettings]
   );
-  const calendarSync = normalizeCalendarSyncSettings(settings.calendarSync);
-  const updateCalendarSync = useCallback(
-    async (updates: Partial<typeof calendarSync>) => {
-      await handleChange('calendarSync', {
-        ...calendarSync,
-        ...updates,
-      });
-    },
-    [calendarSync, handleChange]
-  );
-  const handleCalendarEnabledChange = useCallback(
-    (checked: boolean) => {
-      updateCalendarSync({ enabled: checked });
-    },
-    [updateCalendarSync]
-  );
-  const handleCalendarAgingPeriodChange = useCallback(
-    (checked: boolean) => {
-      updateCalendarSync({ syncAgingPeriod: checked });
-    },
-    [updateCalendarSync]
-  );
-  const handleCalendarFlavorPeriodChange = useCallback(
-    (checked: boolean) => {
-      updateCalendarSync({ syncFlavorPeriod: checked });
-    },
-    [updateCalendarSync]
-  );
-  const calendarSyncSupported = useSyncExternalStore(
-    subscribeCalendarSyncSupport,
-    getCalendarSyncSupportSnapshot,
-    getUnsupportedCalendarSyncSnapshot
-  );
-
   // 控制动画状态
   const [_shouldRender, _setShouldRender] = React.useState(true);
   const [isVisible, setIsVisible] = React.useState(false);
@@ -288,36 +242,6 @@ const FlavorPeriodSettings: React.FC<FlavorPeriodSettingsProps> = ({
   return (
     <SettingPage title="赏味期" isVisible={isVisible} onClose={handleClose}>
       <div className="mt-4">
-        {calendarSyncSupported && (
-          <SettingSection
-            title="日历同步"
-          >
-            <SettingRow label="同步到系统日历" isLast={!calendarSync.enabled}>
-              <SettingToggle
-                checked={calendarSync.enabled}
-                onChange={handleCalendarEnabledChange}
-              />
-            </SettingRow>
-
-            {calendarSync.enabled && (
-              <>
-                <SettingRow label="养豆期" isSubSetting>
-                  <SettingToggle
-                    checked={calendarSync.syncAgingPeriod}
-                    onChange={handleCalendarAgingPeriodChange}
-                  />
-                </SettingRow>
-                <SettingRow label="赏味期" isSubSetting isLast>
-                  <SettingToggle
-                    checked={calendarSync.syncFlavorPeriod}
-                    onChange={handleCalendarFlavorPeriodChange}
-                  />
-                </SettingRow>
-              </>
-            )}
-          </SettingSection>
-        )}
-
         {/* 全局默认预设 */}
         <SettingSection
           title="全局默认预设"
