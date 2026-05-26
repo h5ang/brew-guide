@@ -38,6 +38,11 @@ import {
   type DateDisplayMode,
   type TableColumnKey,
 } from './tableColumns';
+import {
+  compareDateDisplayBeans,
+  getAgingDays,
+  getDateSortValue,
+} from './tableSorting';
 
 // 默认排序状态（空数组，表示不预设列排序）
 const DEFAULT_SORTING: SortingState = [];
@@ -94,29 +99,6 @@ const formatDateShort = (dateStr: string): string => {
     return `${year}-${date.getMonth() + 1}-${date.getDate()}`;
   } catch {
     return dateStr;
-  }
-};
-
-const getAgingDays = (dateStr: string): number => {
-  try {
-    const timestamp = parseDateToTimestamp(dateStr);
-    const roastDate = new Date(timestamp);
-    const today = new Date();
-    const todayDate = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    const roastDateOnly = new Date(
-      roastDate.getFullYear(),
-      roastDate.getMonth(),
-      roastDate.getDate()
-    );
-    return Math.ceil(
-      (todayDate.getTime() - roastDateOnly.getTime()) / (1000 * 60 * 60 * 24)
-    );
-  } catch {
-    return 0;
   }
 };
 
@@ -180,21 +162,24 @@ const createBeanSortingFn =
     return baseSortingFn(rowA, rowB, columnId);
   };
 
-// 获取赏味期状态的排序值
-const getFlavorStatusSortValue = (bean: ExtendedCoffeeBean): number => {
-  // 排序逻辑：已衰退 > 赏味期 > 冰冻 > 养豆期 > 在途 > 未知
-  const info = calculateFlavorInfo(bean);
+const createDirectionAwareBeanSortingFn =
+  (
+    sorting: SortingState,
+    compareRows: (
+      rowA: Row<ExtendedCoffeeBean>,
+      rowB: Row<ExtendedCoffeeBean>,
+      desc: boolean
+    ) => number
+  ): SortingFn<ExtendedCoffeeBean> =>
+  (rowA, rowB, columnId) => {
+    const isDesc = getSortingDesc(sorting, columnId);
+    const emptyGroupResult = compareEmptyBeanGroup(rowA, rowB, isDesc);
 
-  if (info.phase === '衰退期') return 0;
-  // 赏味期剩余天数越少越靠前（更紧急）
-  if (info.phase === '赏味期') return 100 + info.remainingDays;
-  if (info.phase === '冷冻') return 200;
-  // 养豆期剩余天数越少越靠前（越接近赏味期）
-  if (info.phase === '养豆期') return 300 + info.remainingDays;
-  if (info.phase === '在途') return 400;
+    if (emptyGroupResult !== 0) return emptyGroupResult;
 
-  return 500; // 未知
-};
+    const desiredResult = compareRows(rowA, rowB, isDesc);
+    return isDesc ? -desiredResult : desiredResult;
+  };
 
 const getFlavorStatus = (bean: ExtendedCoffeeBean): string => {
   if (bean.isInTransit) return '在途';
@@ -430,6 +415,16 @@ const TableView: React.FC<TableViewProps> = ({
       sorting,
       sortingFns.alphanumeric as SortingFn<ExtendedCoffeeBean>
     );
+    const dateDisplaySortingFn = createDirectionAwareBeanSortingFn(
+      sorting,
+      (rowA, rowB, desc) =>
+        compareDateDisplayBeans(
+          rowA.original,
+          rowB.original,
+          dateDisplayMode,
+          desc
+        )
+    );
     const getNameDisplayValue = (bean: ExtendedCoffeeBean) =>
       showRoasterColumn
         ? formatBeanNameWithoutRoaster(bean, roasterSettings)
@@ -441,9 +436,9 @@ const TableView: React.FC<TableViewProps> = ({
       )
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allColumns: Record<
       TableColumnKey,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ColumnDef<ExtendedCoffeeBean, any>
     > = {
       roaster: columnHelper.accessor(
@@ -462,24 +457,7 @@ const TableView: React.FC<TableViewProps> = ({
         sortingFn: nameSortingFn,
       }),
       flavorPeriod: columnHelper.accessor(
-        row => {
-          const isGreenBean = row.beanState === 'green';
-
-          // 赏味期模式且非生豆，使用自定义排序
-          if (!isGreenBean && dateDisplayMode === 'flavorPeriod') {
-            return getFlavorStatusSortValue(row);
-          }
-
-          const displayDate = isGreenBean ? row.purchaseDate : row.roastDate;
-          if (!displayDate) return 999;
-          if (row.isInTransit) return 1000;
-          if (row.isFrozen) return 998;
-
-          if (!isGreenBean && dateDisplayMode === 'agingDays') {
-            return getAgingDays(displayDate);
-          }
-          return parseDateToTimestamp(displayDate);
-        },
+        row => getDateSortValue(row, dateDisplayMode),
         {
           id: 'flavorPeriod',
           header: getDateDisplayColumnLabel(dateDisplayMode, hasGreenBeans),
@@ -512,7 +490,7 @@ const TableView: React.FC<TableViewProps> = ({
               </span>
             );
           },
-          sortingFn: basicSortingFn,
+          sortingFn: dateDisplaySortingFn,
         }
       ),
       capacity: columnHelper.accessor(row => parseFloat(row.remaining || '0'), {
@@ -679,6 +657,7 @@ const TableView: React.FC<TableViewProps> = ({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     enableMultiSort: true,
+    isMultiSortEvent: () => true,
   });
 
   // 处理详情点击

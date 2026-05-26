@@ -64,7 +64,9 @@ export const getDaysFromRoast = (bean: CoffeeBean): number => {
 };
 
 /**
- * 统一的咖啡豆排序函数
+ * 统一的咖啡豆赏味期比较函数。
+ *
+ * 阶段顺序始终保持一致；desc 只反转同一阶段内的天数/日期顺序。
  * 排序规则（从上到下）：
  * - 衰退期 → 越老越靠前
  * - 赏味期 → 快过期的优先
@@ -73,45 +75,60 @@ export const getDaysFromRoast = (bean: CoffeeBean): number => {
  * - 在途 → 按日期排序
  * - 其他 → 无日期豆子，排最后
  */
+export const compareBeansByFlavorPeriod = (
+  a: CoffeeBean,
+  b: CoffeeBean,
+  desc = false
+): number => {
+  const { phase: phaseA, remainingDays: daysA } = getFlavorInfo(a);
+  const { phase: phaseB, remainingDays: daysB } = getFlavorInfo(b);
+
+  if (phaseA !== phaseB) {
+    const phaseValueA = getPhaseValue(phaseA);
+    const phaseValueB = getPhaseValue(phaseB);
+    return phaseValueA - phaseValueB;
+  }
+
+  if (phaseA === '衰退期') {
+    const daysFromRoastA = getDaysFromRoast(a);
+    const daysFromRoastB = getDaysFromRoast(b);
+    const result = daysFromRoastB - daysFromRoastA;
+    return desc ? -result : result;
+  }
+
+  if (phaseA === '赏味期') {
+    const result = daysA - daysB;
+    return desc ? -result : result;
+  }
+
+  if (phaseA === '冷冻') {
+    const daysFromRoastA = getDaysFromRoast(a);
+    const daysFromRoastB = getDaysFromRoast(b);
+    const result = daysFromRoastB - daysFromRoastA;
+    return desc ? -result : result;
+  }
+
+  if (phaseA === '养豆期') {
+    const result = daysA - daysB;
+    return desc ? -result : result;
+  }
+
+  const timeA = a.roastDate ? new Date(a.roastDate).getTime() : NaN;
+  const timeB = b.roastDate ? new Date(b.roastDate).getTime() : NaN;
+
+  if (isNaN(timeA) && isNaN(timeB)) return 0;
+  if (isNaN(timeA)) return 1;
+  if (isNaN(timeB)) return -1;
+
+  const result = timeB - timeA;
+  return desc ? -result : result;
+};
+
+/**
+ * 统一的咖啡豆排序函数
+ */
 export const sortBeansByFlavorPeriod = (beans: CoffeeBean[]): CoffeeBean[] => {
-  return [...beans].sort((a, b) => {
-    const { phase: phaseA, remainingDays: daysA } = getFlavorInfo(a);
-    const { phase: phaseB, remainingDays: daysB } = getFlavorInfo(b);
-
-    // 首先按照阶段分组排序
-    if (phaseA !== phaseB) {
-      const phaseValueA = getPhaseValue(phaseA);
-      const phaseValueB = getPhaseValue(phaseB);
-      return phaseValueA - phaseValueB;
-    }
-
-    // 如果阶段相同，根据不同阶段有不同的排序逻辑
-    if (phaseA === '衰退期') {
-      // 衰退期：超过养豆时间长的在上，养豆时间短的在下
-      const daysFromRoastA = getDaysFromRoast(a);
-      const daysFromRoastB = getDaysFromRoast(b);
-      return daysFromRoastB - daysFromRoastA; // 降序，天数大的在前
-    } else if (phaseA === '赏味期') {
-      // 赏味期：剩余天数少的在上，剩余天数多的在下
-      return daysA - daysB; // 升序，剩余天数少的在前
-    } else if (phaseA === '冷冻') {
-      // 冷冻：养豆时间长的在上，养豆时间短的在下
-      const daysFromRoastA = getDaysFromRoast(a);
-      const daysFromRoastB = getDaysFromRoast(b);
-      return daysFromRoastB - daysFromRoastA; // 降序，天数大的在前
-    } else if (phaseA === '养豆期') {
-      // 养豆期：剩余养豆天数少的在上（即快要进入赏味期的在上）
-      return daysA - daysB; // 升序，剩余天数少的在前
-    } else if (phaseA === '在途') {
-      // 在途：按烘焙日期排序，如果有的话（较新的在前）
-      if (!a.roastDate || !b.roastDate) return 0;
-      return new Date(b.roastDate).getTime() - new Date(a.roastDate).getTime();
-    } else {
-      // 其他未知状态：按烘焙日期排序
-      if (!a.roastDate || !b.roastDate) return 0;
-      return new Date(b.roastDate).getTime() - new Date(a.roastDate).getTime();
-    }
-  });
+  return [...beans].sort((a, b) => compareBeansByFlavorPeriod(a, b));
 };
 
 /**
@@ -121,42 +138,5 @@ export const sortBeansByFlavorPeriod = (beans: CoffeeBean[]): CoffeeBean[] => {
 export const sortBeansByFlavorPeriodReverse = (
   beans: CoffeeBean[]
 ): CoffeeBean[] => {
-  return [...beans].sort((a, b) => {
-    const { phase: phaseA, remainingDays: daysA } = getFlavorInfo(a);
-    const { phase: phaseB, remainingDays: daysB } = getFlavorInfo(b);
-
-    // 首先按照阶段分组排序（保持原顺序）
-    if (phaseA !== phaseB) {
-      const phaseValueA = getPhaseValue(phaseA);
-      const phaseValueB = getPhaseValue(phaseB);
-      return phaseValueA - phaseValueB; // 保持分组顺序不变
-    }
-
-    // 如果阶段相同，根据不同阶段反转组内的排序逻辑
-    if (phaseA === '衰退期') {
-      // 衰退期：养豆时间短的在上
-      const daysFromRoastA = getDaysFromRoast(a);
-      const daysFromRoastB = getDaysFromRoast(b);
-      return daysFromRoastA - daysFromRoastB; // 升序
-    } else if (phaseA === '赏味期') {
-      // 赏味期：剩余天数多的在上
-      return daysB - daysA; // 降序
-    } else if (phaseA === '冷冻') {
-      // 冷冻：养豆时间短的在上
-      const daysFromRoastA = getDaysFromRoast(a);
-      const daysFromRoastB = getDaysFromRoast(b);
-      return daysFromRoastA - daysFromRoastB; // 升序
-    } else if (phaseA === '养豆期') {
-      // 养豆期：剩余养豆天数多的在上
-      return daysB - daysA; // 降序
-    } else if (phaseA === '在途') {
-      // 在途：按烘焙日期排序（旧的在前）
-      if (!a.roastDate || !b.roastDate) return 0;
-      return new Date(a.roastDate).getTime() - new Date(b.roastDate).getTime();
-    } else {
-      // 其他未知状态：按烘焙日期排序（旧的在前）
-      if (!a.roastDate || !b.roastDate) return 0;
-      return new Date(a.roastDate).getTime() - new Date(b.roastDate).getTime();
-    }
-  });
+  return [...beans].sort((a, b) => compareBeansByFlavorPeriod(a, b, true));
 };
