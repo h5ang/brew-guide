@@ -203,6 +203,27 @@ const NoteItem: React.FC<NoteItemProps> = ({
     [beanImage, beanInfo, beanName, imageError, roasterLogo, roasterSettings]
   );
 
+  const handleNoteImageClick = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+
+      const { imageUrl, imageIndex } = event.currentTarget.dataset;
+      if (!imageUrl || !imageIndex) {
+        return;
+      }
+
+      if (noteImageError) {
+        return;
+      }
+
+      openImageViewer({
+        url: imageUrl,
+        alt: `笔记图片 ${Number(imageIndex) + 1}`,
+      });
+    },
+    [noteImageError]
+  );
+
   const singleImageUrl = isSingleNoteImage ? noteImages[0] : '';
   const cachedSingleImageSize = useMemo(
     () => (singleImageUrl ? singleImageSizeCache.get(singleImageUrl) : null),
@@ -336,14 +357,14 @@ const NoteItem: React.FC<NoteItemProps> = ({
                       ? 'grid max-w-50 grid-cols-2'
                       : 'grid max-w-75 grid-cols-3'
                 }`}
-                onClick={e => e.stopPropagation()}
               >
                 {noteImages.map((img, index) => (
-                  <div
-                    key={index}
+                  <button
+                    key={img}
+                    type="button"
                     className={`relative cursor-pointer overflow-hidden rounded-[3px] border border-neutral-200/50 dark:border-neutral-800/50 ${
                       isSingleNoteImage ? 'inline-flex' : 'block aspect-square'
-                    }`}
+                    } appearance-none bg-transparent p-0`}
                     style={
                       isSingleNoteImage && singleImageSize
                         ? {
@@ -352,14 +373,10 @@ const NoteItem: React.FC<NoteItemProps> = ({
                           }
                         : undefined
                     }
-                    onClick={() => {
-                      if (!noteImageError) {
-                        openImageViewer({
-                          url: img,
-                          alt: `笔记图片 ${index + 1}`,
-                        });
-                      }
-                    }}
+                    data-image-index={index}
+                    data-image-url={img}
+                    onClick={handleNoteImageClick}
+                    aria-label={`查看笔记图片 ${index + 1}`}
                   >
                     {noteImageError ? (
                       <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500 dark:text-neutral-400">
@@ -406,7 +423,7 @@ const NoteItem: React.FC<NoteItemProps> = ({
                         loading="lazy"
                       />
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
