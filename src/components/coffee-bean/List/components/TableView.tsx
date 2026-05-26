@@ -31,58 +31,17 @@ import {
 import FlavorStatusRing from './FlavorStatusRing';
 import TableHoverPreview, { type HoverPreviewBean } from './TableHoverPreview';
 import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
-
-// 表格列配置
-export type TableColumnKey =
-  | 'roaster'
-  | 'name'
-  | 'flavorPeriod'
-  | 'capacity'
-  | 'price'
-  | 'beanType'
-  | 'origin'
-  | 'estate'
-  | 'process'
-  | 'variety'
-  | 'roastLevel'
-  | 'flavor'
-  | 'rating'
-  | 'notes';
-
-export const TABLE_COLUMN_CONFIG: {
-  key: TableColumnKey;
-  label: string;
-  greenBeanLabel?: string; // 生豆模式下的标签名称
-  defaultVisible: boolean;
-}[] = [
-  { key: 'roaster', label: '烘焙商', defaultVisible: false },
-  { key: 'name', label: '名称', defaultVisible: true },
-  {
-    key: 'flavorPeriod',
-    label: '赏味期',
-    greenBeanLabel: '购买日期',
-    defaultVisible: true,
-  },
-  { key: 'capacity', label: '容量', defaultVisible: true },
-  { key: 'price', label: '价格', defaultVisible: true },
-  { key: 'beanType', label: '类型', defaultVisible: false },
-  { key: 'origin', label: '产地', defaultVisible: false },
-  { key: 'estate', label: '庄园', defaultVisible: false },
-  { key: 'process', label: '处理法', defaultVisible: false },
-  { key: 'variety', label: '品种', defaultVisible: false },
-  { key: 'roastLevel', label: '烘焙度', defaultVisible: false },
-  { key: 'flavor', label: '风味', defaultVisible: false },
-  { key: 'rating', label: '评分', defaultVisible: false },
-  { key: 'notes', label: '备注', defaultVisible: true },
-];
-
-// 获取默认可见列
-export const getDefaultVisibleColumns = (): TableColumnKey[] =>
-  TABLE_COLUMN_CONFIG.filter(c => c.defaultVisible).map(c => c.key);
+import {
+  getDateDisplayColumnLabel,
+  getDefaultVisibleColumns,
+  TABLE_COLUMN_CONFIG,
+  type DateDisplayMode,
+  type TableColumnKey,
+} from './tableColumns';
 
 // 默认排序状态（空数组，表示不预设列排序）
 const DEFAULT_SORTING: SortingState = [];
-const SORTING_STORAGE_KEY = 'brew-guide:coffee-beans:tableSorting';
+const SORTING_STORAGE_KEY = 'brew-guide:coffee-beans:tableSorting:v2';
 const HOVER_PREVIEW_OFFSET_X = 24;
 const HOVER_PREVIEW_OFFSET_Y = 20;
 
@@ -95,7 +54,9 @@ const loadSorting = (): SortingState => {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) return parsed;
     }
-  } catch {}
+  } catch {
+    return DEFAULT_SORTING;
+  }
   return DEFAULT_SORTING;
 };
 
@@ -103,12 +64,6 @@ const loadSorting = (): SortingState => {
 const saveSorting = (sorting: SortingState) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(SORTING_STORAGE_KEY, JSON.stringify(sorting));
-};
-
-// 重置排序状态
-export const resetTableSorting = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(SORTING_STORAGE_KEY);
 };
 
 interface TableViewProps {
@@ -124,7 +79,7 @@ interface TableViewProps {
     event: React.MouseEvent
   ) => void;
   settings?: {
-    dateDisplayMode?: 'date' | 'flavorPeriod' | 'agingDays';
+    dateDisplayMode?: DateDisplayMode;
   };
   visibleColumns?: TableColumnKey[];
   activeBeanId?: string | null;
@@ -289,7 +244,11 @@ const TableView: React.FC<TableViewProps> = ({
   visibleColumns = getDefaultVisibleColumns(),
   activeBeanId,
 }) => {
-  const dateDisplayMode = settings?.dateDisplayMode ?? 'date';
+  const storeDateDisplayMode = useSettingsStore(
+    state => state.settings.dateDisplayMode
+  );
+  const dateDisplayMode =
+    settings?.dateDisplayMode ?? storeDateDisplayMode ?? 'date';
 
   // 获取烘焙商字段设置
   const roasterFieldEnabled = useSettingsStore(
@@ -523,7 +482,7 @@ const TableView: React.FC<TableViewProps> = ({
         },
         {
           id: 'flavorPeriod',
-          header: hasGreenBeans ? '购买日期' : '赏味期',
+          header: getDateDisplayColumnLabel(dateDisplayMode, hasGreenBeans),
           cell: ({ row }) => {
             const bean = row.original;
             const isGreenBean = bean.beanState === 'green';
@@ -720,7 +679,6 @@ const TableView: React.FC<TableViewProps> = ({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     enableMultiSort: true,
-    isMultiSortEvent: () => true, // 点击即可多重排序，无需按 Shift
   });
 
   // 处理详情点击

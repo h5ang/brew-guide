@@ -5,7 +5,8 @@ import { Virtuoso } from 'react-virtuoso';
 import { ExtendedCoffeeBean, BeanType, BeanState } from '../types';
 import BeanListItem from './BeanListItem';
 import ImageFlowView from './ImageFlowView';
-import TableView, { TableColumnKey } from './TableView';
+import TableView from './TableView';
+import type { TableColumnKey } from './tableColumns';
 import RemainingEditor from './RemainingEditor';
 import { showToast } from '@/components/common/feedback/LightToast';
 import {

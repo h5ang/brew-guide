@@ -31,7 +31,11 @@ import {
   FlavorPeriodStatus,
   FLAVOR_PERIOD_LABELS,
 } from '@/lib/utils/beanVarietyUtils';
-import { TABLE_COLUMN_CONFIG, type TableColumnKey } from './TableView';
+import {
+  getDateDisplayColumnLabel,
+  TABLE_COLUMN_CONFIG,
+  type TableColumnKey,
+} from './tableColumns';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useInputFocus } from '@/lib/hooks/useInputFocus';
 import { useHorizontalWheelScroll } from '@/lib/hooks/useHorizontalWheelScroll';
@@ -506,6 +510,9 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   );
   const showEstimatedCups = useSettingsStore(
     state => state.settings.showEstimatedCups
+  );
+  const dateDisplayMode = useSettingsStore(
+    state => state.settings.dateDisplayMode ?? 'date'
   );
   const hasConfiguredBeanGroups = useSettingsStore(
     state => (state.settings.coffeeBeanGroups?.length || 0) > 0
@@ -1491,11 +1498,15 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
                                 {TABLE_COLUMN_CONFIG.map(col => {
-                                  // 根据是否有生豆动态显示标签
                                   const displayLabel =
-                                    hasGreenBeans && col.greenBeanLabel
-                                      ? col.greenBeanLabel
-                                      : col.label;
+                                    col.key === 'flavorPeriod'
+                                      ? getDateDisplayColumnLabel(
+                                          dateDisplayMode,
+                                          hasGreenBeans
+                                        )
+                                      : hasGreenBeans && col.greenBeanLabel
+                                        ? col.greenBeanLabel
+                                        : col.label;
 
                                   return (
                                     <FilterButton

@@ -88,7 +88,7 @@ import { BrewingNoteData } from '@/types/app';
 import {
   type TableColumnKey,
   getDefaultVisibleColumns,
-} from './components/TableView';
+} from './components/tableColumns';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import {
   COFFEE_BEAN_NAVIGATION_EVENTS,
