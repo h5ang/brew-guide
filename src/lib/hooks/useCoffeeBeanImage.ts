@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type CoffeeBeanImageSide,
   getCoffeeBeanImageBeanIds,
@@ -27,13 +27,21 @@ export function useCoffeeBeanImage(
   const { side = 'front', preferThumbnail = true, fallback } = options;
   const [imageSource, setImageSource] = useState<string | undefined>(fallback);
   const [refreshKey, setRefreshKey] = useState(0);
+  const sourceIdentityRef = useRef<string | undefined>();
 
   useEffect(() => {
     let cancelled = false;
-    setImageSource(fallback);
+    const sourceIdentity = [beanId, side, preferThumbnail].join('\u0001');
+    const sourceIdentityChanged = sourceIdentityRef.current !== sourceIdentity;
+    sourceIdentityRef.current = sourceIdentity;
 
     if (!beanId) {
+      setImageSource(fallback);
       return;
+    }
+
+    if (sourceIdentityChanged) {
+      setImageSource(fallback);
     }
 
     getCoffeeBeanImageSource(beanId, { side, preferThumbnail })
