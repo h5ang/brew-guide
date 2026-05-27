@@ -377,17 +377,14 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
               {dateLabel}
             </div>
             <div className="flex min-h-4 items-center gap-2 text-xs leading-4 font-medium">
-              {!isAddMode && currentBean?.isInTransit ? (
-                <span className="whitespace-nowrap text-neutral-800 dark:text-neutral-100">
-                  在途
-                </span>
-              ) : isAddMode && bean?.isInTransit ? (
-                <span
-                  onClick={() => handleUpdateField({ isInTransit: false })}
-                  className="cursor-pointer bg-neutral-100 px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-                >
-                  在途
-                </span>
+              {currentBean?.isInTransit ? (
+                <DatePicker
+                  date={undefined}
+                  onDateChange={date => handleDateChange(date, dateField)}
+                  placeholder="在途"
+                  className="w-auto leading-4 [&_button]:h-4 [&_button]:w-auto [&_button]:items-center [&_button]:justify-start [&_button]:border-0 [&_button]:py-0 [&_button]:text-xs [&_button]:leading-4 [&_button]:font-medium [&_button>span]:leading-4 [&_button>span]:text-neutral-800 dark:[&_button>span]:text-neutral-100"
+                  displayFormat="yyyy-MM-dd"
+                />
               ) : (
                 <>
                   <DatePicker

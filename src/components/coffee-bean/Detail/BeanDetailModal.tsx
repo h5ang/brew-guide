@@ -755,7 +755,10 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    handleUpdateField({ [field]: `${year}-${month}-${day}` });
+    handleUpdateField({
+      [field]: `${year}-${month}-${day}`,
+      isInTransit: false,
+    });
   };
 
   // 关闭处理
