@@ -1,5 +1,45 @@
 import { CustomEquipment, equipmentList } from '@/lib/core/config';
 
+type PourTypeOption = {
+  value: string;
+  label: string;
+};
+
+const POUR_TYPE_LABELS: Record<string, string> = {
+  extraction: '萃取浓缩',
+  beverage: '饮料',
+  other: '其他',
+  center: '中心注水',
+  circle: '绕圈注水',
+  ice: '添加冰块',
+  bypass: 'Bypass',
+  wait: '等待',
+};
+
+const ESPRESSO_POUR_TYPES = ['extraction', 'beverage', 'other'] as const;
+const REGULAR_SYSTEM_POUR_TYPES = [
+  'center',
+  'circle',
+  'ice',
+  'bypass',
+] as const;
+
+const toPourTypeOption = (pourType: string): PourTypeOption => ({
+  value: pourType,
+  label: getPourTypeName(pourType),
+});
+
+const appendPourTypeOption = (
+  options: PourTypeOption[],
+  option: PourTypeOption
+) => {
+  if (!option.value || options.some(item => item.value === option.value)) {
+    return;
+  }
+
+  options.push(option);
+};
+
 /**
  * 根据器具ID获取器具名称（统一查找逻辑）
  * @param equipmentId 器具ID
@@ -104,24 +144,58 @@ export const isEspressoMachine = (
 export const getPourTypeName = (pourType?: string): string => {
   if (!pourType) return '请选择注水方式';
 
-  switch (pourType) {
-    case 'extraction':
-      return '萃取浓缩';
-    case 'beverage':
-      return '饮料';
-    case 'other':
-      return '其他';
-    case 'center':
-      return '中心注水';
-    case 'circle':
-      return '绕圈注水';
-    case 'ice':
-      return '添加冰块';
-    case 'bypass':
-      return 'Bypass';
-    default:
-      return pourType;
+  return POUR_TYPE_LABELS[pourType] || pourType;
+};
+
+export const getPourTypeOptions = (
+  customEquipment: CustomEquipment
+): PourTypeOption[] => {
+  if (isEspressoMachine(customEquipment)) {
+    return ESPRESSO_POUR_TYPES.map(toPourTypeOption);
   }
+
+  const options: PourTypeOption[] = [];
+  const customPourAnimations = customEquipment.customPourAnimations || [];
+
+  for (const animation of customPourAnimations) {
+    if (!animation.isSystemDefault) {
+      appendPourTypeOption(options, {
+        value: animation.id,
+        label: animation.name,
+      });
+    }
+  }
+
+  if (customEquipment.animationType !== 'custom') {
+    for (const animation of customPourAnimations) {
+      if (animation.isSystemDefault && animation.pourType) {
+        appendPourTypeOption(options, {
+          value: animation.pourType,
+          label: animation.name,
+        });
+      }
+    }
+
+    for (const pourType of REGULAR_SYSTEM_POUR_TYPES) {
+      appendPourTypeOption(options, toPourTypeOption(pourType));
+    }
+  }
+
+  appendPourTypeOption(options, toPourTypeOption('wait'));
+  appendPourTypeOption(options, toPourTypeOption('other'));
+
+  return options;
+};
+
+export const isPourTypeAvailable = (
+  customEquipment: CustomEquipment,
+  pourType?: string
+): boolean => {
+  if (!pourType) return false;
+
+  return getPourTypeOptions(customEquipment).some(
+    option => option.value === pourType
+  );
 };
 
 /**
@@ -132,6 +206,8 @@ export const getPourTypeName = (pourType?: string): string => {
 export const getDefaultPourType = (
   customEquipment: CustomEquipment
 ): string => {
+  const customPourAnimations = customEquipment.customPourAnimations || [];
+
   // 根据器具类型返回默认注水方式
   switch (customEquipment.animationType) {
     case 'espresso':
@@ -143,30 +219,10 @@ export const getDefaultPourType = (
     case 'clever':
       return 'circle'; // 手冲器具默认使用绕圈注水
     case 'custom':
-      // 如果是自定义预设并且有自定义注水动画
-      if (
-        customEquipment.customPourAnimations &&
-        customEquipment.customPourAnimations.length > 0
-      ) {
-        // 先找系统默认的动画
-        const defaultAnimation = customEquipment.customPourAnimations.find(
-          anim => anim.isSystemDefault && anim.pourType
-        );
-
-        if (defaultAnimation && defaultAnimation.pourType) {
-          return defaultAnimation.pourType;
-        }
-
-        // 没有系统默认动画就用第一个动画
-        const firstAnimation = customEquipment.customPourAnimations[0];
-        if (firstAnimation.pourType) {
-          return firstAnimation.pourType;
-        }
-
-        return firstAnimation.id;
-      }
-      // 如果没有自定义注水动画，默认使用绕圈注水
-      return 'circle';
+      return (
+        customPourAnimations.find(animation => !animation.isSystemDefault)
+          ?.id || 'other'
+      );
     default:
       return 'circle';
   }

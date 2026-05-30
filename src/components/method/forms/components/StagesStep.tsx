@@ -6,7 +6,7 @@ import { CustomEquipment } from '@/lib/core/config';
 import { Stage } from './types';
 import {
   isEspressoMachine,
-  getPourTypeName as _getPourTypeName,
+  getPourTypeOptions,
 } from '@/lib/utils/equipmentUtils';
 import {
   applyCumulativeDurationEdit,
@@ -240,75 +240,6 @@ const StagesStep: React.FC<StagesStepProps> = ({
 
   const calculateTotalTime = () => calculateTotalDuration(stages);
   const calculateCurrentWater = () => calculateTotalWater(stages);
-
-  const getPourTypeOptions = () => {
-    if (isEspressoMachine(customEquipment)) {
-      return [
-        { value: 'extraction', label: '萃取浓缩' },
-        { value: 'beverage', label: '饮料' },
-        { value: 'other', label: '其他' },
-      ];
-    }
-
-    const options: { value: string; label: string }[] = [];
-
-    if (
-      customEquipment.customPourAnimations &&
-      customEquipment.customPourAnimations.length > 0
-    ) {
-      customEquipment.customPourAnimations
-        .filter(anim => !anim.isSystemDefault)
-        .forEach(animation => {
-          options.push({ value: animation.id, label: animation.name });
-        });
-
-      if (customEquipment.animationType !== 'custom') {
-        customEquipment.customPourAnimations
-          .filter(anim => anim.isSystemDefault && anim.pourType)
-          .forEach(animation => {
-            options.push({
-              value: animation.pourType || '',
-              label: animation.name,
-            });
-          });
-
-        const defaultTypes = [
-          { type: 'center', label: '中心注水' },
-          { type: 'circle', label: '绕圈注水' },
-          { type: 'ice', label: '添加冰块' },
-          { type: 'bypass', label: 'Bypass' },
-        ];
-        defaultTypes.forEach(({ type, label }) => {
-          if (
-            !customEquipment.customPourAnimations?.some(
-              a => a.pourType === type
-            )
-          ) {
-            options.push({ value: type, label });
-          }
-        });
-        options.push({ value: 'wait', label: '等待' });
-        options.push({ value: 'other', label: '其他方式' });
-      } else {
-        options.push({ value: 'wait', label: '等待' });
-        options.push({ value: 'other', label: '其他方式' });
-      }
-    } else {
-      if (customEquipment.animationType === 'custom') {
-        options.push({ value: 'wait', label: '等待' });
-        options.push({ value: 'other', label: '其他方式' });
-      } else {
-        options.push({ value: 'center', label: '中心注水' });
-        options.push({ value: 'circle', label: '绕圈注水' });
-        options.push({ value: 'ice', label: '添加冰块' });
-        options.push({ value: 'bypass', label: 'Bypass' });
-        options.push({ value: 'wait', label: '等待' });
-        options.push({ value: 'other', label: '其他方式' });
-      }
-    }
-
-    return options;
-  };
 
   const handleWaterBlur = (index: number, value: string) => {
     setEditingWater(null);
@@ -597,7 +528,7 @@ const StagesStep: React.FC<StagesStepProps> = ({
     }
   };
 
-  const pourTypeOptions = getPourTypeOptions();
+  const pourTypeOptions = getPourTypeOptions(customEquipment);
   const isEspresso = isEspressoMachine(customEquipment);
   const hasValve = customEquipment.hasValve;
 

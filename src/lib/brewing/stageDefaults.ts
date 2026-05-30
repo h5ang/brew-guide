@@ -1,9 +1,21 @@
 import type { CustomEquipment, Stage } from '@/lib/core/config';
+import {
+  getDefaultPourType,
+  getPourTypeName,
+  isEspressoMachine,
+  isPourTypeAvailable,
+} from '@/lib/utils/equipmentUtils';
 
 type StageTextDefaults = {
   label: string;
   detail: string;
 };
+
+const DEFAULT_FIRST_STAGE_DURATION = 10;
+const DEFAULT_WAIT_STAGE_DURATION = 20;
+const DEFAULT_COFFEE_DOSE = 15;
+const DEFAULT_FIRST_STAGE_WATER_MULTIPLIER = 2;
+const DEFAULT_ESPRESSO_EXTRACTION_DURATION = 25;
 
 const SYSTEM_STAGE_DEFAULTS: Record<string, StageTextDefaults> = {
   circle: {
@@ -34,6 +46,19 @@ const SYSTEM_STAGE_DEFAULTS: Record<string, StageTextDefaults> = {
 
 const LEGACY_STAGE_LABELS = ['注水'];
 const LEGACY_STAGE_DETAILS = ['注水'];
+const ESPRESSO_DEFAULT_STAGE_LABELS = ['萃取浓缩', '饮料', '其他', ''];
+
+const parseGramValue = (value?: string): number => {
+  if (!value) return 0;
+
+  const parsedValue = parseFloat(value.replace('g', ''));
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
+const getFirstStageWater = (coffee?: string): string => {
+  const coffeeDose = parseGramValue(coffee) || DEFAULT_COFFEE_DOSE;
+  return String(Math.round(coffeeDose * DEFAULT_FIRST_STAGE_WATER_MULTIPLIER));
+};
 
 const getCustomAnimationDefault = (
   pourType: string,
@@ -157,20 +182,206 @@ export const applyRegularStagePourTypeDefaults = (
   return nextStage;
 };
 
-export const normalizeStageDefaults = (stage: Stage): Stage => {
-  if (stage.pourType !== 'wait') {
+const createEspressoStageDefaults = (
+  pourType: string,
+  options: { blankBeverageLabel?: boolean } = {}
+): Stage => ({
+  duration:
+    pourType === 'extraction'
+      ? DEFAULT_ESPRESSO_EXTRACTION_DURATION
+      : undefined,
+  label:
+    pourType === 'beverage' && options.blankBeverageLabel
+      ? ''
+      : getPourTypeName(pourType),
+  water: '',
+  detail: '',
+  pourType,
+});
+
+const isManagedEspressoStageLabel = (
+  currentPourType: string | undefined,
+  nextPourType: string,
+  label: string | undefined
+): boolean =>
+  !label ||
+  ESPRESSO_DEFAULT_STAGE_LABELS.includes(label) ||
+  (nextPourType === 'extraction' && currentPourType === 'beverage') ||
+  (nextPourType === 'beverage' && currentPourType === 'extraction');
+
+const applyEspressoStagePourTypeDefaults = (
+  stage: Stage,
+  pourType: string
+): Stage => {
+  const nextStage: Stage = {
+    ...stage,
+    pourType,
+  };
+
+  if (isManagedEspressoStageLabel(stage.pourType, pourType, stage.label)) {
+    nextStage.label = getPourTypeName(pourType);
+  }
+
+  if (pourType === 'extraction') {
+    nextStage.duration =
+      typeof stage.duration === 'number'
+        ? stage.duration
+        : DEFAULT_ESPRESSO_EXTRACTION_DURATION;
+  } else if (pourType === 'beverage') {
+    nextStage.duration = undefined;
+  }
+
+  return nextStage;
+};
+
+export const applyStagePourTypeDefaults = (
+  stage: Stage,
+  pourType: string,
+  customEquipment: CustomEquipment
+): Stage =>
+  isEspressoMachine(customEquipment)
+    ? applyEspressoStagePourTypeDefaults(stage, pourType)
+    : applyRegularStagePourTypeDefaults(stage, pourType, customEquipment);
+
+export const createRegularStageDefaults = (
+  pourType: string,
+  customEquipment: CustomEquipment,
+  options: {
+    isFirstStage?: boolean;
+    coffee?: string;
+    valveStatus?: 'open' | 'closed';
+  } = {}
+): Stage => {
+  if (pourType === 'wait') {
     return {
-      ...stage,
-      detail: stage.detail || '',
+      pourType: 'wait',
+      label: SYSTEM_STAGE_DEFAULTS.wait.label,
+      water: '',
+      duration: options.isFirstStage ? DEFAULT_FIRST_STAGE_DURATION : undefined,
+      detail: SYSTEM_STAGE_DEFAULTS.wait.detail,
+      ...(options.valveStatus ? { valveStatus: options.valveStatus } : {}),
+    };
+  }
+
+  const defaults = getStageTextDefaults(pourType, customEquipment);
+  const stage: Stage = {
+    pourType,
+    label: defaults.label,
+    water: '',
+    detail: defaults.detail,
+    ...(options.valveStatus ? { valveStatus: options.valveStatus } : {}),
+  };
+
+  if (pourType !== 'bypass') {
+    stage.duration = options.isFirstStage
+      ? DEFAULT_FIRST_STAGE_DURATION
+      : undefined;
+  }
+
+  if (options.isFirstStage) {
+    stage.water = getFirstStageWater(options.coffee);
+  }
+
+  return stage;
+};
+
+export const createInitialRegularStages = (
+  customEquipment: CustomEquipment,
+  coffee = `${DEFAULT_COFFEE_DOSE}g`
+): Stage[] => {
+  const defaultPourType = getDefaultPourType(customEquipment);
+  const valveStatus = customEquipment.hasValve ? 'closed' : undefined;
+  const firstStage = createRegularStageDefaults(
+    defaultPourType,
+    customEquipment,
+    {
+      isFirstStage: true,
+      coffee,
+      valveStatus,
+    }
+  );
+
+  if (defaultPourType === 'circle') {
+    firstStage.label = '焖蒸(绕圈注水)';
+    firstStage.detail = '中心向外绕圈，确保均匀萃取';
+  }
+
+  return [
+    firstStage,
+    {
+      duration: DEFAULT_WAIT_STAGE_DURATION,
+      label: SYSTEM_STAGE_DEFAULTS.wait.label,
+      detail: SYSTEM_STAGE_DEFAULTS.wait.detail,
+      pourType: 'wait',
+    },
+  ];
+};
+
+export const createInitialStagesForEquipment = (
+  customEquipment: CustomEquipment,
+  coffee = `${DEFAULT_COFFEE_DOSE}g`
+): Stage[] =>
+  isEspressoMachine(customEquipment)
+    ? [createEspressoStageDefaults('extraction')]
+    : createInitialRegularStages(customEquipment, coffee);
+
+export const createNewStageForEquipment = (
+  customEquipment: CustomEquipment,
+  options: { existingStages: Stage[]; coffee: string }
+): Stage => {
+  if (isEspressoMachine(customEquipment)) {
+    const pourType =
+      options.existingStages.length > 0
+        ? 'beverage'
+        : getDefaultPourType(customEquipment);
+
+    return createEspressoStageDefaults(pourType, {
+      blankBeverageLabel: pourType === 'beverage',
+    });
+  }
+
+  return createRegularStageDefaults(
+    getDefaultPourType(customEquipment),
+    customEquipment,
+    {
+      isFirstStage: options.existingStages.length === 0,
+      coffee: options.coffee,
+      valveStatus: customEquipment.hasValve ? 'closed' : undefined,
+    }
+  );
+};
+
+export const normalizeStageDefaults = (
+  stage: Stage,
+  customEquipment?: CustomEquipment
+): Stage => {
+  const normalizedPourType =
+    customEquipment && !isPourTypeAvailable(customEquipment, stage.pourType)
+      ? getDefaultPourType(customEquipment)
+      : stage.pourType;
+
+  const normalizedStage =
+    normalizedPourType && normalizedPourType !== stage.pourType
+      ? applyStagePourTypeDefaults(
+          stage,
+          normalizedPourType,
+          customEquipment as CustomEquipment
+        )
+      : stage;
+
+  if (normalizedStage.pourType !== 'wait') {
+    return {
+      ...normalizedStage,
+      detail: normalizedStage.detail || '',
     };
   }
 
   return {
-    ...stage,
-    label: stage.label || SYSTEM_STAGE_DEFAULTS.wait.label,
+    ...normalizedStage,
+    label: normalizedStage.label || SYSTEM_STAGE_DEFAULTS.wait.label,
     water: '',
-    detail: LEGACY_STAGE_DETAILS.includes(stage.detail || '')
+    detail: LEGACY_STAGE_DETAILS.includes(normalizedStage.detail || '')
       ? ''
-      : stage.detail || '',
+      : normalizedStage.detail || '',
   };
 };

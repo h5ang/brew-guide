@@ -9,14 +9,11 @@ import React, {
 } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { CustomEquipment } from '@/lib/core/config';
+import { isEspressoMachine } from '@/lib/utils/equipmentUtils';
 import {
-  isEspressoMachine,
-  getDefaultPourType,
-  getPourTypeName,
-} from '@/lib/utils/equipmentUtils';
-import {
-  applyRegularStagePourTypeDefaults,
-  getStageTextDefaults,
+  applyStagePourTypeDefaults,
+  createInitialStagesForEquipment,
+  createNewStageForEquipment,
   normalizeStageDefaults,
 } from '@/lib/brewing/stageDefaults';
 import { Steps, NameStep, ParamsStep, StagesStep, Stage } from './components';
@@ -26,7 +23,8 @@ import { showToast } from '@/components/common/feedback/LightToast';
 
 // 数据规范化辅助函数
 const normalizeMethodData = (
-  method: Partial<MethodWithStages> & Record<string, unknown>
+  method: Partial<MethodWithStages> & Record<string, unknown>,
+  customEquipment: CustomEquipment
 ): MethodWithStages => {
   const normalizedMethod = { ...method };
 
@@ -91,7 +89,10 @@ const normalizeMethodData = (
               normalizedStage.water = `${normalizedStage.water}g`;
             }
           }
-          return normalizeStageDefaults(normalizedStage as unknown as Stage);
+          return normalizeStageDefaults(
+            normalizedStage as unknown as Stage,
+            customEquipment
+          );
         }
       );
     }
@@ -201,23 +202,7 @@ const CustomMethodForm = React.forwardRef<
 
     // 初始化新方法
     const initializeNewMethod = useCallback((): MethodWithStages => {
-      const isCustomPreset = customEquipment.animationType === 'custom';
       const isEspresso = isEspressoMachine(customEquipment);
-
-      // 自定义预设类型 - 不设置初始步骤
-      if (isCustomPreset) {
-        return {
-          name: '',
-          params: {
-            coffee: '15g',
-            water: '225g',
-            ratio: '1:15',
-            grindSize: '中细',
-            temp: '92°C',
-            stages: [],
-          },
-        };
-      }
 
       // 意式机类型（使用新数据模型）
       if (isEspresso) {
@@ -242,32 +227,6 @@ const CustomMethodForm = React.forwardRef<
         };
       }
 
-      // 手冲类型 - 获取默认注水方式
-      const defaultPourType = getDefaultPourType(customEquipment);
-
-      // 创建初始步骤（使用新数据模型：焖蒸 + 等待）
-      // Requirements 6.1, 6.2, 6.3: 手冲器具默认焖蒸阶段 + 等待阶段
-      const initialStages: Stage[] = [
-        {
-          // Requirement 6.2: pourType="circle", label="焖蒸(绕圈注水)", water="30", duration="10"
-          duration: 10,
-          label: '焖蒸(绕圈注水)',
-          water: '30',
-          detail: '中心向外绕圈，确保均匀萃取',
-          pourType: defaultPourType, // 使用器具默认注水方式以提供更好的用户体验
-          ...(customEquipment.hasValve
-            ? { valveStatus: 'closed' as 'closed' | 'open' }
-            : {}),
-        },
-        {
-          // Requirement 6.3: pourType="wait", label="等待", duration="15", detail=""
-          duration: 20,
-          label: '等待',
-          detail: '',
-          pourType: 'wait',
-        },
-      ];
-
       return {
         name: '',
         params: {
@@ -276,7 +235,7 @@ const CustomMethodForm = React.forwardRef<
           ratio: '1:15',
           grindSize: '中细',
           temp: '92°C',
-          stages: initialStages,
+          stages: createInitialStagesForEquipment(customEquipment, '15g'),
         },
       };
     }, [customEquipment]);
@@ -337,15 +296,6 @@ const CustomMethodForm = React.forwardRef<
       return water.endsWith('g') ? water : `${water}g`;
     };
 
-    // ===== 注水步骤辅助函数 =====
-    const getDefaultStageLabel = (pourType: string) => {
-      return getStageTextDefaults(pourType, customEquipment).label;
-    };
-
-    const getDefaultStageDetail = (pourType: string) => {
-      return getStageTextDefaults(pourType, customEquipment).detail;
-    };
-
     // ===== 副作用 =====
 
     // 自动聚焦输入框
@@ -374,7 +324,8 @@ const CustomMethodForm = React.forwardRef<
       if (initialMethod) {
         // 使用初始方法
         const normalizedMethod = normalizeMethodData(
-          initialMethod as Partial<MethodWithStages> & Record<string, unknown>
+          initialMethod as Partial<MethodWithStages> & Record<string, unknown>,
+          customEquipment
         );
 
         // 处理聪明杯标签特殊情况
@@ -389,7 +340,7 @@ const CustomMethodForm = React.forwardRef<
 
         setMethod(normalizedMethod);
       }
-    }, [initialMethod, customEquipment.hasValve]);
+    }, [initialMethod, customEquipment]);
 
     // ===== 事件处理函数 =====
 
@@ -542,59 +493,10 @@ const CustomMethodForm = React.forwardRef<
     };
 
     const addStage = () => {
-      // 获取器具类型
-      const _equipmentType = customEquipment.animationType;
-      const isEspresso = isEspressoMachine(customEquipment);
-
-      // 确定默认注水方式
-      let defaultPourType = getDefaultPourType(customEquipment);
-
-      // 对于意式机，检查是否已有步骤，有则新步骤默认为"饮料"类型
-      if (isEspresso && method.params.stages.length > 0) {
-        defaultPourType = 'beverage';
-      }
-
-      // 根据器具类型和阶段设置默认阶段用时（新数据模型使用 duration）
-      const defaultDuration = (() => {
-        if (isEspresso) {
-          // 意式咖啡机：只有萃取类型有时间，饮料类型没有 duration
-          return defaultPourType === 'extraction' ? 25 : undefined;
-        } else if (defaultPourType === 'bypass') {
-          // Bypass 类型没有 duration
-          return undefined;
-        } else if (method.params.stages.length === 0) {
-          return 10; // 第一个阶段默认10秒
-        } else {
-          // 新增步骤不预设时间，让用户自行输入
-          return undefined;
-        }
-      })();
-
-      // 创建新阶段（使用新数据模型）
-      const newStage: Stage = {
-        duration: defaultDuration,
-        // 当是意式机且为饮料类型时，不自动设置标签名称，留空让用户自行填写
-        // 非意式机则使用默认的步骤名称
-        // 等待类型使用固定标签
-        label:
-          defaultPourType === 'wait'
-            ? '等待'
-            : isEspresso
-              ? defaultPourType === 'beverage'
-                ? ''
-                : getPourTypeName(defaultPourType)
-              : getDefaultStageLabel(defaultPourType),
-        // 等待类型不需要水量
-        water: defaultPourType === 'wait' ? '' : '',
-        // 非意式机设置默认的详细说明
-        detail: isEspresso ? '' : getDefaultStageDetail(defaultPourType),
-        pourType: defaultPourType,
-      };
-
-      // 为聪明杯添加阀门状态
-      if (customEquipment.hasValve) {
-        newStage.valveStatus = 'closed';
-      }
+      const newStage = createNewStageForEquipment(customEquipment, {
+        existingStages: method.params.stages,
+        coffee: method.params.coffee,
+      });
 
       // 更新方法
       setMethod({
@@ -1030,70 +932,13 @@ const CustomMethodForm = React.forwardRef<
     const handlePourTypeChange = (index: number, value: string) => {
       const newStages = [...method.params.stages];
       const stage = { ...newStages[index] } as Stage;
-      const isEspresso = isEspressoMachine(customEquipment);
-
-      // 设置pourType，对所有器具类型通用
-      stage.pourType = value;
-
-      // 对于意式机的特殊处理
-      if (isEspresso) {
-        // 获取注水方式的显示名称
-        const pourTypeName = getPourTypeName(value);
-
-        // 获取所有可能的默认注水方式标签
-        const allDefaultLabels = ['萃取浓缩', '饮料', '其他', ''];
-
-        // 检查当前标签是否与任何默认标签匹配，或者是否为特定切换场景（从饮料切换到萃取，或从萃取切换到饮料）
-        const isLabelDefault =
-          !stage.label ||
-          stage.label === '' ||
-          allDefaultLabels.includes(stage.label) ||
-          (value === 'extraction' && stage.label === '饮料') ||
-          (value === 'beverage' && stage.label === '萃取浓缩');
-
-        // 根据不同的注水方式处理默认值
-        switch (value) {
-          case 'extraction':
-            // 萃取模式，需要时间和液重
-            if (isLabelDefault) {
-              stage.label = pourTypeName;
-            }
-            // 确保有 duration 字段，萃取模式需要
-            if (typeof stage.duration !== 'number') {
-              stage.duration = 25;
-            }
-            break;
-          case 'beverage':
-            // 饮料模式，只需要名称和液重，不需要时间
-            if (isLabelDefault) {
-              stage.label = pourTypeName;
-            }
-            // 饮料阶段不需要时间
-            stage.duration = undefined;
-            break;
-          default:
-            // 其他模式，根据实际情况设置
-            if (isLabelDefault) {
-              stage.label = pourTypeName;
-            }
-            break;
-        }
-      }
-      // 常规器具和自定义动画统一通过阶段默认值工具处理
-      else {
-        const normalizedStage = applyRegularStagePourTypeDefaults(
-          stage,
-          value,
-          customEquipment
-        );
-        stage.label = normalizedStage.label;
-        stage.water = normalizedStage.water;
-        stage.detail = normalizedStage.detail;
-        stage.pourType = normalizedStage.pourType;
-      }
 
       // 更新stages
-      newStages[index] = stage;
+      newStages[index] = applyStagePourTypeDefaults(
+        stage,
+        value,
+        customEquipment
+      );
 
       // 更新方法
       setMethod({
