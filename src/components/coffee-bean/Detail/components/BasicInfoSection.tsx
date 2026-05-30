@@ -106,6 +106,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   const isOutOfStock = remainingNumber !== null && remainingNumber <= 0;
   const hasValidUnitPrice =
     !isNaN(priceNumber) && !isNaN(capacityNumber) && capacityNumber > 0;
+  const detailValueGapClass = isAddMode || isEditMode ? 'gap-2' : 'gap-1';
   const agingDays =
     !isAddMode &&
     !isGreenBeanType &&
@@ -231,7 +232,9 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
             <div className="w-16 shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
               容量
             </div>
-            <div className="flex min-h-4 items-center gap-2 text-xs leading-4 font-medium">
+            <div
+              className={`flex min-h-4 items-center ${detailValueGapClass} text-xs leading-4 font-medium`}
+            >
               {/* 剩余量 */}
               {editingRemaining ? (
                 <div
@@ -394,7 +397,9 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
             <div className="w-16 shrink-0 text-xs leading-4 font-medium text-neutral-500 dark:text-neutral-400">
               {dateLabel}
             </div>
-            <div className="flex min-h-4 items-center gap-2 text-xs leading-4 font-medium">
+            <div
+              className={`flex min-h-4 items-center ${detailValueGapClass} text-xs leading-4 font-medium`}
+            >
               {currentBean?.isInTransit ? (
                 <DatePicker
                   date={undefined}
