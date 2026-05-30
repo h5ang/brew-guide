@@ -22,21 +22,24 @@ const SettingPage: React.FC<SettingPageProps> = ({
 }) => {
   const layoutMode = useSettingPageLayoutMode();
   const isEmbedded = layoutMode === 'embedded';
+  const embeddedContentClass = 'mx-auto w-full max-w-xl min-w-0';
 
   return (
     <div
       className={
         isEmbedded
-          ? 'flex h-full flex-col bg-neutral-50 dark:bg-neutral-900'
+          ? 'flex h-full min-w-0 flex-col bg-neutral-50 dark:bg-neutral-900'
           : 'fixed inset-0 mx-auto flex flex-col bg-neutral-50 dark:bg-neutral-900'
       }
       style={isEmbedded ? undefined : getChildPageStyle(isVisible)}
     >
       {isEmbedded ? (
-        <div className="pt-safe-top z-20 pr-6 pl-3">
-          <h2 className="pl-3.5 text-xl font-medium text-neutral-800 dark:text-neutral-200">
-            {title}
-          </h2>
+        <div className="pt-safe-top z-20">
+          <div className={`${embeddedContentClass} pr-6 pl-3`}>
+            <h2 className="pl-3.5 text-xl font-medium text-neutral-800 dark:text-neutral-200">
+              {title}
+            </h2>
+          </div>
         </div>
       ) : (
         <div className="pt-safe-top z-20 flex items-center justify-between px-6">
@@ -57,7 +60,11 @@ const SettingPage: React.FC<SettingPageProps> = ({
         {/* 顶部渐变阴影（随滚动粘附）*/}
         <div className="pointer-events-none sticky top-0 z-10 h-12 w-full bg-linear-to-b from-neutral-50 to-transparent first:border-b-0 dark:from-neutral-900"></div>
 
-        {children}
+        {isEmbedded ? (
+          <div className={embeddedContentClass}>{children}</div>
+        ) : (
+          children
+        )}
       </div>
     </div>
   );
