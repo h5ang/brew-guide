@@ -206,7 +206,6 @@ export interface AppModalsProps {
   handleAddEquipment: () => void;
   handleEditEquipment: (equipment: CustomEquipment) => void;
   handleShareEquipment: (equipment: CustomEquipment) => Promise<void>;
-  handleReorderEquipments: (newOrder: CustomEquipment[]) => Promise<void>;
   handleImportEquipmentToForm: (
     equipment: CustomEquipment,
     methods?: Method[]
@@ -371,7 +370,6 @@ const AppModals: React.FC<AppModalsProps> = ({
   handleAddEquipment,
   handleEditEquipment,
   handleShareEquipment,
-  handleReorderEquipments,
   handleImportEquipmentToForm,
 
   // 转生豆
@@ -1240,7 +1238,6 @@ const AppModals: React.FC<AppModalsProps> = ({
         onEditEquipment={handleEditEquipment}
         onDeleteEquipment={handleDeleteEquipment}
         onShareEquipment={handleShareEquipment}
-        onReorderEquipments={handleReorderEquipments}
         settings={settings}
       />
 

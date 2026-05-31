@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/lib/stores/settingsStore';
 import hapticsUtils from '@/lib/ui/haptics';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
 import { useGrinderStore, type Grinder } from '@/lib/stores/grinderStore';
+import { deriveNavigationSettings } from '@/lib/navigation/navigationSettings';
 import { SettingPage } from './atomic';
 
 interface GrinderSettingsProps {
@@ -26,6 +27,8 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
   // 使用 settingsStore 获取设置
   const settings = useSettingsStore(state => state.settings) as SettingsOptions;
   const updateSettings = useSettingsStore(state => state.updateSettings);
+  const navigationState = deriveNavigationSettings(settings.navigationSettings);
+  const showBrewing = navigationState.visibleTabs.brewing;
 
   // 使用 settingsStore 的 handleChange
   const handleChange = React.useCallback(
@@ -168,7 +171,7 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
             </summary>
             <div className="space-y-2.5 px-4 pt-1 pb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
               <p>
-                新增磨豆机后，点击任意研磨度输入框都会弹出选择器，点击即可填入当前刻度。
+                添加磨豆机后，点击任意研磨度输入框都会弹出选择器，点击即可填入当前刻度。
               </p>
               <p>
                 选中的磨豆机会用胶囊显示，左侧图标（
@@ -176,12 +179,6 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
                 /
                 <Unlink className="mx-0.5 inline h-3 w-3 -translate-y-px" />
                 ）表示同步开关，开启时保存记录会自动更新刻度。
-              </p>
-              <p>你也可以在这里直接修改刻度，系统会记住最新值。</p>
-              <div className="h-px bg-neutral-200 dark:bg-neutral-700" />
-              <p>
-                目前功能处于 MVP
-                实现阶段，若有任何体验不足的地方或建议反馈，欢迎来群里交流～
               </p>
             </div>
           </details>
@@ -311,8 +308,8 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
           </details>
         )}
 
-        {/* 刻度指示器显示设置（仅在有磨豆机时显示） */}
-        {grinders.length > 0 && (
+        {/* 刻度指示器显示设置（仅在有磨豆机且冲煮开启时显示） */}
+        {grinders.length > 0 && showBrewing && (
           <div className="flex items-center justify-between rounded bg-neutral-100 px-4 py-3 dark:bg-neutral-800">
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium text-neutral-600 dark:text-neutral-300">

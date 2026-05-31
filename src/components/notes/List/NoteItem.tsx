@@ -50,6 +50,11 @@ const getConstrainedSize = (
   };
 };
 
+const getTextInitial = (text: string | undefined): string => {
+  const trimmedText = text?.trim();
+  return trimmedText ? Array.from(trimmedText)[0] : '';
+};
+
 // 优化笔记项组件以避免不必要的重渲染
 const NoteItem: React.FC<NoteItemProps> = ({
   note,
@@ -148,6 +153,9 @@ const NoteItem: React.FC<NoteItemProps> = ({
     fallback: beanInfo?.image,
     preferThumbnail: true,
   });
+  const beanPlaceholderInitial = beanInfo
+    ? getBeanDisplayInitial(beanInfo)
+    : getTextInitial(beanName) || getTextInitial(note.notes) || '豆';
 
   const roasterLogoName = useMemo(() => {
     if (!beanInfo || beanImage) {
@@ -328,9 +336,7 @@ const NoteItem: React.FC<NoteItemProps> = ({
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-400 dark:text-neutral-600">
-                {beanInfo
-                  ? getBeanDisplayInitial(beanInfo)
-                  : beanName?.charAt(0) || '?'}
+                {beanPlaceholderInitial}
               </div>
             )}
           </div>

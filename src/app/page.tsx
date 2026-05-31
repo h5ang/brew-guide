@@ -3330,35 +3330,6 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     }
   };
 
-  const handleReorderEquipments = async (newOrder: CustomEquipment[]) => {
-    try {
-      const { saveEquipmentOrder, loadEquipmentOrder } =
-        await import('@/lib/stores/settingsStore');
-      const { equipmentUtils } = await import('@/lib/equipment/equipmentUtils');
-
-      const currentOrder = loadEquipmentOrder();
-      const allCurrentEquipments = equipmentUtils.getAllEquipments(
-        customEquipments,
-        currentOrder
-      );
-
-      const updatedEquipments = allCurrentEquipments.map(eq => {
-        if (!eq.isCustom) return eq;
-        const reorderedCustomEq = newOrder.find(newEq => newEq.id === eq.id);
-        return reorderedCustomEq
-          ? { ...reorderedCustomEq, isCustom: true }
-          : eq;
-      });
-
-      const newEquipmentOrder =
-        equipmentUtils.generateEquipmentOrder(updatedEquipments);
-
-      await saveEquipmentOrder(newEquipmentOrder);
-    } catch (error) {
-      console.error('保存器具排序失败:', error);
-    }
-  };
-
   useEffect(() => {
     if (selectedEquipment) {
       const isCustomPresetEquipment = customEquipments.some(
@@ -4737,7 +4708,6 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
         handleAddEquipment={handleAddEquipment}
         handleEditEquipment={handleEditEquipment}
         handleShareEquipment={handleShareEquipment}
-        handleReorderEquipments={handleReorderEquipments}
         handleImportEquipmentToForm={handleImportEquipmentToForm}
         // 转生豆
         showConvertToGreenDrawer={showConvertToGreenDrawer}
