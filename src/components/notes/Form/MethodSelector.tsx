@@ -26,6 +26,25 @@ interface EditingValues {
   temp: string;
 }
 
+const SCROLLABLE_OVERFLOW_PATTERN = /(auto|scroll|overlay)/;
+
+const findScrollableAncestor = (element: HTMLElement): HTMLElement | null => {
+  let parent = element.parentElement;
+
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    const canScrollY = SCROLLABLE_OVERFLOW_PATTERN.test(style.overflowY);
+
+    if (canScrollY && parent.scrollHeight > parent.clientHeight) {
+      return parent;
+    }
+
+    parent = parent.parentElement;
+  }
+
+  return null;
+};
+
 // 从带单位的字符串中提取数字
 const extractNumber = (str: string): string => {
   const match = str.match(/(\d+(\.\d+)?)/);
@@ -78,6 +97,7 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
 
   // 记录当前初始化的方案，避免重复初始化
   const initializedMethodRef = useRef<string | null>(null);
+  const selectedMethodElementRef = useRef<HTMLDivElement | null>(null);
 
   // Store 方法 - 使用 stable selector
   const setMethodParamOverride = useSettingsStore(
@@ -91,12 +111,11 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     state => state.settings.methodParamOverrides
   );
 
-  const allMethods = [...customMethods, ...commonMethods];
-
   const findMethod = useCallback(
     (methodId: string): Method | undefined =>
-      allMethods.find(m => m.id === methodId || m.name === methodId),
-    [allMethods]
+      customMethods.find(m => m.id === methodId || m.name === methodId) ??
+      commonMethods.find(m => m.id === methodId || m.name === methodId),
+    [customMethods, commonMethods]
   );
 
   // 检查是否有覆盖参数
@@ -258,6 +277,51 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     extractCoffeeFromPlaceholder,
   ]);
 
+  useEffect(() => {
+    if (!selectedMethod) return;
+
+    let animationFrameId: number | null = null;
+    let fallbackTimerId: ReturnType<typeof setTimeout> | null = null;
+
+    const scrollSelectedMethodIntoView = () => {
+      const selectedElement = selectedMethodElementRef.current;
+      if (!selectedElement) return;
+
+      const scrollContainer = findScrollableAncestor(selectedElement);
+
+      if (!scrollContainer) {
+        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        return;
+      }
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = selectedElement.getBoundingClientRect();
+      const elementTop =
+        elementRect.top - containerRect.top + scrollContainer.scrollTop;
+      const centeredTop =
+        elementTop - (scrollContainer.clientHeight - elementRect.height) / 2;
+
+      scrollContainer.scrollTo({
+        top: Math.max(0, centeredTop),
+        behavior: 'auto',
+      });
+    };
+
+    animationFrameId = requestAnimationFrame(() => {
+      scrollSelectedMethodIntoView();
+      fallbackTimerId = setTimeout(scrollSelectedMethodIntoView, 120);
+    });
+
+    return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (fallbackTimerId !== null) {
+        clearTimeout(fallbackTimerId);
+      }
+    };
+  }, [selectedEquipment, selectedMethod, customMethods, commonMethods]);
+
   // 处理方案选择
   const handleMethodClick = useCallback(
     (methodId: string) => {
@@ -409,6 +473,7 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     return (
       <div key={methodId} className="group relative">
         <div
+          ref={isSelected ? selectedMethodElementRef : undefined}
           className={`group relative border-l ${
             isSelected
               ? 'border-neutral-800/50 dark:border-white'
