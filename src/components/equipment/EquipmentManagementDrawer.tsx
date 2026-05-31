@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import {
+  motion,
+  AnimatePresence,
+  Reorder,
+  useDragControls,
+} from 'framer-motion';
 import { GripVertical, Edit, Trash2, Share2, X, EyeOff } from 'lucide-react';
 import type {
   CustomEquipment,
@@ -27,7 +32,6 @@ interface EquipmentManagementDrawerProps {
   onEditEquipment: (equipment: CustomEquipment) => void;
   onDeleteEquipment: (equipment: CustomEquipment) => void;
   onShareEquipment: (equipment: CustomEquipment) => void;
-  onReorderEquipments: (newOrder: CustomEquipment[]) => void;
   settings: SettingsOptions;
 }
 
@@ -58,6 +62,157 @@ interface EquipmentWithActions {
   }>;
 }
 
+type EquipmentAction = 'edit' | 'delete' | 'share' | 'hide';
+
+interface EquipmentRowProps {
+  equipment: EquipmentWithActions;
+  onDragEnd: () => void;
+  onToggleActions: (equipmentId: string) => void;
+  onAction: (action: EquipmentAction, equipment: EquipmentWithActions) => void;
+}
+
+const EquipmentRow: React.FC<EquipmentRowProps> = ({
+  equipment,
+  onDragEnd,
+  onToggleActions,
+  onAction,
+}) => {
+  const dragControls = useDragControls();
+  const { name: equipmentName, customSuffix } =
+    getEquipmentDisplayParts(equipment);
+  const equipmentDisplayName = getEquipmentDisplayName(equipment);
+
+  return (
+    <Reorder.Item
+      value={equipment}
+      dragControls={dragControls}
+      dragListener={false}
+      onDragEnd={onDragEnd}
+      whileDrag={{
+        scale: 1.01,
+        transition: { duration: 0.1 },
+      }}
+      style={{
+        listStyle: 'none',
+      }}
+    >
+      <motion.div
+        className="flex items-center py-3"
+        whileDrag={{
+          backgroundColor: 'transparent',
+          transition: { duration: 0.1 },
+        }}
+      >
+        <button
+          type="button"
+          aria-label={`拖动调整 ${equipmentDisplayName} 排序`}
+          title="拖动排序"
+          onPointerDown={event => dragControls.start(event)}
+          className="mr-3 cursor-grab rounded-md p-1 pl-0 transition-colors duration-150 active:cursor-grabbing"
+        >
+          <motion.span
+            className="flex"
+            whileDrag={{
+              color: 'rgb(107 114 128)',
+              transition: { duration: 0.1 },
+            }}
+          >
+            <GripVertical className="h-4 w-4 text-neutral-400 transition-colors duration-150 dark:text-neutral-500" />
+          </motion.span>
+        </button>
+
+        <motion.span
+          className="flex min-w-0 flex-1 items-baseline text-base font-medium text-neutral-700 transition-colors duration-150 dark:text-neutral-200"
+          whileDrag={{
+            color: 'rgb(107 114 128)',
+            transition: { duration: 0.1 },
+          }}
+          title={equipmentDisplayName}
+        >
+          <span className={equipment.showActions ? 'truncate' : undefined}>
+            {equipmentName}
+          </span>
+          {customSuffix && (
+            <span className="ml-1 shrink-0 text-neutral-400 dark:text-neutral-500">
+              {customSuffix}
+            </span>
+          )}
+        </motion.span>
+
+        <div className="flex items-center justify-end">
+          <AnimatePresence mode="wait">
+            {equipment.showActions ? (
+              <motion.div
+                initial={{ opacity: 0, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, filter: 'blur(4px)' }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center space-x-1"
+              >
+                <button
+                  type="button"
+                  onClick={() => onAction('edit', equipment)}
+                  className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+                >
+                  <Edit className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAction('share', equipment)}
+                  className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+                >
+                  <Share2 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                </button>
+                {equipment.isSystem ? (
+                  <button
+                    type="button"
+                    onClick={() => onAction('hide', equipment)}
+                    className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+                  >
+                    <EyeOff className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onAction('delete', equipment)}
+                    className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+                  >
+                    <Trash2 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onToggleActions(equipment.id)}
+                  className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+                >
+                  <X className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                </button>
+              </motion.div>
+            ) : (
+              <motion.button
+                type="button"
+                initial={{
+                  opacity: 0.6,
+                  filter: 'blur(2px)',
+                }}
+                animate={{ opacity: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0.6, filter: 'blur(2px)' }}
+                transition={{ duration: 0.2 }}
+                onClick={() => onToggleActions(equipment.id)}
+                className="rounded-md p-2 transition-all duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
+              >
+                <span className="flex h-4 w-4 items-center justify-center text-lg leading-none font-bold text-neutral-600 select-none dark:text-neutral-400">
+                  ⋯
+                </span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </Reorder.Item>
+  );
+};
+
 const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
   isOpen,
   onClose,
@@ -66,7 +221,6 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
   onEditEquipment,
   onDeleteEquipment,
   onShareEquipment,
-  onReorderEquipments: _onReorderEquipments,
   settings,
 }) => {
   // 动画状态管理
@@ -86,6 +240,7 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
   const [allEquipments, setAllEquipments] = useState<EquipmentWithActions[]>(
     []
   );
+  const pendingOrderRef = React.useRef<EquipmentWithActions[] | null>(null);
 
   // 处理显示/隐藏动画
   useEffect(() => {
@@ -110,6 +265,7 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
           isSystem: !('isCustom' in eq && eq.isCustom),
         }) as EquipmentWithActions
     );
+    pendingOrderRef.current = null;
     setAllEquipments(equipmentsWithActions);
   }, [baseEquipments]);
 
@@ -119,33 +275,45 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
     }
   }, [settings?.hapticFeedback]);
 
-  // 处理拖拽排序（所有器具统一排序）
-  const handleReorder = async (newOrder: EquipmentWithActions[]) => {
-    setAllEquipments(newOrder);
+  const handleReorder = React.useCallback(
+    (newOrder: EquipmentWithActions[]) => {
+      pendingOrderRef.current = newOrder;
+      setAllEquipments(newOrder);
+    },
+    []
+  );
+
+  // 拖拽中只更新本地顺序，松手后再持久化一次，避免外部刷新打断 Reorder 状态。
+  const persistReorder = React.useCallback(async () => {
+    const orderToSave = pendingOrderRef.current;
+    if (!orderToSave) return;
+
+    pendingOrderRef.current = null;
 
     try {
-      // 生成新的器具排序数据
-      const { equipmentUtils } = await import('@/lib/equipment/equipmentUtils');
-      const newEquipmentOrder = equipmentUtils.generateEquipmentOrder(newOrder);
+      const visibleIds = orderToSave.map(equipment => equipment.id);
+      const currentOrder = settings.equipmentOrder || [];
+      const nextOrder = [
+        ...visibleIds,
+        ...currentOrder.filter(id => !visibleIds.includes(id)),
+      ];
 
       // 保存排序
-      const { saveEquipmentOrder } = await import('@/lib/stores/settingsStore');
-      await saveEquipmentOrder(newEquipmentOrder);
-
-      // 传递自定义器具给父组件以保持向后兼容
-      const customEquipmentsOnly = newOrder.filter(
-        eq => !eq.isSystem
-      ) as CustomEquipment[];
-      _onReorderEquipments(customEquipmentsOnly);
+      await useSettingsStore.getState().setEquipmentOrder(nextOrder);
 
       // 通知所有器具栏组件更新
       const { equipmentEventBus } =
         await import('@/lib/equipment/equipmentEventBus');
       equipmentEventBus.notify();
     } catch (error) {
+      pendingOrderRef.current = orderToSave;
       console.error('保存器具排序失败:', error);
     }
-  };
+  }, [settings.equipmentOrder]);
+
+  const handleDragEnd = React.useCallback(() => {
+    void persistReorder();
+  }, [persistReorder]);
 
   // 切换操作按钮显示
   const toggleActions = async (equipmentId: string) => {
@@ -160,7 +328,7 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
 
   // 处理操作按钮点击
   const handleAction = async (
-    action: 'edit' | 'delete' | 'share' | 'hide',
+    action: EquipmentAction,
     equipment: EquipmentWithActions
   ) => {
     await triggerHaptic();
@@ -268,146 +436,17 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
                   onReorder={handleReorder}
                   className="space-y-2"
                 >
-                  {allEquipments.map(equipment => {
-                    const { name: equipmentName, customSuffix } =
-                      getEquipmentDisplayParts(equipment);
-                    const equipmentDisplayName =
-                      getEquipmentDisplayName(equipment);
-
-                    return (
-                      <Reorder.Item
-                        key={equipment.id}
-                        value={equipment}
-                        whileDrag={{
-                          scale: 1.01,
-                          transition: { duration: 0.1 },
-                        }}
-                        style={{
-                          listStyle: 'none',
-                        }}
-                      >
-                        <motion.div
-                          className="flex items-center py-3"
-                          whileDrag={{
-                            backgroundColor: 'transparent',
-                            transition: { duration: 0.1 },
-                          }}
-                          onPointerDown={e => {
-                            const target = e.target as HTMLElement;
-                            const isDragHandle = target.closest('.drag-handle');
-                            if (!isDragHandle) {
-                              e.preventDefault();
-                            }
-                          }}
-                        >
-                          <div className="drag-handle mr-3 cursor-grab rounded-md p-1 pl-0 transition-colors duration-150 active:cursor-grabbing">
-                            <motion.div
-                              whileDrag={{
-                                color: 'rgb(107 114 128)',
-                                transition: { duration: 0.1 },
-                              }}
-                            >
-                              <GripVertical className="h-4 w-4 text-neutral-400 transition-colors duration-150 dark:text-neutral-500" />
-                            </motion.div>
-                          </div>
-
-                          <motion.span
-                            className="flex min-w-0 flex-1 items-baseline text-base font-medium text-neutral-700 transition-colors duration-150 dark:text-neutral-200"
-                            whileDrag={{
-                              color: 'rgb(107 114 128)',
-                              transition: { duration: 0.1 },
-                            }}
-                            title={equipmentDisplayName}
-                          >
-                            <span
-                              className={
-                                equipment.showActions ? 'truncate' : undefined
-                              }
-                            >
-                              {equipmentName}
-                            </span>
-                            {customSuffix && (
-                              <span className="ml-1 shrink-0 text-neutral-400 dark:text-neutral-500">
-                                {customSuffix}
-                              </span>
-                            )}
-                          </motion.span>
-
-                          <div className="flex items-center justify-end">
-                            <AnimatePresence mode="wait">
-                              {equipment.showActions ? (
-                                <motion.div
-                                  initial={{ opacity: 0, filter: 'blur(4px)' }}
-                                  animate={{ opacity: 1, filter: 'blur(0px)' }}
-                                  exit={{ opacity: 0, filter: 'blur(4px)' }}
-                                  transition={{ duration: 0.2 }}
-                                  className="flex items-center space-x-1"
-                                >
-                                  <button
-                                    onClick={() =>
-                                      handleAction('edit', equipment)
-                                    }
-                                    className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                  >
-                                    <Edit className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleAction('share', equipment)
-                                    }
-                                    className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                  >
-                                    <Share2 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                                  </button>
-                                  {equipment.isSystem ? (
-                                    <button
-                                      onClick={() =>
-                                        handleAction('hide', equipment)
-                                      }
-                                      className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                    >
-                                      <EyeOff className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() =>
-                                        handleAction('delete', equipment)
-                                      }
-                                      className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                    >
-                                      <Trash2 className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => toggleActions(equipment.id)}
-                                    className="rounded-md p-2 transition-colors duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                  >
-                                    <X className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-                                  </button>
-                                </motion.div>
-                              ) : (
-                                <motion.button
-                                  initial={{
-                                    opacity: 0.6,
-                                    filter: 'blur(2px)',
-                                  }}
-                                  animate={{ opacity: 1, filter: 'blur(0px)' }}
-                                  exit={{ opacity: 0.6, filter: 'blur(2px)' }}
-                                  transition={{ duration: 0.2 }}
-                                  onClick={() => toggleActions(equipment.id)}
-                                  className="rounded-md p-2 transition-all duration-150 hover:bg-neutral-100 active:bg-neutral-200 dark:hover:bg-neutral-700 dark:active:bg-neutral-600"
-                                >
-                                  <span className="flex h-4 w-4 items-center justify-center text-lg leading-none font-bold text-neutral-600 select-none dark:text-neutral-400">
-                                    ⋯
-                                  </span>
-                                </motion.button>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        </motion.div>
-                      </Reorder.Item>
-                    );
-                  })}
+                  {allEquipments.map(equipment => (
+                    <EquipmentRow
+                      key={equipment.id}
+                      equipment={equipment}
+                      onDragEnd={handleDragEnd}
+                      onToggleActions={toggleActions}
+                      onAction={(action, rowEquipment) => {
+                        void handleAction(action, rowEquipment);
+                      }}
+                    />
+                  ))}
                 </Reorder.Group>
               </div>
             ) : (
