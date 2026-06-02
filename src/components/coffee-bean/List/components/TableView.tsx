@@ -54,20 +54,20 @@ const COLUMN_SIZE_CONFIG: Record<
   TableColumnKey,
   { size: number; minSize: number; maxSize?: number }
 > = {
-  roaster: { size: 160, minSize: 120, maxSize: 320 },
-  name: { size: 220, minSize: 160, maxSize: 420 },
-  flavorPeriod: { size: 140, minSize: 120, maxSize: 240 },
-  capacity: { size: 128, minSize: 96, maxSize: 220 },
-  price: { size: 128, minSize: 96, maxSize: 220 },
-  beanType: { size: 100, minSize: 88, maxSize: 180 },
-  origin: { size: 140, minSize: 110, maxSize: 260 },
-  estate: { size: 140, minSize: 110, maxSize: 260 },
-  process: { size: 120, minSize: 100, maxSize: 220 },
-  variety: { size: 120, minSize: 100, maxSize: 220 },
-  roastLevel: { size: 110, minSize: 96, maxSize: 200 },
-  flavor: { size: 200, minSize: 140, maxSize: 360 },
-  rating: { size: 96, minSize: 88, maxSize: 140 },
-  notes: { size: 240, minSize: 160, maxSize: 420 },
+  roaster: { size: 125, minSize: 100, maxSize: 250 },
+  name: { size: 200, minSize: 100, maxSize: 400 },
+  flavorPeriod: { size: 90, minSize: 70, maxSize: 120 },
+  capacity: { size: 90, minSize: 90, maxSize: 120 },
+  price: { size: 90, minSize: 90, maxSize: 120 },
+  beanType: { size: 70, minSize: 65, maxSize: 120 },
+  origin: { size: 100, minSize: 90, maxSize: 200 },
+  estate: { size: 100, minSize: 90, maxSize: 200 },
+  process: { size: 100, minSize: 90, maxSize: 200 },
+  variety: { size: 100, minSize: 90, maxSize: 200 },
+  roastLevel: { size: 90, minSize: 90, maxSize: 120 },
+  flavor: { size: 200, minSize: 100, maxSize: 400 },
+  rating: { size: 90, minSize: 90, maxSize: 120 },
+  notes: { size: 200, minSize: 160, maxSize: 400 },
 };
 
 // 从 localStorage 读取排序状态
@@ -797,7 +797,7 @@ const TableView: React.FC<TableViewProps> = ({
                               onClick={event => event.stopPropagation()}
                             >
                               <span
-                                className={`absolute top-1/2 left-1/2 h-5 w-px -translate-x-1/2 -translate-y-1/2 bg-neutral-300 transition-opacity dark:bg-neutral-600 ${
+                                className={`absolute top-1/2 left-1/2 h-3 w-px rounded-full -translate-x-1/2 -translate-y-1/2 bg-neutral-200 transition-opacity dark:bg-neutral-800 ${
                                   isResizing ? 'opacity-100' : 'opacity-70'
                                 }`}
                               />
