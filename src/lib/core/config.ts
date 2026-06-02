@@ -1469,4 +1469,5 @@ export const sponsorsList = [
   '小李',
   'RX',
   'no Tattos',
+  'May Wang',
 ];
