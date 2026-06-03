@@ -1,12 +1,12 @@
 'use client';
 
 import { Capacitor } from '@capacitor/core';
-import { TempFileManager } from '@/lib/utils/tempFileManager';
+import {
+  TempFileManager,
+  type JsonFileSaveMode,
+} from '@/lib/utils/tempFileManager';
 
-export type JsonExportMode =
-  | 'web-download'
-  | 'android-document'
-  | 'native-share';
+export type JsonExportMode = JsonFileSaveMode;
 
 export interface JsonExportResult {
   mode: JsonExportMode;
@@ -69,9 +69,17 @@ export async function exportJsonFile({
   }
 
   if (Capacitor.getPlatform() === 'android') {
-    await TempFileManager.saveJsonFile(jsonData, normalizedFileName);
+    const mode = await TempFileManager.saveJsonFile(
+      jsonData,
+      normalizedFileName,
+      {
+        title,
+        text,
+        dialogTitle,
+      }
+    );
     return {
-      mode: 'android-document',
+      mode,
       fileName: normalizedFileName,
     };
   }

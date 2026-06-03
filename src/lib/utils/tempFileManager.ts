@@ -2,7 +2,10 @@ import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { saveImageToAndroidGallery } from './nativeGallerySaver';
-import { saveFileWithAndroidDocumentPicker } from './nativeDocumentSaver';
+import {
+  isAndroidDocumentSaverUnavailable,
+  saveFileWithAndroidDocumentPicker,
+} from './nativeDocumentSaver';
 
 /**
  * 分享选项接口
@@ -12,6 +15,11 @@ interface ShareOptions {
   text: string;
   dialogTitle: string;
 }
+
+export type JsonFileSaveMode =
+  | 'web-download'
+  | 'android-document'
+  | 'native-share';
 
 /**
  * 临时文件管理器
@@ -247,22 +255,37 @@ export class TempFileManager {
   /**
    * 保存JSON文件到用户选择的位置。Android 使用系统文件创建器，避免依赖分享面板。
    */
-  static async saveJsonFile(jsonData: string, fileName: string): Promise<void> {
-    if (!Capacitor.isNativePlatform()) {
-      await this.shareJsonFileWeb(jsonData, fileName);
-      return;
-    }
-
-    if (Capacitor.getPlatform() === 'android') {
-      await this.saveJsonFileWithAndroidDocumentPicker(jsonData, fileName);
-      return;
-    }
-
-    await this.shareJsonFileNative(jsonData, fileName, {
+  static async saveJsonFile(
+    jsonData: string,
+    fileName: string,
+    shareOptions: ShareOptions = {
       title: '导出数据',
       text: '请选择保存位置',
       dialogTitle: '导出数据',
-    });
+    }
+  ): Promise<JsonFileSaveMode> {
+    if (!Capacitor.isNativePlatform()) {
+      await this.shareJsonFileWeb(jsonData, fileName);
+      return 'web-download';
+    }
+
+    if (Capacitor.getPlatform() === 'android') {
+      try {
+        await this.saveJsonFileWithAndroidDocumentPicker(jsonData, fileName);
+        return 'android-document';
+      } catch (error) {
+        if (!isAndroidDocumentSaverUnavailable(error)) {
+          throw error;
+        }
+
+        console.warn('Android 文档保存插件不可用，回退到系统分享导出:', error);
+        await this.shareJsonFileNative(jsonData, fileName, shareOptions);
+        return 'native-share';
+      }
+    }
+
+    await this.shareJsonFileNative(jsonData, fileName, shareOptions);
+    return 'native-share';
   }
 
   private static async saveJsonFileWithAndroidDocumentPicker(
