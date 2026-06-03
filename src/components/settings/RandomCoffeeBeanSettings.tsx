@@ -135,11 +135,6 @@ const RandomCoffeeBeanSettings: React.FC<RandomCoffeeBeanSettingsProps> = ({
         {randomSettings.enableLongPressRandomType && (
           <SettingRow
             label="长按时随机的类型"
-            description={`点击随机${
-              randomSettings.defaultRandomType === 'espresso' ? '手冲' : '意式'
-            }豆，长按随机${
-              randomSettings.defaultRandomType === 'espresso' ? '意式' : '手冲'
-            }豆`}
             isLast
           >
             <SettingSelector
