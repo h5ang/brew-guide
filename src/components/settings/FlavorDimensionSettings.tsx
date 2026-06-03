@@ -1,20 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, GripVertical } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Reorder } from 'framer-motion';
 
-import { SettingsOptions } from './Settings';
-import { useSettingsStore } from '@/lib/stores/settingsStore';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { FlavorDimension, DEFAULT_FLAVOR_DIMENSIONS } from '@/lib/core/db';
+import type { SettingsOptions } from './Settings';
 import {
-  getSettingsStore,
+  SettingPage,
+  SettingReorderableRow,
+  SettingRow,
+  SettingSection,
+} from './atomic';
+import PageStackDrawer from '@/components/common/ui/PageStackDrawer';
+import ConfirmDrawer from '@/components/common/ui/ConfirmDrawer';
+import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
+import { modalHistory, useModalHistory } from '@/lib/hooks/useModalHistory';
+import type { FlavorDimension } from '@/lib/core/db';
+import {
   getFlavorDimensionsSync,
+  getSettingsStore,
+  useSettingsStore,
 } from '@/lib/stores/settingsStore';
 import hapticsUtils from '@/lib/ui/haptics';
-import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
-import { SettingPage } from './atomic';
-import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 
 interface FlavorDimensionSettingsProps {
   settings: SettingsOptions;
@@ -25,35 +31,127 @@ interface FlavorDimensionSettingsProps {
   ) => void | Promise<void>;
 }
 
+interface DimensionDraft {
+  id: string | null;
+  label: string;
+  isDefault: boolean;
+}
+
+interface DimensionEditorDrawerProps {
+  draft: DimensionDraft | null;
+  onLabelChange: (label: string) => void;
+  onCancel: () => void;
+  onDone: () => void;
+  onDelete: () => void;
+}
+
+const readFlavorDimensions = (): FlavorDimension[] => {
+  try {
+    return getFlavorDimensionsSync();
+  } catch (error) {
+    console.error('加载评分维度失败:', error);
+    return [];
+  }
+};
+
+const DimensionEditorDrawer: React.FC<DimensionEditorDrawerProps> = ({
+  draft,
+  onLabelChange,
+  onCancel,
+  onDone,
+  onDelete,
+}) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!draft) return;
+
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [draft]);
+
+  return (
+    <PageStackDrawer
+      isOpen={Boolean(draft)}
+      title={draft?.id ? '编辑维度' : '新建维度'}
+      activeKey={draft?.id || 'new'}
+      canGoBack={false}
+      doneDisabled={!draft?.label.trim()}
+      onCancel={onCancel}
+      onBack={onCancel}
+      onDone={onDone}
+      historyId="flavor-dimension-editor-drawer"
+    >
+      <div>
+        <SettingSection title="维度名称">
+          <SettingRow vertical>
+            <input
+              ref={inputRef}
+              value={draft?.label || ''}
+              onChange={event => onLabelChange(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' && draft?.label.trim()) {
+                  onDone();
+                }
+              }}
+              placeholder="输入评分维度名称"
+              className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-50 dark:placeholder:text-neutral-500"
+              autoComplete="off"
+              id="flavor-dimension-name-input"
+            />
+          </SettingRow>
+        </SettingSection>
+
+        {draft?.id && !draft.isDefault && (
+          <SettingSection title="操作">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex w-full cursor-pointer items-center px-3.5 py-3.5 text-left text-sm font-medium text-neutral-600 transition active:bg-black/5 dark:text-neutral-300 dark:active:bg-white/5"
+            >
+              删除维度
+            </button>
+          </SettingSection>
+        )}
+      </div>
+    </PageStackDrawer>
+  );
+};
+
 const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
   settings: _settings,
   onClose,
   handleChange: _handleChange,
 }) => {
-  // 使用 settingsStore 获取设置
   const settings = useSettingsStore(state => state.settings) as SettingsOptions;
-  const updateSettings = useSettingsStore(state => state.updateSettings);
-
-  // 使用 settingsStore 的 handleChange
-  const handleChange = React.useCallback(
-    async <K extends keyof SettingsOptions>(
-      key: K,
-      value: SettingsOptions[K]
-    ) => {
-      await updateSettings({ [key]: value } as any);
-    },
-    [updateSettings]
+  const [shouldRender] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
+  const [dimensions, setDimensions] =
+    useState<FlavorDimension[]>(readFlavorDimensions);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [draft, setDraft] = useState<DimensionDraft | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FlavorDimension | null>(
+    null
   );
 
-  // 控制动画状态
-  const [shouldRender, setShouldRender] = useState(true);
-  const [isVisible, setIsVisible] = useState(false);
-
-  // 用于保存最新的 onClose 引用
   const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
 
-  // 关闭处理函数（带动画）
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const triggerLightHaptic = React.useCallback(() => {
+    if (settings.hapticFeedback) {
+      hapticsUtils.light();
+    }
+  }, [settings.hapticFeedback]);
+
   const handleCloseWithAnimation = React.useCallback(() => {
     setIsVisible(false);
     window.dispatchEvent(new CustomEvent('subSettingsClosing'));
@@ -62,19 +160,16 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
     }, 350);
   }, []);
 
-  // 使用统一的历史栈管理系统
   useModalHistory({
     id: 'flavor-dimension-settings',
     isOpen: true,
     onClose: handleCloseWithAnimation,
   });
 
-  // UI 返回按钮点击处理
   const handleClose = () => {
     modalHistory.back();
   };
 
-  // 处理显示/隐藏动画（入场动画）
   useEffect(() => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -83,125 +178,84 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
     });
   }, []);
 
-  const [dimensions, setDimensions] = useState<FlavorDimension[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState('');
-  const [newDimensionLabel, setNewDimensionLabel] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
-
-  // 删除确认抽屉状态
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmData, setDeleteConfirmData] = useState<{
-    id: string;
-    label: string;
-  } | null>(null);
-
-  // 加载评分维度数据
-  useEffect(() => {
-    loadDimensions();
+  const loadDimensions = React.useCallback(() => {
+    setDimensions(readFlavorDimensions());
   }, []);
 
-  const loadDimensions = () => {
+  const openCreateDrawer = React.useCallback(() => {
+    setDraft({
+      id: null,
+      label: '',
+      isDefault: false,
+    });
+  }, []);
+
+  const openEditDrawer = React.useCallback((dimension: FlavorDimension) => {
+    setDraft({
+      id: dimension.id,
+      label: dimension.label,
+      isDefault: Boolean(dimension.isDefault),
+    });
+  }, []);
+
+  const closeEditor = React.useCallback(() => {
+    setDraft(null);
+  }, []);
+
+  const saveDraft = React.useCallback(async () => {
+    const trimmedLabel = draft?.label.trim();
+    if (!draft || !trimmedLabel) return;
+
     try {
-      const loadedDimensions = getFlavorDimensionsSync();
-      setDimensions(loadedDimensions);
-    } catch (error) {
-      console.error('加载评分维度失败:', error);
-    }
-  };
-
-  // 添加新维度
-  const handleAddDimension = async () => {
-    if (!newDimensionLabel.trim()) return;
-
-    try {
-      await getSettingsStore().addFlavorDimension(newDimensionLabel.trim());
-      loadDimensions();
-      setNewDimensionLabel('');
-      setShowAddForm(false);
-
-      if (settings.hapticFeedback) {
-        hapticsUtils.light();
+      if (draft.id) {
+        await getSettingsStore().updateFlavorDimension(draft.id, {
+          label: trimmedLabel,
+        });
+      } else {
+        await getSettingsStore().addFlavorDimension(trimmedLabel);
       }
-    } catch (error) {
-      console.error('添加评分维度失败:', error);
-      alert('添加评分维度失败，请重试');
-    }
-  };
 
-  // 开始编辑
-  const startEditing = (dimension: FlavorDimension) => {
-    setEditingId(dimension.id);
-    setEditingLabel(dimension.label);
-  };
-
-  // 保存编辑
-  const saveEdit = async () => {
-    if (!editingId || !editingLabel.trim()) return;
-
-    try {
-      await getSettingsStore().updateFlavorDimension(editingId, {
-        label: editingLabel.trim(),
-      });
       loadDimensions();
-      setEditingId(null);
-      setEditingLabel('');
-
-      if (settings.hapticFeedback) {
-        hapticsUtils.light();
-      }
+      closeEditor();
+      triggerLightHaptic();
     } catch (error) {
-      console.error('更新评分维度失败:', error);
-      alert('更新评分维度失败，请重试');
+      console.error(
+        draft.id ? '更新评分维度失败:' : '添加评分维度失败:',
+        error
+      );
+      alert(draft.id ? '更新评分维度失败，请重试' : '添加评分维度失败，请重试');
     }
-  };
+  }, [closeEditor, draft, loadDimensions, triggerLightHaptic]);
 
-  // 取消编辑
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingLabel('');
-  };
+  const promptDeleteDimension = React.useCallback(() => {
+    if (!draft?.id || draft.isDefault) return;
 
-  // 删除维度
-  const handleDeleteDimension = async (id: string) => {
-    const dimension = dimensions.find(d => d.id === id);
-    if (!dimension) return;
+    const target = dimensions.find(dimension => dimension.id === draft.id);
+    if (!target) return;
 
-    if (dimension.isDefault) {
-      alert('不能删除默认评分维度');
-      return;
-    }
-
-    setDeleteConfirmData({ id, label: dimension.label });
+    setDeleteTarget(target);
     setShowDeleteConfirm(true);
-  };
+  }, [dimensions, draft]);
 
-  // 执行删除维度
-  const executeDeleteDimension = async (id: string) => {
+  const executeDeleteDimension = React.useCallback(async () => {
+    if (!deleteTarget) return;
+
     try {
-      await getSettingsStore().deleteFlavorDimension(id);
+      await getSettingsStore().deleteFlavorDimension(deleteTarget.id);
       loadDimensions();
-
-      if (settings.hapticFeedback) {
-        hapticsUtils.light();
-      }
+      closeEditor();
+      triggerLightHaptic();
     } catch (error) {
       console.error('删除评分维度失败:', error);
       alert('删除评分维度失败，请重试');
     }
-  };
+  }, [closeEditor, deleteTarget, loadDimensions, triggerLightHaptic]);
 
-  // 重置为默认
-  const handleResetToDefault = async () => {
-    setDeleteConfirmData({ id: '__reset__', label: '所有自定义维度' });
-    setShowDeleteConfirm(true);
-  };
-
-  // 执行重置
-  const executeResetToDefault = async () => {
+  const executeResetToDefault = React.useCallback(async () => {
     try {
       await getSettingsStore().resetFlavorDimensions();
       loadDimensions();
+      setIsReorderMode(false);
 
       if (settings.hapticFeedback) {
         hapticsUtils.medium();
@@ -210,243 +264,156 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
       console.error('重置评分维度失败:', error);
       alert('重置评分维度失败，请重试');
     }
-  };
+  }, [loadDimensions, settings.hapticFeedback]);
 
-  // 处理重新排序
-  const handleReorder = async (newOrder: FlavorDimension[]) => {
-    try {
-      setDimensions(newOrder);
-      await getSettingsStore().reorderFlavorDimensions(newOrder);
-
-      if (settings.hapticFeedback) {
-        hapticsUtils.light();
+  const handleReorder = React.useCallback(
+    async (newOrder: FlavorDimension[]) => {
+      try {
+        setDimensions(newOrder);
+        await getSettingsStore().reorderFlavorDimensions(newOrder);
+        triggerLightHaptic();
+      } catch (error) {
+        console.error('重新排序失败:', error);
+        alert('重新排序失败，请重试');
+        loadDimensions();
       }
-    } catch (error) {
-      console.error('重新排序失败:', error);
-      alert('重新排序失败，请重试');
-      // 出错时恢复原有顺序
-      loadDimensions();
-    }
-  };
+    },
+    [loadDimensions, triggerLightHaptic]
+  );
+
+  const toggleReorderMode = React.useCallback(() => {
+    setIsReorderMode(current => !current);
+    triggerLightHaptic();
+  }, [triggerLightHaptic]);
+
+  const dimensionSectionTitle = (
+    <div className="flex items-center justify-between pl-3.5">
+      <h3 className="text-sm font-semibold tracking-wider text-neutral-500 uppercase dark:text-neutral-400">
+        当前维度
+      </h3>
+      {dimensions.length > 1 && (
+        <button
+          type="button"
+          onClick={toggleReorderMode}
+          className="flex cursor-pointer items-center rounded-full px-3 text-sm font-medium text-neutral-600 transition-transform active:scale-[0.96] dark:text-neutral-300"
+        >
+          {isReorderMode ? '完成' : '编辑'}
+        </button>
+      )}
+    </div>
+  );
 
   if (!shouldRender) return null;
 
   return (
-    <SettingPage title="评分维度" isVisible={isVisible} onClose={handleClose}>
-      {/* 滚动内容区域 */}
-      <div className="-mt-4 space-y-6 px-6">
-        {/* 维度列表 */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-              当前维度 ({dimensions.length})
-            </h3>
+    <>
+      <SettingPage title="评分维度" isVisible={isVisible} onClose={handleClose}>
+        <SettingSection
+          title={dimensionSectionTitle}
+          footer={`共 ${dimensions.length} 个维度，可在评分表单中按当前顺序展示。`}
+          className="-mt-4"
+        >
+          {dimensions.length === 0 ? (
             <button
-              onClick={handleResetToDefault}
-              className="text-xs text-neutral-500 underline hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
+              type="button"
+              onClick={openCreateDrawer}
+              className="flex w-full cursor-pointer items-center px-3.5 py-3.5 text-left transition active:bg-black/5 dark:active:bg-white/5"
             >
-              重置为默认
+              <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                新建维度
+              </span>
             </button>
-          </div>
-
-          <Reorder.Group
-            axis="y"
-            values={dimensions}
-            onReorder={handleReorder}
-            className="space-y-2"
-          >
-            {dimensions.map(dimension => (
-              <Reorder.Item
-                key={dimension.id}
-                value={dimension}
-                whileDrag={{
-                  scale: 1.01,
-                  transition: { duration: 0.1 },
-                }}
-                style={{
-                  listStyle: 'none',
-                }}
-              >
-                <motion.div
-                  className="flex items-center py-3"
-                  whileDrag={{
-                    backgroundColor: 'rgba(0,0,0,0.05)',
-                    transition: { duration: 0.1 },
-                  }}
-                  onPointerDown={e => {
-                    const target = e.target as HTMLElement;
-                    const isDragHandle = target.closest('.drag-handle');
-                    if (!isDragHandle) {
-                      e.preventDefault();
-                    }
-                  }}
+          ) : (
+            <div>
+              <div className="px-3.5">
+                <button
+                  type="button"
+                  onClick={openCreateDrawer}
+                  className="flex w-full cursor-pointer items-center border-b border-black/5 py-3.5 text-left transition active:opacity-70 dark:border-white/5"
                 >
-                  {/* 拖拽手柄 */}
-                  <div className="drag-handle mr-3 cursor-grab p-1 pl-0 active:cursor-grabbing">
-                    <motion.div
-                      whileDrag={{
-                        color: 'rgb(107 114 128)',
-                        transition: { duration: 0.1 },
-                      }}
-                    >
-                      <GripVertical className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
-                    </motion.div>
-                  </div>
+                  <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    新建维度
+                  </span>
+                </button>
+              </div>
 
-                  {/* 维度内容 */}
-                  <div className="flex-1">
-                    {editingId === dimension.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editingLabel}
-                          onChange={e => setEditingLabel(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveEdit();
-                            if (e.key === 'Escape') cancelEdit();
-                          }}
-                          className="flex-1 rounded bg-neutral-100 px-2 py-1 text-sm focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:bg-neutral-700"
-                          autoFocus
-                        />
-                        <button
-                          onClick={saveEdit}
-                          className="rounded bg-neutral-800 px-2 py-1 text-xs text-white hover:opacity-80 dark:bg-neutral-200 dark:text-neutral-800"
-                        >
-                          保存
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="px-2 py-1 text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <motion.div
-                          whileDrag={{
-                            color: 'rgb(107 114 128)',
-                            transition: { duration: 0.1 },
-                          }}
-                        >
-                          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                            {dimension.label}
-                          </span>
-                          {dimension.isDefault && (
-                            <span className="ml-2 text-xs text-neutral-500 dark:text-neutral-400">
-                              (默认)
-                            </span>
-                          )}
-                        </motion.div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => startEditing(dimension)}
-                            className="p-1 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </button>
-                          {!dimension.isDefault && (
-                            <button
-                              onClick={() =>
-                                handleDeleteDimension(dimension.id)
-                              }
-                              className="p-1 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
-        </div>
-
-        {/* 添加新维度 */}
-        <div className="space-y-3">
-          {/* <h3 className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                            添加新维度
-                        </h3>
-                         */}
-          <AnimatePresence>
-            {showAddForm ? (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-3"
+              <Reorder.Group
+                axis="y"
+                values={dimensions}
+                onReorder={handleReorder}
+                className="m-0 list-none p-0"
               >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newDimensionLabel}
-                    onChange={e => setNewDimensionLabel(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddDimension();
-                      if (e.key === 'Escape') {
-                        setShowAddForm(false);
-                        setNewDimensionLabel('');
-                      }
-                    }}
-                    placeholder="醇厚度、香气、余韵..."
-                    className="flex-1 rounded border border-neutral-200/50 bg-neutral-100 px-3 py-2 text-sm focus:ring-1 focus:ring-neutral-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800"
-                    autoFocus
+                {dimensions.map((dimension, index) => (
+                  <SettingReorderableRow
+                    key={dimension.id}
+                    value={dimension}
+                    label={
+                      dimension.isDefault
+                        ? `${dimension.label} · 默认`
+                        : dimension.label
+                    }
+                    isLast={index === dimensions.length - 1}
+                    isReorderMode={isReorderMode}
+                    onOpen={openEditDrawer}
+                    onDragEnd={triggerLightHaptic}
                   />
-                  <button
-                    onClick={handleAddDimension}
-                    disabled={!newDimensionLabel.trim()}
-                    className="rounded bg-neutral-800 px-4 py-2 text-sm text-white hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-200 dark:text-neutral-800"
-                  >
-                    添加
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setNewDimensionLabel('');
-                    }}
-                    className="px-4 py-2 text-sm text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
-                  >
-                    取消
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="flex w-full items-center justify-center gap-2 rounded border border-dashed border-neutral-300 bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-600 transition-colors hover:border-neutral-400 hover:text-neutral-800 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-500 dark:hover:text-neutral-300"
-              >
-                <Plus className="h-4 w-4" />
-                添加新的评分维度
-              </button>
-            )}
-          </AnimatePresence>
-        </div>
+                ))}
+              </Reorder.Group>
+            </div>
+          )}
+        </SettingSection>
 
-        {/* 底部空间 */}
-        <div className="h-20" />
-      </div>
+        <SettingSection title="操作">
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="flex w-full cursor-pointer items-center px-3.5 py-3.5 text-left text-sm font-medium text-neutral-600 transition active:bg-black/5 dark:text-neutral-300 dark:active:bg-white/5"
+          >
+            重置为默认维度
+          </button>
+        </SettingSection>
+      </SettingPage>
 
-      {/* 删除确认抽屉 */}
+      <DimensionEditorDrawer
+        draft={draft}
+        onLabelChange={label =>
+          setDraft(current => (current ? { ...current, label } : current))
+        }
+        onCancel={closeEditor}
+        onDone={() => void saveDraft()}
+        onDelete={promptDeleteDimension}
+      />
+
       <DeleteConfirmDrawer
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={() => {
-          if (deleteConfirmData) {
-            if (deleteConfirmData.id === '__reset__') {
-              executeResetToDefault();
-            } else {
-              executeDeleteDimension(deleteConfirmData.id);
-            }
-          }
+          void executeDeleteDimension();
         }}
-        itemName={deleteConfirmData?.label || ''}
+        itemName={deleteTarget?.label || ''}
         itemType="评分维度"
-        onExitComplete={() => setDeleteConfirmData(null)}
+        onExitComplete={() => setDeleteTarget(null)}
       />
-    </SettingPage>
+
+      <ConfirmDrawer
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          void executeResetToDefault();
+        }}
+        confirmText="重置"
+        isDanger
+        message={
+          <>
+            确认将评分维度恢复为默认配置吗？
+            <span className="text-neutral-800 dark:text-neutral-200">
+              所有自定义维度都会被移除
+            </span>
+            ，此操作不可撤销。
+          </>
+        }
+      />
+    </>
   );
 };
 
