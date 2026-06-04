@@ -63,6 +63,10 @@ export interface Step {
   duration?: number; // 新格式：阶段用时
   pourTime?: number;
   water?: string;
+  displayWater?: {
+    independent: string;
+    cumulative: string;
+  };
   detail?: string;
   pourType?: string;
   valveStatus?: 'open' | 'closed';

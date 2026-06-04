@@ -15,6 +15,10 @@ interface StageItemProps {
     time?: number;
     pourTime?: number;
     valveStatus?: string;
+    displayWater?: {
+      independent: string;
+      cumulative: string;
+    };
   };
   index: number;
   onClick: () => void;
@@ -138,6 +142,10 @@ const StageItem: React.FC<StageItemProps> = React.memo(
     const isWaitingStage = step.type === 'wait';
     const isBypassStep = step.pourType === 'bypass';
     const isCurrentStage = activeTab === '注水' && index === currentStage;
+    const waterText =
+      stepDisplayMode === 'independent'
+        ? (step.displayWater?.independent ?? step.items?.[0])
+        : (step.displayWater?.cumulative ?? step.items?.[0]);
 
     const textStyle = useMemo(() => {
       return 'text-neutral-600 dark:text-neutral-400';
@@ -311,7 +319,9 @@ const StageItem: React.FC<StageItemProps> = React.memo(
                               {!isWaitingStage && <span>·</span>}
                             </>
                           )}
-                        {!isWaitingStage && <span>{step.items[0]}</span>}
+                        {!isWaitingStage && waterText && (
+                          <span>{waterText}</span>
+                        )}
                         {showFlowRate && step.type === 'pour' && step.note && (
                           <>
                             <span>·</span>

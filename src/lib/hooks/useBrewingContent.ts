@@ -12,21 +12,13 @@ import type { SettingsOptions } from '@/lib/core/db';
 import { loadCustomMethodsForEquipment } from '@/lib/stores/customMethodStore';
 import { filterHiddenMethods } from '@/lib/stores/settingsStore';
 import { MethodType } from '@/lib/types/method';
-import { isLegacyFormat } from '@/lib/brewing/stageMigration';
+import { isLegacyFormat, parseWater } from '@/lib/brewing/stageMigration';
 import {
   calculateTotalDuration,
   calculateTotalWater,
   calculateCumulativeTime,
-  calculateCumulativeWater,
 } from '@/lib/brewing/stageUtils';
 import { hasBrewingStages } from '@/lib/brewing/methodAvailability';
-
-// 增强 Content.注水.steps 接口以支持 pourType
-declare module './useBrewingState' {
-  interface Step {
-    pourType?: string;
-  }
-}
 
 // 格式化时间工具函数
 export const formatTime = (seconds: number, compact: boolean = false) => {
@@ -41,6 +33,12 @@ export const formatTime = (seconds: number, compact: boolean = false) => {
   }
   // 完整模式: 1:20 (用于主计时器显示)
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const appendGramUnit = (water: string | number | undefined): string => {
+  const value = String(water ?? '0').trim();
+  if (!value) return '0g';
+  return value.toLowerCase().endsWith('g') ? value : `${value}g`;
 };
 
 export interface UseBrewingContentProps {
@@ -458,6 +456,8 @@ export function useBrewingContent({
       type: 'pour' | 'wait';
       label: string;
       water: string;
+      independentWater: string;
+      cumulativeWater: string;
       detail: string;
       startTime: number;
       endTime: number;
@@ -479,6 +479,8 @@ export function useBrewingContent({
           type: 'pour',
           label: stage.label,
           water: stage.water || '0',
+          independentWater: stage.water || '0',
+          cumulativeWater: stage.water || '0',
           detail: stage.detail,
           startTime: -1,
           endTime: -1,
@@ -505,6 +507,8 @@ export function useBrewingContent({
           type: 'wait',
           label: stage.label || '等待',
           water: String(cumulativeWater),
+          independentWater: '0',
+          cumulativeWater: String(cumulativeWater),
           detail: stage.detail || '',
           startTime,
           endTime,
@@ -521,6 +525,8 @@ export function useBrewingContent({
           type: 'pour',
           label: stage.label || `阶段 ${stageIndex + 1}`,
           water: String(cumulativeWater),
+          independentWater: stage.water || '0',
+          cumulativeWater: String(cumulativeWater),
           detail: stage.detail || '',
           startTime,
           endTime,
@@ -542,7 +548,11 @@ export function useBrewingContent({
       注水: {
         steps: expandedStages.map(stage => ({
           title: stage.label,
-          items: [`${stage.water}g`, stage.detail], // 添加 g 单位
+          items: [appendGramUnit(stage.water), stage.detail],
+          displayWater: {
+            independent: appendGramUnit(stage.independentWater),
+            cumulative: appendGramUnit(stage.cumulativeWater),
+          },
           note: stage.pourType === 'bypass' ? '' : stage.time + '秒',
           type: stage.type,
           originalIndex: stage.originalIndex,
@@ -561,6 +571,8 @@ export function useBrewingContent({
       type: 'pour' | 'wait';
       label: string;
       water: string;
+      independentWater: string;
+      cumulativeWater: string;
       detail: string;
       startTime: number; // 开始时间
       endTime: number; // 结束时间
@@ -573,12 +585,22 @@ export function useBrewingContent({
 
     // 按照BrewingTimer的逻辑扩展阶段
     stages.forEach((stage, index) => {
+      const previousCumulativeWater =
+        index > 0 ? parseWater(stages[index - 1]?.water) : 0;
+      const currentCumulativeWater = parseWater(stage.water);
+      const independentWater = Math.max(
+        0,
+        currentCumulativeWater - previousCumulativeWater
+      );
+
       // Bypass 类型的步骤不参与主要计时，单独处理
       if (stage.pourType === 'bypass') {
         expandedStages.push({
           type: 'pour', // 标记为注水类型，但不参与计时
           label: stage.label,
           water: stage.water || '0',
+          independentWater: stage.water || '0',
+          cumulativeWater: stage.water || '0',
           detail: stage.detail,
           startTime: -1, // 特殊标记，表示不参与计时
           endTime: -1,
@@ -602,6 +624,8 @@ export function useBrewingContent({
           type: 'wait',
           label: stage.label,
           water: stage.water || '0',
+          independentWater: '0',
+          cumulativeWater: stage.water || '0',
           detail: stage.detail,
           startTime: prevStageTime,
           endTime: stageTime,
@@ -618,6 +642,8 @@ export function useBrewingContent({
           type: 'pour',
           label: stage.label,
           water: stage.water || '0',
+          independentWater: String(independentWater),
+          cumulativeWater: String(currentCumulativeWater),
           detail: stage.detail,
           startTime: prevStageTime,
           endTime: prevStageTime + stagePourTime,
@@ -635,6 +661,8 @@ export function useBrewingContent({
             type: 'wait',
             label: '等待',
             water: stage.water || '0', // 水量与前一阶段相同
+            independentWater: '0',
+            cumulativeWater: String(currentCumulativeWater),
             detail: '',
             startTime: prevStageTime + stagePourTime,
             endTime: stageTime,
@@ -650,6 +678,8 @@ export function useBrewingContent({
           type: 'wait',
           label: '等待',
           water: stage.water || '0',
+          independentWater: '0',
+          cumulativeWater: stage.water || '0',
           detail: '',
           startTime: prevStageTime,
           endTime: stageTime,
@@ -667,7 +697,11 @@ export function useBrewingContent({
       注水: {
         steps: expandedStages.map(stage => ({
           title: stage.label,
-          items: [`${stage.water}g`, stage.detail], // 添加 g 单位
+          items: [appendGramUnit(stage.water), stage.detail],
+          displayWater: {
+            independent: appendGramUnit(stage.independentWater),
+            cumulative: appendGramUnit(stage.cumulativeWater),
+          },
           note:
             stage.pourType === 'bypass'
               ? '' // Bypass 步骤不显示时间
