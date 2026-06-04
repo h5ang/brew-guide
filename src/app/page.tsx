@@ -73,6 +73,8 @@ import type { BrewingNoteData } from '@/types/app';
 import { updateParameterInfo } from '@/lib/brewing/parameters';
 import BrewingNoteFormModal from '@/components/notes/Form/BrewingNoteFormModal';
 import CoffeeBeans from '@/components/coffee-bean/List';
+import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
+import { useBrewingNoteStore } from '@/lib/stores/brewingNoteStore';
 import {
   loadCustomEquipments,
   saveCustomEquipment,
@@ -287,9 +289,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
   const NAVIGATION_COLLAPSED_STORAGE_KEY = 'navigationCollapsed';
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return (
-      localStorage.getItem(NAVIGATION_COLLAPSED_STORAGE_KEY) === 'true'
-    );
+    return localStorage.getItem(NAVIGATION_COLLAPSED_STORAGE_KEY) === 'true';
   });
 
   // 使用设置相关状态
@@ -659,13 +659,27 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     navigateToStep,
   } = brewingState;
 
+  const hasNavigationCoffeeBeans = useCoffeeBeanStore(
+    state => state.beans.length > 0
+  );
+  const hasNavigationBrewingNotes = useBrewingNoteStore(
+    state => state.notes.length > 0
+  );
+
+  const hasActiveNavigationContent =
+    activeMainTab === '咖啡豆'
+      ? navigationState.visibleTabs.coffeeBean && hasNavigationCoffeeBeans
+      : activeMainTab === '笔记'
+        ? navigationState.visibleTabs.notes && hasNavigationBrewingNotes
+        : true;
+  const isNavigationCollapsible =
+    isDesktopLayout && activeMainTab !== '冲煮' && hasActiveNavigationContent;
+  const isNavigationActuallyCollapsed =
+    isNavigationCollapsed && isNavigationCollapsible;
   const canCollapseNavigation =
-    isDesktopLayout && activeMainTab !== '冲煮' && !isNavigationCollapsed;
+    isNavigationCollapsible && !isNavigationActuallyCollapsed;
   const canToggleNavigation =
-    isDesktopLayout &&
-    activeMainTab !== '冲煮' &&
-    !isNavResizing &&
-    !hasAnyModalOpen;
+    isNavigationCollapsible && !isNavResizing && !hasAnyModalOpen;
 
   const handleCollapseNavigation = useCallback(() => {
     if (!canCollapseNavigation) return;
@@ -686,10 +700,11 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
 
   useEffect(() => {
     if (!isNavigationCollapsed) return;
-    if (!isDesktopLayout || activeMainTab === '冲煮') {
+    if (!isNavigationCollapsible) {
+      localStorage.setItem(NAVIGATION_COLLAPSED_STORAGE_KEY, 'false');
       setIsNavigationCollapsed(false);
     }
-  }, [activeMainTab, isDesktopLayout, isNavigationCollapsed]);
+  }, [isNavigationCollapsed, isNavigationCollapsible]);
 
   useEffect(() => {
     const handleNavigationShortcut = (event: KeyboardEvent) => {
@@ -705,10 +720,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       }
       setIsNavigationCollapsed(prev => {
         const next = !prev;
-        localStorage.setItem(
-          NAVIGATION_COLLAPSED_STORAGE_KEY,
-          String(next)
-        );
+        localStorage.setItem(NAVIGATION_COLLAPSED_STORAGE_KEY, String(next));
         return next;
       });
     };
@@ -3801,41 +3813,38 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     />
   ) : null;
 
-  const collapsedSidebarControl =
-    isDesktopLayout && isNavigationCollapsed ? (
-      <NavigationArrowButton
-        direction="expand"
-        placement="inline"
-        onClick={handleExpandNavigation}
-      />
-    ) : null;
+  const collapsedSidebarControl = isNavigationActuallyCollapsed ? (
+    <NavigationArrowButton
+      direction="expand"
+      placement="inline"
+      onClick={handleExpandNavigation}
+    />
+  ) : null;
 
   const collapsedNavigationDock = useCollapsedNavigationDock();
 
-  const contentNavigationControl =
-    isDesktopLayout && isNavigationCollapsed && activeMainTab !== '冲煮' ? (
-      <CollapsedNavigationDockTrigger
-        triggerRef={collapsedNavigationDock.triggerRef}
-        openOverlay={collapsedNavigationDock.openOverlay}
-        closeOverlay={collapsedNavigationDock.closeOverlay}
-      />
-    ) : null;
+  const contentNavigationControl = isNavigationActuallyCollapsed ? (
+    <CollapsedNavigationDockTrigger
+      triggerRef={collapsedNavigationDock.triggerRef}
+      openOverlay={collapsedNavigationDock.openOverlay}
+      closeOverlay={collapsedNavigationDock.closeOverlay}
+    />
+  ) : null;
 
-  const collapsedNavigationOverlay =
-    isDesktopLayout && isNavigationCollapsed && activeMainTab !== '冲煮' ? (
-      <CollapsedNavigationDockOverlay
-        isOverlayOpen={collapsedNavigationDock.isOverlayOpen}
-        overlayRef={collapsedNavigationDock.overlayRef}
-        openOverlay={collapsedNavigationDock.openOverlay}
-        closeOverlay={collapsedNavigationDock.closeOverlay}
-        overlayContent={renderNavigationBar(
-          'collapsed-navigation-overlay',
-          collapsedSidebarControl,
-          'always',
-          false
-        )}
-      />
-    ) : null;
+  const collapsedNavigationOverlay = isNavigationActuallyCollapsed ? (
+    <CollapsedNavigationDockOverlay
+      isOverlayOpen={collapsedNavigationDock.isOverlayOpen}
+      overlayRef={collapsedNavigationDock.overlayRef}
+      openOverlay={collapsedNavigationDock.openOverlay}
+      closeOverlay={collapsedNavigationDock.closeOverlay}
+      overlayContent={renderNavigationBar(
+        'collapsed-navigation-overlay',
+        collapsedSidebarControl,
+        'always',
+        false
+      )}
+    />
+  ) : null;
 
   return (
     <>
@@ -3851,7 +3860,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
             ),
             // CSS 变量用于 BottomActionBar 等组件
             '--nav-panel-width':
-              isDesktopLayout && !isNavigationCollapsed
+              isDesktopLayout && !isNavigationActuallyCollapsed
                 ? `${navPanelWidth}px`
                 : '0px',
             '--detail-panel-width':
@@ -3863,7 +3872,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       >
         <PWAInstallBanner />
         <div className="flex h-full flex-col md:flex-row">
-          {!isNavigationCollapsed && (
+          {!isNavigationActuallyCollapsed && (
             <div className="md:h-full md:shrink-0 md:overflow-hidden">
               {renderNavigationBar('navigation-bar', expandedSidebarControl)}
             </div>
@@ -3872,7 +3881,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
           {collapsedNavigationOverlay}
 
           {/* 导航栏拖动条 - 侧边导航布局（md 及以上）显示，放在 NavigationBar 和 main 之间避免被裁切 */}
-          {isDesktopLayout && !isNavigationCollapsed && (
+          {isDesktopLayout && !isNavigationActuallyCollapsed && (
             <div
               className="group relative z-10 hidden h-full w-0 cursor-col-resize select-none md:block"
               onMouseDown={handleNavResizeStart}
