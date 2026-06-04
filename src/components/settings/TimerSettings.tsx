@@ -45,12 +45,14 @@ const TimerSettings: React.FC<TimerSettingsProps> = ({
   );
 
   // 控制动画状态
-  const [shouldRender, setShouldRender] = React.useState(true);
   const [isVisible, setIsVisible] = React.useState(false);
 
   // 用于保存最新的 onClose 引用
   const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // 关闭处理函数（带动画）
   const handleCloseWithAnimation = React.useCallback(() => {
@@ -82,53 +84,12 @@ const TimerSettings: React.FC<TimerSettingsProps> = ({
     });
   }, []);
 
-  if (!shouldRender) return null;
-
   return (
     <SettingPage title="计时器" isVisible={isVisible} onClose={handleClose}>
       {/* 预览区域 */}
       <TimerPreview settings={settings} />
 
-      <SettingSection title="布局" className="mt-6">
-        <SettingRow label="阶段信息布局反转">
-          <SettingToggle
-            checked={settings.layoutSettings?.stageInfoReversed || false}
-            onChange={checked => {
-              const newLayoutSettings = {
-                ...settings.layoutSettings,
-                stageInfoReversed: checked,
-              };
-              handleChange('layoutSettings', newLayoutSettings);
-            }}
-          />
-        </SettingRow>
-        <SettingRow label="控制区布局反转" isLast>
-          <SettingToggle
-            checked={settings.layoutSettings?.controlsReversed || false}
-            onChange={checked => {
-              const newLayoutSettings = {
-                ...settings.layoutSettings,
-                controlsReversed: checked,
-              };
-              handleChange('layoutSettings', newLayoutSettings);
-            }}
-          />
-        </SettingRow>
-      </SettingSection>
-
-      <SettingSection title="显示">
-        <SettingRow label="始终显示计时器信息">
-          <SettingToggle
-            checked={settings.layoutSettings?.alwaysShowTimerInfo || false}
-            onChange={checked => {
-              const newLayoutSettings = {
-                ...settings.layoutSettings,
-                alwaysShowTimerInfo: checked,
-              };
-              handleChange('layoutSettings', newLayoutSettings);
-            }}
-          />
-        </SettingRow>
+      <SettingSection title="显示" className="mt-6">
         <SettingRow label="显示流速">
           <SettingToggle
             checked={settings.showFlowRate || false}

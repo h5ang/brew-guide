@@ -5,10 +5,7 @@ import { useSettingsStore } from '@/lib/stores/settingsStore';
 
 // 布局设置接口
 export interface LayoutSettings {
-  stageInfoReversed?: boolean; // 是否反转阶段信息布局
   progressBarHeight?: number; // 进度条高度（像素）
-  controlsReversed?: boolean; // 是否反转底部控制区布局
-  alwaysShowTimerInfo?: boolean; // 是否始终显示计时器信息区域
   dataFontSize?: '2xl' | '3xl' | '4xl'; // 数据显示字体大小
   stepDisplayMode?: 'independent' | 'cumulative' | 'time'; // 步骤时间显示模式：独立、累计、时间
 }
@@ -143,69 +140,6 @@ const BrewingTimerSettings: React.FC<BrewingTimerSettingsProps> = ({
                   }}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                  阶段信息布局反转
-                </span>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={localLayoutSettings?.stageInfoReversed || false}
-                    onChange={e => {
-                      const newSettings = {
-                        ...localLayoutSettings,
-                        stageInfoReversed: e.target.checked,
-                      };
-                      handleLayoutChange(newSettings);
-                    }}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-5 w-9 rounded-full bg-neutral-200 peer-checked:bg-neutral-600 after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full dark:bg-neutral-700 dark:peer-checked:bg-neutral-500" />
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                  控制区布局反转
-                </span>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={localLayoutSettings?.controlsReversed || false}
-                    onChange={e => {
-                      const newSettings = {
-                        ...localLayoutSettings,
-                        controlsReversed: e.target.checked,
-                      };
-                      handleLayoutChange(newSettings);
-                    }}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-5 w-9 rounded-full bg-neutral-200 peer-checked:bg-neutral-600 after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full dark:bg-neutral-700 dark:peer-checked:bg-neutral-500" />
-                </label>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                  始终显示计时器信息
-                </span>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={localLayoutSettings?.alwaysShowTimerInfo || false}
-                    onChange={e => {
-                      const newSettings = {
-                        ...localLayoutSettings,
-                        alwaysShowTimerInfo: e.target.checked,
-                      };
-                      handleLayoutChange(newSettings);
-                    }}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-5 w-9 rounded-full bg-neutral-200 peer-checked:bg-neutral-600 after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full dark:bg-neutral-700 dark:peer-checked:bg-neutral-500" />
-                </label>
-              </div>
-
               <div className="flex items-center justify-between">
                 <span className="text-sm text-neutral-700 dark:text-neutral-300">
                   显示流速

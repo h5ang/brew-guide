@@ -92,9 +92,6 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
   // 设置默认值
   const layoutSettings: LayoutSettings = settings.layoutSettings || {};
   const showFlowRate = settings.showFlowRate ?? false;
-  const stageInfoReversed = layoutSettings.stageInfoReversed ?? false;
-  const controlsReversed = layoutSettings.controlsReversed ?? false;
-  const alwaysShowTimerInfo = layoutSettings.alwaysShowTimerInfo ?? true;
   const progressBarHeight = layoutSettings.progressBarHeight ?? 4;
 
   // 获取字体大小类名 - 使用明确的类名以确保 Tailwind 包含这些样式
@@ -113,275 +110,225 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
       <div className="relative w-full">
         <div className="flex flex-col justify-end px-6 py-3">
           {/* 阶段信息和进度条区域 */}
-          {alwaysShowTimerInfo && (
-            <div className="space-y-3">
-              {/* 当前阶段信息 */}
-              <div
-                className={`flex items-baseline border-l-2 border-neutral-800 pl-3 dark:border-neutral-100 ${
-                  stageInfoReversed ? 'flex-row-reverse' : 'flex-row'
-                } justify-between`}
-              >
-                <div className={stageInfoReversed ? 'text-right' : 'text-left'}>
+          <div className="space-y-3">
+            {/* 当前阶段信息 */}
+            <div className="flex flex-row items-baseline justify-between border-l-2 border-neutral-800 pl-3 dark:border-neutral-100">
+              <div className="text-left">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                  当前阶段
+                </div>
+                <div className="mt-1 text-sm font-medium tracking-wide">
+                  {timerData.currentStage.label}
+                </div>
+              </div>
+              <div className="flex flex-row items-baseline text-right">
+                <div className="mr-0">
                   <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                    当前阶段
+                    目标时间
                   </div>
-                  <div className="mt-1 text-sm font-medium tracking-wide">
-                    {timerData.currentStage.label}
+                  <div className="mt-1 text-sm font-medium tracking-wide tabular-nums">
+                    {formatTime(timerData.currentStage.endTime, true)}
                   </div>
                 </div>
-                <div
-                  className={`flex flex-row items-baseline ${
-                    stageInfoReversed ? 'text-left' : 'text-right'
-                  }`}
-                >
-                  <div className={stageInfoReversed ? 'mr-4' : 'mr-0'}>
+                <div className={`${showFlowRate ? 'min-w-20' : 'min-w-24'}`}>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    目标水量
+                  </div>
+                  <div
+                    className={`mt-1 flex flex-col text-sm font-medium tracking-wide tabular-nums`}
+                  >
+                    <div className="flex items-baseline justify-end">
+                      <span>{currentWater}</span>
+                      <span className="mx-0.5 text-neutral-300 dark:text-neutral-600">
+                        /
+                      </span>
+                      <span>{timerData.currentStage.water}</span>
+                    </div>
+                  </div>
+                </div>
+                {showFlowRate && (
+                  <div className="min-w-14">
                     <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                      目标时间
+                      流速
                     </div>
                     <div className="mt-1 text-sm font-medium tracking-wide tabular-nums">
-                      {formatTime(timerData.currentStage.endTime, true)}
+                      {timerData.flowRate.toFixed(1)}
                     </div>
                   </div>
-                  <div className={`${showFlowRate ? 'min-w-20' : 'min-w-24'}`}>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                      目标水量
-                    </div>
-                    <div
-                      className={`mt-1 flex flex-col text-sm font-medium tracking-wide tabular-nums`}
-                    >
-                      <div
-                        className={`flex items-baseline ${
-                          stageInfoReversed ? 'justify-start' : 'justify-end'
-                        }`}
-                      >
-                        <span>{currentWater}</span>
-                        <span className="mx-0.5 text-neutral-300 dark:text-neutral-600">
-                          /
-                        </span>
-                        <span>{timerData.currentStage.water}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {showFlowRate && (
-                    <div className="min-w-14">
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                        流速
-                      </div>
-                      <div className="mt-1 text-sm font-medium tracking-wide tabular-nums">
-                        {timerData.flowRate.toFixed(1)}
-                      </div>
-                    </div>
-                  )}
+                )}
+              </div>
+            </div>
+
+            {/* 下一阶段信息 */}
+            <div className="flex flex-row items-baseline justify-between border-l border-neutral-300 pl-3 dark:border-neutral-700">
+              <div className="text-left">
+                <div className="flex items-center justify-start gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  <span>下一步</span>
+                </div>
+                <div className="mt-1">
+                  <span className="text-sm font-medium tracking-wide text-neutral-600 dark:text-neutral-400">
+                    {timerData.nextStage.label}
+                  </span>
                 </div>
               </div>
+              <div className="flex flex-row items-baseline text-right">
+                <div className="mr-0">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    目标时间
+                  </div>
+                  <div className="mt-1 text-sm font-medium tracking-wide text-neutral-600 tabular-nums dark:text-neutral-400">
+                    {formatTime(timerData.nextStage.endTime, true)}
+                  </div>
+                </div>
+                <div className={`${showFlowRate ? 'min-w-20' : 'min-w-24'}`}>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    目标水量
+                  </div>
+                  <div className="mt-1 text-right text-sm font-medium tracking-wide text-neutral-600 tabular-nums dark:text-neutral-400">
+                    {timerData.nextStage.water}
+                  </div>
+                </div>
+                {showFlowRate && (
+                  <div className="min-w-14">
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                      流速
+                    </div>
+                    <div className="mt-1 text-right text-sm font-medium tracking-wide text-neutral-600 tabular-nums dark:text-neutral-400">
+                      {timerData.nextStage.type === 'pour' ? '2.5' : '-'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-              {/* 下一阶段信息 */}
-              <div
-                className={`flex items-baseline border-l border-neutral-300 pl-3 dark:border-neutral-700 ${
-                  stageInfoReversed ? 'flex-row-reverse' : 'flex-row'
-                } justify-between`}
-              >
-                <div className={stageInfoReversed ? 'text-right' : 'text-left'}>
+            {/* 进度条 */}
+            <div className="relative mb-3">
+              {/* 阶段分隔线 - 始终显示 */}
+              {expandedStages.map((stage, index) => {
+                const totalTime =
+                  expandedStages[expandedStages.length - 1].endTime;
+                const percentage = (stage.endTime / totalTime) * 100;
+                return (
                   <div
-                    className={`flex items-center ${
-                      stageInfoReversed ? 'justify-end' : 'justify-start'
-                    } gap-2 text-xs text-neutral-500 dark:text-neutral-400`}
-                  >
-                    <span>下一步</span>
-                  </div>
-                  <div className="mt-1">
-                    <span className="text-sm font-medium tracking-wide text-neutral-600 dark:text-neutral-400">
-                      {timerData.nextStage.label}
-                    </span>
-                  </div>
-                </div>
-                <div
-                  className={`flex flex-row items-baseline ${
-                    stageInfoReversed ? 'text-left' : 'text-right'
-                  }`}
-                >
-                  <div className={stageInfoReversed ? 'mr-4' : 'mr-0'}>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                      目标时间
-                    </div>
-                    <div className="mt-1 text-sm font-medium tracking-wide tabular-nums text-neutral-600 dark:text-neutral-400">
-                      {formatTime(timerData.nextStage.endTime, true)}
-                    </div>
-                  </div>
-                  <div className={`${showFlowRate ? 'min-w-20' : 'min-w-24'}`}>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                      目标水量
-                    </div>
-                    <div
-                      className={`mt-1 text-sm font-medium tracking-wide tabular-nums text-neutral-600 dark:text-neutral-400 ${
-                        stageInfoReversed ? 'text-left' : 'text-right'
-                      }`}
-                    >
-                      {timerData.nextStage.water}
-                    </div>
-                  </div>
-                  {showFlowRate && (
-                    <div className="min-w-14">
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                        流速
-                      </div>
-                      <div
-                        className={`mt-1 text-sm font-medium tracking-wide tabular-nums text-neutral-600 dark:text-neutral-400 ${
-                          stageInfoReversed ? 'text-left' : 'text-right'
-                        }`}
-                      >
-                        {timerData.nextStage.type === 'pour' ? '2.5' : '-'}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    key={`divider-end-${stage.endTime}-${index}`}
+                    className="absolute top-0 w-[2px] bg-neutral-50 dark:bg-neutral-900"
+                    style={{
+                      left: `${percentage}%`,
+                      height: `${progressBarHeight}px`,
+                      opacity: 0.8,
+                    }}
+                  />
+                );
+              })}
 
-              {/* 进度条 */}
-              <div className="relative mb-3">
-                {/* 阶段分隔线 - 始终显示 */}
+              <div
+                className="w-full overflow-hidden bg-neutral-200/50 dark:bg-neutral-800"
+                style={{
+                  height: `${progressBarHeight}px`,
+                }}
+              >
+                {/* 阶段分隔线 */}
                 {expandedStages.map((stage, index) => {
+                  if (index === 0) return null;
+
                   const totalTime =
                     expandedStages[expandedStages.length - 1].endTime;
-                  const percentage = (stage.endTime / totalTime) * 100;
+                  const percentage = (stage.startTime / totalTime) * 100;
+
                   return (
                     <div
-                      key={`divider-end-${stage.endTime}-${index}`}
-                      className="absolute top-0 w-[2px] bg-neutral-50 dark:bg-neutral-900"
+                      key={`divider-${stage.startTime}-${index}`}
+                      className="absolute top-0 bottom-0 z-10 w-[1.5px] bg-neutral-100 dark:bg-neutral-900"
                       style={{
                         left: `${percentage}%`,
                         height: `${progressBarHeight}px`,
-                        opacity: 0.8,
                       }}
                     />
                   );
                 })}
 
-                <div
-                  className="w-full overflow-hidden bg-neutral-200/50 dark:bg-neutral-800"
-                  style={{
-                    height: `${progressBarHeight}px`,
-                  }}
-                >
-                  {/* 阶段分隔线 */}
-                  {expandedStages.map((stage, index) => {
-                    if (index === 0) return null;
+                {/* 等待阶段的斜纹背景 */}
+                {expandedStages.map((stage, index) => {
+                  const totalTime =
+                    expandedStages[expandedStages.length - 1].endTime;
+                  const startPercentage = (stage.startTime / totalTime) * 100;
+                  const width =
+                    ((stage.endTime - stage.startTime) / totalTime) * 100;
 
-                    const totalTime =
-                      expandedStages[expandedStages.length - 1].endTime;
-                    const percentage = (stage.startTime / totalTime) * 100;
-
-                    return (
-                      <div
-                        key={`divider-${stage.startTime}-${index}`}
-                        className="absolute top-0 bottom-0 z-10 w-[1.5px] bg-neutral-100 dark:bg-neutral-900"
-                        style={{
-                          left: `${percentage}%`,
-                          height: `${progressBarHeight}px`,
-                        }}
-                      />
-                    );
-                  })}
-
-                  {/* 等待阶段的斜纹背景 */}
-                  {expandedStages.map((stage, index) => {
-                    const totalTime =
-                      expandedStages[expandedStages.length - 1].endTime;
-                    const startPercentage = (stage.startTime / totalTime) * 100;
-                    const width =
-                      ((stage.endTime - stage.startTime) / totalTime) * 100;
-
-                    return stage.type === 'wait' ? (
-                      <div
-                        key={`waiting-${stage.endTime}-${index}`}
-                        className="absolute"
-                        style={{
-                          left: `${startPercentage}%`,
-                          width: `${width}%`,
-                          height: `${progressBarHeight}px`,
-                          background: `repeating-linear-gradient(
+                  return stage.type === 'wait' ? (
+                    <div
+                      key={`waiting-${stage.endTime}-${index}`}
+                      className="absolute"
+                      style={{
+                        left: `${startPercentage}%`,
+                        width: `${width}%`,
+                        height: `${progressBarHeight}px`,
+                        background: `repeating-linear-gradient(
                                                         45deg,
                                                         transparent,
                                                         transparent 4px,
                                                         rgba(0, 0, 0, 0.1) 4px,
                                                         rgba(0, 0, 0, 0.1) 8px
                                                     )`,
-                        }}
-                      />
-                    ) : null;
-                  })}
+                      }}
+                    />
+                  ) : null;
+                })}
 
-                  {/* 进度指示器 */}
-                  <div
-                    className="h-full bg-neutral-800 dark:bg-neutral-100"
-                    style={{
-                      width: `${(currentTime / timerData.totalTime) * 100}%`,
-                    }}
-                  />
+                {/* 进度指示器 */}
+                <div
+                  className="h-full bg-neutral-800 dark:bg-neutral-100"
+                  style={{
+                    width: `${(currentTime / timerData.totalTime) * 100}%`,
+                  }}
+                />
+              </div>
+
+              {/* 时间标记 */}
+              <div className="relative mt-1 h-3 w-full">
+                <div
+                  className="absolute top-0 text-[9px] font-medium text-neutral-600 tabular-nums dark:text-neutral-300"
+                  style={{
+                    left: `${(timerData.currentStage.endTime / timerData.totalTime) * 100}%`,
+                    transform: 'translateX(-100%)',
+                  }}
+                >
+                  {formatTime(timerData.currentStage.endTime, true)}
                 </div>
 
-                {/* 时间标记 */}
-                <div className="relative mt-1 h-3 w-full">
-                  <div
-                    className="absolute top-0 text-[9px] font-medium tabular-nums text-neutral-600 dark:text-neutral-300"
-                    style={{
-                      left: `${(timerData.currentStage.endTime / timerData.totalTime) * 100}%`,
-                      transform: 'translateX(-100%)',
-                    }}
-                  >
-                    {formatTime(timerData.currentStage.endTime, true)}
-                  </div>
-
-                  <div className="absolute top-0 right-0 text-[9px] font-medium tabular-nums text-neutral-600 dark:text-neutral-300">
-                    {formatTime(timerData.totalTime, true)}
-                  </div>
+                <div className="absolute top-0 right-0 text-[9px] font-medium text-neutral-600 tabular-nums dark:text-neutral-300">
+                  {formatTime(timerData.totalTime, true)}
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* 控制区域 */}
-          <div
-            className={`flex items-center ${
-              controlsReversed ? 'flex-row-reverse' : 'flex-row'
-            } min-w-0 justify-between gap-2`}
-          >
+          <div className="flex min-w-0 flex-row items-center justify-between gap-2">
             <div
               className={`grid grid-cols-[auto_auto_auto] ${
                 showFlowRate ? 'gap-2 sm:gap-4' : 'gap-4 sm:gap-8'
               } min-w-0 flex-1 overflow-hidden`}
             >
               {/* 时间显示 */}
-              <div
-                className={`flex flex-col ${
-                  controlsReversed ? 'items-end' : 'items-start'
-                }`}
-              >
+              <div className="flex flex-col items-start">
                 <span className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
                   时间
                 </span>
                 <div
-                  className={`timer-font min-w-[3ch] ${fontSizeClass} font-light tracking-widest text-neutral-800 dark:text-neutral-100 ${
-                    controlsReversed ? 'text-right' : 'text-left'
-                  } tabular-nums`}
+                  className={`timer-font min-w-[3ch] ${fontSizeClass} text-left font-light tracking-widest text-neutral-800 tabular-nums dark:text-neutral-100`}
                 >
                   {formatTime(currentTime)}
                 </div>
               </div>
 
               {/* 水量显示 */}
-              <div
-                className={`flex flex-col ${
-                  controlsReversed ? 'items-end' : 'items-start'
-                }`}
-              >
+              <div className="flex flex-col items-start">
                 <span className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
                   水量
                 </span>
                 <div
-                  className={`timer-font min-w-[3ch] ${fontSizeClass} font-light tracking-widest text-neutral-800 dark:text-neutral-100 ${
-                    controlsReversed ? 'text-right' : 'text-left'
-                  } tabular-nums`}
+                  className={`timer-font min-w-[3ch] ${fontSizeClass} text-left font-light tracking-widest text-neutral-800 tabular-nums dark:text-neutral-100`}
                 >
                   <span>{currentWater}</span>
                   <span className="ml-1 text-sm text-neutral-500 dark:text-neutral-400">
@@ -392,18 +339,12 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
 
               {/* 流速显示 */}
               {showFlowRate && (
-                <div
-                  className={`flex flex-col ${
-                    controlsReversed ? 'items-end' : 'items-start'
-                  }`}
-                >
+                <div className="flex flex-col items-start">
                   <span className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">
                     流速
                   </span>
                   <div
-                    className={`timer-font min-w-[2.5ch] ${fontSizeClass} font-light tracking-widest text-neutral-800 dark:text-neutral-100 ${
-                      controlsReversed ? 'text-right' : 'text-left'
-                    } tabular-nums`}
+                    className={`timer-font min-w-[2.5ch] ${fontSizeClass} text-left font-light tracking-widest text-neutral-800 tabular-nums dark:text-neutral-100`}
                   >
                     <span>{timerData.flowRate.toFixed(1)}</span>
                   </div>
@@ -412,13 +353,7 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
             </div>
 
             {/* 控制按钮 */}
-            <div
-              className={`flex flex-shrink-0 items-center ${
-                controlsReversed
-                  ? 'flex-row-reverse space-x-3 space-x-reverse'
-                  : 'flex-row space-x-3'
-              }`}
-            >
+            <div className="flex flex-shrink-0 flex-row items-center space-x-3">
               <button
                 className={`${showFlowRate ? 'h-11 w-11 sm:h-12 sm:w-12' : 'h-12 w-12 sm:h-14 sm:w-14'} flex flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400`}
               >

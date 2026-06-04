@@ -47,11 +47,9 @@ export const defaultSettings: AppSettings = {
 
   // 布局设置
   layoutSettings: {
-    stageInfoReversed: false,
     progressBarHeight: 12,
-    controlsReversed: false,
-    alwaysShowTimerInfo: true,
     dataFontSize: '2xl',
+    stepDisplayMode: 'cumulative',
   },
 
   // 雷达图设置
@@ -318,6 +316,7 @@ const mergeSettingsWithDefaults = (
   return {
     ...defaultSettings,
     ...supportedSettings,
+    layoutSettings: normalizeLayoutSettings(settings?.layoutSettings),
     navigationSettings: normalizeNavigationSettings(
       settings?.navigationSettings
     ),
@@ -325,6 +324,19 @@ const mergeSettingsWithDefaults = (
       settings?.estimatedCupDoseSettings
     ),
     calendarSync: normalizeCalendarSyncSettings(settings?.calendarSync),
+  };
+};
+
+const normalizeLayoutSettings = (
+  layout?: Partial<NonNullable<AppSettings['layoutSettings']>> | null
+): NonNullable<AppSettings['layoutSettings']> => {
+  const defaultLayout = defaultSettings.layoutSettings!;
+
+  return {
+    progressBarHeight:
+      layout?.progressBarHeight ?? defaultLayout.progressBarHeight,
+    dataFontSize: layout?.dataFontSize ?? defaultLayout.dataFontSize,
+    stepDisplayMode: layout?.stepDisplayMode ?? defaultLayout.stepDisplayMode,
   };
 };
 
@@ -361,11 +373,14 @@ export const useSettingsStore = create<SettingsStore>()(
             mergedSettings.useClassicNotesListStyle = true;
           }
 
-          if (
+          const shouldPersistMergedSettings =
             mergedSettings.activeSyncType !== stored.data.activeSyncType ||
             mergedSettings.supabaseBackupProvider !==
-              stored.data.supabaseBackupProvider
-          ) {
+              stored.data.supabaseBackupProvider ||
+            JSON.stringify(mergedSettings.layoutSettings) !==
+              JSON.stringify(stored.data.layoutSettings);
+
+          if (shouldPersistMergedSettings) {
             await db.appSettings.put({ id: 'main', data: mergedSettings });
           }
 
@@ -396,7 +411,14 @@ export const useSettingsStore = create<SettingsStore>()(
 
     updateSettings: async updates => {
       const currentSettings = get().settings;
-      const newSettings = { ...currentSettings, ...updates };
+      const newSettings = {
+        ...currentSettings,
+        ...updates,
+        layoutSettings:
+          updates.layoutSettings === undefined
+            ? currentSettings.layoutSettings
+            : normalizeLayoutSettings(updates.layoutSettings),
+      };
 
       try {
         await db.appSettings.put({ id: 'main', data: newSettings });
@@ -417,26 +439,18 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // 确保所有字段都有值，使用类型断言来确保类型安全
       const newLayoutSettings: NonNullable<AppSettings['layoutSettings']> = {
-        stageInfoReversed:
-          layout.stageInfoReversed ??
-          currentLayout?.stageInfoReversed ??
-          defaultLayout.stageInfoReversed,
         progressBarHeight:
           layout.progressBarHeight ??
           currentLayout?.progressBarHeight ??
           defaultLayout.progressBarHeight,
-        controlsReversed:
-          layout.controlsReversed ??
-          currentLayout?.controlsReversed ??
-          defaultLayout.controlsReversed,
-        alwaysShowTimerInfo:
-          layout.alwaysShowTimerInfo ??
-          currentLayout?.alwaysShowTimerInfo ??
-          defaultLayout.alwaysShowTimerInfo,
         dataFontSize:
           layout.dataFontSize ??
           currentLayout?.dataFontSize ??
           defaultLayout.dataFontSize,
+        stepDisplayMode:
+          layout.stepDisplayMode ??
+          currentLayout?.stepDisplayMode ??
+          defaultLayout.stepDisplayMode,
       };
       await get().updateSettings({ layoutSettings: newLayoutSettings });
     },
