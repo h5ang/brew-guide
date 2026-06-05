@@ -310,7 +310,6 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
       <SettingPage title="评分维度" isVisible={isVisible} onClose={handleClose}>
         <SettingSection
           title={dimensionSectionTitle}
-          footer={`共 ${dimensions.length} 个维度，可在评分表单中按当前顺序展示。`}
           className="-mt-4"
         >
           {dimensions.length === 0 ? (
@@ -348,9 +347,7 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
                     key={dimension.id}
                     value={dimension}
                     label={
-                      dimension.isDefault
-                        ? `${dimension.label} · 默认`
-                        : dimension.label
+                      dimension.label
                     }
                     isLast={index === dimensions.length - 1}
                     isReorderMode={isReorderMode}
