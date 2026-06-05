@@ -71,6 +71,9 @@ interface ParsedStage {
   valveStatus?: 'open' | 'closed';
 }
 
+const compactMethodParamsPattern =
+  /^(\d+(?:\.\d+)?)g\s*\|\s*(1:(\d+(?:\.\d+)?))\s*\|\s*([^|\n]+)\s*\|\s*([^|\n]+)(?:\s*\|\s*意式)?$/m;
+
 const readableTextSectionSeparator = /\n[ \t]*---[ \t]*\n/;
 const coffeeBeanTextHeaderPattern = /【咖啡豆(?:信息)?】/;
 
@@ -97,6 +100,27 @@ function splitCoffeeBeanTextSections(text: string): string[] {
         : section.slice(headerMatch.index).trim();
     })
     .filter(startsWithCoffeeBeanTextHeader);
+}
+
+function parseCompactMethodParams(
+  text: string
+): Pick<
+  Method['params'],
+  'coffee' | 'water' | 'ratio' | 'grindSize' | 'temp'
+> | null {
+  const match = text.match(compactMethodParamsPattern);
+  if (!match) return null;
+
+  const coffee = `${match[1]}g`;
+  const ratio = match[2];
+
+  return {
+    coffee,
+    water: `${Math.round(Number(match[1]) * Number(match[3]))}g`,
+    ratio,
+    grindSize: match[4].trim(),
+    temp: match[5].trim(),
+  };
 }
 
 /**
@@ -1199,21 +1223,9 @@ function parseMethodText(
     method.name = nameMatch[1].trim();
   }
 
-  // 尝试解析 v2 简洁格式的参数行：15g | 1:15 | 中细 | 93°C
-  const compactParamsMatch = text.match(
-    /(\d+g)\s*\|\s*(1:\d+)\s*\|\s*([^|]+)\s*\|\s*(\d+°?C)/
-  );
-  if (compactParamsMatch) {
-    method.params.coffee = compactParamsMatch[1].trim();
-    method.params.ratio = compactParamsMatch[2].trim();
-    method.params.grindSize = compactParamsMatch[3].trim();
-    method.params.temp = compactParamsMatch[4].trim();
-    // 根据比例计算水量
-    const coffeeNum = parseInt(method.params.coffee);
-    const ratioNum = parseInt(method.params.ratio.split(':')[1]);
-    if (coffeeNum && ratioNum) {
-      method.params.water = `${coffeeNum * ratioNum}g`;
-    }
+  const compactParams = parseCompactMethodParams(text);
+  if (compactParams) {
+    Object.assign(method.params, compactParams);
   } else {
     // 兼容旧格式：逐行提取参数
     const coffeeMatch = text.match(/咖啡粉量:\s*(.*?)(?:\n|$)/);
