@@ -110,7 +110,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
   }, []);
 
   return (
-    <SettingPage title="通知" isVisible={isVisible} onClose={handleClose}>
+    <SettingPage title="提醒通知" isVisible={isVisible} onClose={handleClose}>
       {showGeneralNotificationSection && (
         <SettingSection title="通用" className="-mt-4">
           {showBrewingNotificationSound && (

@@ -152,7 +152,7 @@ const DisplaySettings: React.FC<DisplaySettingsProps> = ({
   }
 
   return (
-    <SettingPage title="外观与字体" isVisible={isVisible} onClose={handleClose}>
+    <SettingPage title="外观" isVisible={isVisible} onClose={handleClose}>
       {/* 外观设置组 */}
       <SettingSection title="外观" className="-mt-4">
         <SettingRow label="外观模式" isLast>

@@ -19,8 +19,9 @@ import {
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
 import {
   canDisableCoffeeBeanView,
+  COFFEE_BEAN_MAIN_VIEW,
+  CONFIGURABLE_COFFEE_BEAN_VIEW_ORDER,
   canDisableMainNavigationTab,
-  COFFEE_BEAN_VIEW_ORDER,
   deriveNavigationSettings,
   mergeNavigationSettings,
   normalizeNavigationSettings,
@@ -107,7 +108,7 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
       if (
         deriveNavigationSettings(nextNavigation).renderedMainTabs.length === 0
       ) {
-        showToast({ type: 'error', title: '至少需要保留一个主导航标签页' });
+        showToast({ type: 'error', title: '至少需要保留一个应用功能' });
         return false;
       }
 
@@ -127,7 +128,7 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
       currentNavigation.visibleTabs[tab] &&
       !canDisableMainNavigationTab(settings.navigationSettings, tab)
     ) {
-      showToast({ type: 'error', title: '至少需要保留一个主导航标签页' });
+      showToast({ type: 'error', title: '至少需要保留一个应用功能' });
       return;
     }
 
@@ -193,19 +194,12 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
   const showCoffeeBeanViewSettings = derivedNavigation.visibleTabs.coffeeBean;
 
   return (
-    <SettingPage title="导航栏" isVisible={isVisible} onClose={handleClose}>
-      <SettingSection title="通用" className="-mt-4">
-        <SettingRow label="简化标签名称" isLast>
-          <SettingToggle
-            checked={settings.simplifiedViewLabels ?? false}
-            onChange={checked =>
-              void updateSettings({ simplifiedViewLabels: checked })
-            }
-          />
-        </SettingRow>
-      </SettingSection>
-
-      <SettingSection title="主导航显示" footer="至少需要保留一个主导航标签页">
+    <SettingPage title="应用功能" isVisible={isVisible} onClose={handleClose}>
+      <SettingSection
+        title="启用的功能"
+        footer="关闭后隐藏对应入口，并简化相关流程；至少保留一个功能"
+        className="-mt-4"
+      >
         <SettingRow label="冲煮">
           <SettingToggle
             checked={derivedNavigation.visibleTabs.brewing}
@@ -218,9 +212,7 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
             onChange={() => handleMainTabToggle('brewing')}
           />
         </SettingRow>
-        <SettingRow
-          label={settings.simplifiedViewLabels ? '库存' : '咖啡豆库存'}
-        >
+        <SettingRow label={getLabel(COFFEE_BEAN_MAIN_VIEW)}>
           <SettingToggle
             checked={derivedNavigation.visibleTabs.coffeeBean}
             disabled={
@@ -245,14 +237,14 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
       </SettingSection>
 
       {showCoffeeBeanViewSettings &&
-        COFFEE_BEAN_VIEW_ORDER.some(
+        CONFIGURABLE_COFFEE_BEAN_VIEW_ORDER.some(
           view => !derivedNavigation.pinnedViews.includes(view)
         ) && (
           <SettingSection
             title="视图显示"
             footer="控制在咖啡豆页面下拉菜单中显示的视图选项"
           >
-            {COFFEE_BEAN_VIEW_ORDER.filter(
+            {CONFIGURABLE_COFFEE_BEAN_VIEW_ORDER.filter(
               view => !derivedNavigation.pinnedViews.includes(view)
             ).map((view, index, array) => (
               <SettingRow
@@ -276,9 +268,9 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
       {showCoffeeBeanViewSettings && (
         <SettingSection
           title="固定视图"
-          footer="开启后，该视图将作为独立标签页显示在主导航栏右侧"
+          footer="把常用视图作为独立入口显示在主导航栏"
         >
-          {COFFEE_BEAN_VIEW_ORDER.map((view, index, array) => (
+          {CONFIGURABLE_COFFEE_BEAN_VIEW_ORDER.map((view, index, array) => (
             <SettingRow
               key={view}
               label={getLabel(view)}
@@ -292,6 +284,17 @@ const NavigationSettings: React.FC<NavigationSettingsProps> = ({
           ))}
         </SettingSection>
       )}
+
+      <SettingSection title="显示偏好">
+        <SettingRow label="简化标签名称" isLast>
+          <SettingToggle
+            checked={settings.simplifiedViewLabels ?? false}
+            onChange={checked =>
+              void updateSettings({ simplifiedViewLabels: checked })
+            }
+          />
+        </SettingRow>
+      </SettingSection>
     </SettingPage>
   );
 };
