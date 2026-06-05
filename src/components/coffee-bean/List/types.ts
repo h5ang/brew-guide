@@ -1,6 +1,7 @@
 import { CoffeeBean } from '@/types/app';
 import { VIEW_OPTIONS, VIEW_LABELS, type ViewOption } from './constants';
 import type { ReactNode } from 'react';
+import type { NavigationSwipeControl } from '@/lib/navigation/navigationSwipe';
 
 // ExtendedCoffeeBean 已移除，直接使用 CoffeeBean
 export type ExtendedCoffeeBean = CoffeeBean;
@@ -41,6 +42,7 @@ export interface CoffeeBeansProps {
   initialViewMode?: ViewOption;
   activeBeanId?: string | null;
   navigationToggleControl?: ReactNode;
+  navigationSwipeControl?: NavigationSwipeControl;
   // 添加设置参数
   settings?: {
     dateDisplayMode?: 'date' | 'flavorPeriod' | 'agingDays';

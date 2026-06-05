@@ -75,6 +75,7 @@ import {
   buildEquipmentNameMap,
   EMPTY_EQUIPMENT_NAME_OVERRIDES,
 } from '@/lib/notes/noteDisplay';
+import { useNavigationSwipe } from '@/lib/navigation/navigationSwipe';
 
 const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   isOpen,
@@ -84,6 +85,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   setShowAlternativeHeader: _setShowAlternativeHeader, // 不再使用，保留以兼容接口
   settings,
   navigationToggleControl,
+  navigationSwipeControl,
 }) => {
   // 用于跟踪用户选择 - 从本地存储初始化
   const [sortOption, setSortOption] = useState<SortOption>(
@@ -1006,6 +1008,8 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
     }
   }, [imageFlowStats, setImageFlowMode, updateViewMode, notes.length]);
 
+  const navigationSwipeHandlers = useNavigationSwipe(navigationSwipeControl);
+
   return (
     <div
       className={`flex h-full flex-col overflow-hidden ${
@@ -1014,7 +1018,12 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
     >
       {/* 笔记筛选分类栏 - 只有当有笔记数据时才显示 */}
       {notes.length > 0 && (
-        <div className="sticky top-0 z-10 flex-none space-y-6 bg-neutral-50 pt-6 md:pt-0 dark:bg-neutral-900">
+        <div
+          className={`sticky top-0 z-10 flex-none space-y-6 bg-neutral-50 ${
+            navigationSwipeControl?.isCollapsed ? 'pt-0' : 'pt-6'
+          } md:pt-0 dark:bg-neutral-900`}
+          {...navigationSwipeHandlers}
+        >
           {/* 数量显示 */}
           <div className="mb-6 flex items-center justify-between px-6">
             <div

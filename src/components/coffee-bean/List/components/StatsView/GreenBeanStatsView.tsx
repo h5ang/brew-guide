@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DateGroupingMode, TypeInventoryStats } from './types';
+import type { NavigationSwipeControl } from '@/lib/navigation/navigationSwipe';
 import { formatNumber } from './utils';
 import {
   globalCache,
@@ -779,6 +780,8 @@ export interface GreenBeanStatsViewProps {
   beanStateType?: 'roasted' | 'green';
   onBeanStateTypeChange?: (type: 'roasted' | 'green') => void;
   showBeanStateSwitch?: boolean;
+  navigationToggleControl?: React.ReactNode;
+  navigationSwipeControl?: NavigationSwipeControl;
   // 内容模式 props（从父组件共享状态）
   contentModeProps?: {
     dateGroupingMode: DateGroupingMode;
@@ -793,6 +796,8 @@ const GreenBeanStatsView: React.FC<GreenBeanStatsViewProps> = ({
   beanStateType = 'green',
   onBeanStateTypeChange,
   showBeanStateSwitch = false,
+  navigationToggleControl,
+  navigationSwipeControl,
   contentModeProps,
 }) => {
   // 是否为内容模式（由父组件管理状态）
@@ -1082,80 +1087,72 @@ const GreenBeanStatsView: React.FC<GreenBeanStatsViewProps> = ({
       ]
     : [];
 
-  // 统计内容
-  const statsContent = (
-    <>
-      {/* 仅在独立模式下渲染 StatsFilterBar */}
-      {!isContentMode && (
-        <div className="sticky top-0 z-10 bg-neutral-50 dark:bg-neutral-900">
-          <StatsFilterBar
-            dateGroupingMode={dateGroupingMode}
-            onDateGroupingModeChange={handleDateGroupingModeChange}
-            selectedDate={selectedDate}
-            onDateClick={setSelectedDate}
-            availableDates={availableDates}
-            dateRangeLabel={dateRangeLabel}
-            beanStateType={beanStateType}
-            onBeanStateTypeChange={onBeanStateTypeChange}
-            showBeanStateSwitch={showBeanStateSwitch}
-          />
-        </div>
-      )}
+  const filterBar = !isContentMode ? (
+    <StatsFilterBar
+      dateGroupingMode={dateGroupingMode}
+      onDateGroupingModeChange={handleDateGroupingModeChange}
+      selectedDate={selectedDate}
+      onDateClick={setSelectedDate}
+      availableDates={availableDates}
+      dateRangeLabel={dateRangeLabel}
+      beanStateType={beanStateType}
+      onBeanStateTypeChange={onBeanStateTypeChange}
+      showBeanStateSwitch={showBeanStateSwitch}
+      navigationToggleControl={navigationToggleControl}
+      navigationSwipeControl={navigationSwipeControl}
+    />
+  ) : null;
 
-      <div className={isContentMode ? 'px-6' : 'mt-5 px-6'}>
-        <div className="flex flex-col items-center">
-          <div className="w-full space-y-5">
-            {/* 概览 */}
+  const statsBody = (
+    <>
+      <div className="flex flex-col items-center">
+        <div className="w-full space-y-5">
+          <StatsCard
+            title="概览"
+            chart={
+              showTrendChart ? (
+                <ConsumptionTrendChart data={trendData} />
+              ) : undefined
+            }
+            stats={overviewStats}
+            extra={
+              isSingleDayView && roastingDetails.length > 0 ? (
+                <RoastingDetails data={roastingDetails} />
+              ) : undefined
+            }
+            onExplain={handleExplain}
+          />
+
+          {todayStatsDisplay.length > 0 && (
             <StatsCard
-              title="概览"
-              chart={
-                showTrendChart ? (
-                  <ConsumptionTrendChart data={trendData} />
-                ) : undefined
-              }
-              stats={overviewStats}
-              extra={
-                isSingleDayView && roastingDetails.length > 0 ? (
-                  <RoastingDetails data={roastingDetails} />
-                ) : undefined
-              }
+              title="今日"
+              stats={todayStatsDisplay}
               onExplain={handleExplain}
             />
+          )}
 
-            {/* 今日 */}
-            {todayStatsDisplay.length > 0 && (
+          {!isHistoricalView &&
+            stats.inventoryByType &&
+            stats.inventoryByType.length > 0 && (
               <StatsCard
-                title="今日"
-                stats={todayStatsDisplay}
+                title="库存"
+                stats={inventoryStats}
+                extra={<InventoryForecast data={stats.inventoryByType} />}
                 onExplain={handleExplain}
               />
             )}
 
-            {/* 库存预测 */}
-            {!isHistoricalView &&
-              stats.inventoryByType &&
-              stats.inventoryByType.length > 0 && (
-                <StatsCard
-                  title="库存"
-                  stats={inventoryStats}
-                  extra={<InventoryForecast data={stats.inventoryByType} />}
-                  onExplain={handleExplain}
-                />
-              )}
-
-            {/* 属性统计 */}
-            {!isSingleDayView && (
-              <>
-                <div className="mb-5 border-t border-neutral-200/40 dark:border-neutral-700/30" />
-                <GreenBeanAttributeStats
-                  beans={beans}
-                  selectedDate={selectedDate}
-                  dateGroupingMode={dateGroupingMode}
-                  onExplain={handleExplain}
-                />
-              </>
-            )}
-          </div>
+          {!isSingleDayView && (
+            <>
+              <div className="mb-5 border-t border-neutral-200/40 dark:border-neutral-700/30" />
+              <GreenBeanAttributeStats
+                beans={beans}
+                selectedDate={selectedDate}
+                dateGroupingMode={dateGroupingMode}
+                onExplain={handleExplain}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -1169,13 +1166,18 @@ const GreenBeanStatsView: React.FC<GreenBeanStatsViewProps> = ({
 
   // 内容模式：返回不包裹容器的内容
   if (isContentMode) {
-    return statsContent;
+    return <div className="px-6">{statsBody}</div>;
   }
 
   // 渲染完整容器
   return (
-    <div className="coffee-bean-stats-container bg-neutral-50 dark:bg-neutral-900">
-      {statsContent}
+    <div className="coffee-bean-stats-container flex h-full flex-col bg-neutral-50 dark:bg-neutral-900">
+      <div className="flex-none bg-neutral-50 dark:bg-neutral-900">
+        {filterBar}
+      </div>
+      <div className="scroll-with-bottom-bar min-h-0 flex-1 overflow-y-auto px-6 pt-5">
+        {statsBody}
+      </div>
     </div>
   );
 };

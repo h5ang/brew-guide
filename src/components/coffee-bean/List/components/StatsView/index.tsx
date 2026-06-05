@@ -1417,6 +1417,8 @@ interface RoastedBeanStatsViewProps extends StatsViewProps {
 // 熟豆统计视图（原 StatsView）
 const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
   beans,
+  navigationToggleControl,
+  navigationSwipeControl,
   beanStateType = 'roasted',
   onBeanStateTypeChange,
   showBeanStateSwitch = false,
@@ -1763,87 +1765,75 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
       ]
     : [];
 
-  // 统计内容
-  const statsContent = (
-    <>
-      {/* 仅在独立模式下渲染 StatsFilterBar */}
-      {!isContentMode && (
-        <div className="sticky top-0 z-10 bg-neutral-50 dark:bg-neutral-900">
-          <StatsFilterBar
-            dateGroupingMode={dateGroupingMode}
-            onDateGroupingModeChange={handleDateGroupingModeChange}
-            selectedDate={selectedDate}
-            onDateClick={setSelectedDate}
-            availableDates={availableDates}
-            dateRangeLabel={dateRangeLabel}
-            beanStateType={beanStateType}
-            onBeanStateTypeChange={onBeanStateTypeChange}
-            showBeanStateSwitch={showBeanStateSwitch}
-          />
-        </div>
-      )}
+  const filterBar = !isContentMode ? (
+    <StatsFilterBar
+      dateGroupingMode={dateGroupingMode}
+      onDateGroupingModeChange={handleDateGroupingModeChange}
+      selectedDate={selectedDate}
+      onDateClick={setSelectedDate}
+      availableDates={availableDates}
+      dateRangeLabel={dateRangeLabel}
+      beanStateType={beanStateType}
+      onBeanStateTypeChange={onBeanStateTypeChange}
+      showBeanStateSwitch={showBeanStateSwitch}
+      navigationToggleControl={navigationToggleControl}
+      navigationSwipeControl={navigationSwipeControl}
+    />
+  ) : null;
 
-      <div className={isContentMode ? 'px-6' : 'mt-5 px-6'}>
-        <div className="flex flex-col items-center">
-          <div className="w-full space-y-5">
-            {/* 概览 */}
+  const statsBody = (
+    <>
+      <div className="flex flex-col items-center">
+        <div className="w-full space-y-5">
+          <StatsCard
+            title="概览"
+            chart={
+              showTrendChart ? <ConsumptionTrendChart data={trendData} /> : undefined
+            }
+            stats={overviewStats}
+            extra={
+              isSingleDayView && brewingDetails.length > 0 ? (
+                <BrewingDetails data={brewingDetails} />
+              ) : undefined
+            }
+            onExplain={handleExplain}
+          />
+
+          {todayStatsDisplay.length > 0 && (
             <StatsCard
-              title="概览"
-              chart={
-                showTrendChart ? (
-                  <ConsumptionTrendChart data={trendData} />
-                ) : undefined
-              }
-              stats={overviewStats}
-              extra={
-                isSingleDayView && brewingDetails.length > 0 ? (
-                  <BrewingDetails data={brewingDetails} />
-                ) : undefined
-              }
+              title="今日"
+              stats={todayStatsDisplay}
               onExplain={handleExplain}
             />
+          )}
 
-            {/* 今日（仅在非按日模式且有数据时显示） */}
-            {todayStatsDisplay.length > 0 && (
+          {!isHistoricalView &&
+            stats.inventoryByType &&
+            stats.inventoryByType.length > 0 && (
               <StatsCard
-                title="今日"
-                stats={todayStatsDisplay}
+                title="库存"
+                stats={inventoryStats}
+                extra={<InventoryForecast data={stats.inventoryByType} />}
                 onExplain={handleExplain}
               />
             )}
 
-            {/* 库存预测（仅实时视图） */}
-            {!isHistoricalView &&
-              stats.inventoryByType &&
-              stats.inventoryByType.length > 0 && (
-                <StatsCard
-                  title="库存"
-                  stats={inventoryStats}
-                  extra={<InventoryForecast data={stats.inventoryByType} />}
-                  onExplain={handleExplain}
-                />
-              )}
+          {!isSingleDayView && (
+            <>
+              <div className="mb-5 border-t border-neutral-200/40 dark:border-neutral-700/30" />
 
-            {/* 咖啡豆属性统计（单日视图不显示） */}
-            {!isSingleDayView && (
-              <>
-                {/* 分割线 */}
-                <div className="mb-5 border-t border-neutral-200/40 dark:border-neutral-700/30" />
-
-                <BeanAttributeStats
-                  beans={beans}
-                  selectedDate={selectedDate}
-                  dateGroupingMode={dateGroupingMode}
-                  ratingHighlights={stats.ratingHighlights}
-                  onExplain={handleExplain}
-                />
-              </>
-            )}
-          </div>
+              <BeanAttributeStats
+                beans={beans}
+                selectedDate={selectedDate}
+                dateGroupingMode={dateGroupingMode}
+                ratingHighlights={stats.ratingHighlights}
+                onExplain={handleExplain}
+              />
+            </>
+          )}
         </div>
       </div>
 
-      {/* 解释弹窗 */}
       <StatsExplainer
         explanation={explanation}
         onClose={handleCloseExplanation}
@@ -1854,13 +1844,18 @@ const RoastedBeanStatsView: React.FC<RoastedBeanStatsViewProps> = ({
 
   // 内容模式：返回不包裹容器的内容
   if (isContentMode) {
-    return statsContent;
+    return <div className="px-6">{statsBody}</div>;
   }
 
   // 渲染完整容器
   return (
-    <div className="coffee-bean-stats-container bg-neutral-50 dark:bg-neutral-900">
-      {statsContent}
+    <div className="coffee-bean-stats-container flex h-full flex-col bg-neutral-50 dark:bg-neutral-900">
+      <div className="flex-none bg-neutral-50 dark:bg-neutral-900">
+        {filterBar}
+      </div>
+      <div className="scroll-with-bottom-bar min-h-0 flex-1 overflow-y-auto px-6 pt-5">
+        {statsBody}
+      </div>
     </div>
   );
 };
@@ -1871,6 +1866,8 @@ interface CombinedStatsViewProps {
   showEmptyBeans?: boolean;
   beanStateType: StatsBeanStateType;
   onBeanStateTypeChange: (state: StatsBeanStateType) => void;
+  navigationToggleControl?: React.ReactNode;
+  navigationSwipeControl?: StatsViewProps['navigationSwipeControl'];
 }
 
 const CombinedStatsView: React.FC<CombinedStatsViewProps> = ({
@@ -1878,6 +1875,8 @@ const CombinedStatsView: React.FC<CombinedStatsViewProps> = ({
   showEmptyBeans,
   beanStateType,
   onBeanStateTypeChange,
+  navigationToggleControl,
+  navigationSwipeControl,
 }) => {
   // 共享的日期筛选状态
   const [dateGroupingMode, setDateGroupingMode] = useState<DateGroupingMode>(
@@ -2002,9 +2001,9 @@ const CombinedStatsView: React.FC<CombinedStatsViewProps> = ({
   );
 
   return (
-    <div className="coffee-bean-stats-container bg-neutral-50 dark:bg-neutral-900">
+    <div className="coffee-bean-stats-container flex h-full flex-col bg-neutral-50 dark:bg-neutral-900">
       {/* 共享的 StatsFilterBar */}
-      <div className="sticky top-0 z-10 bg-neutral-50 dark:bg-neutral-900">
+      <div className="flex-none bg-neutral-50 dark:bg-neutral-900">
         <StatsFilterBar
           dateGroupingMode={dateGroupingMode}
           onDateGroupingModeChange={handleDateGroupingModeChange}
@@ -2015,11 +2014,13 @@ const CombinedStatsView: React.FC<CombinedStatsViewProps> = ({
           beanStateType={beanStateType}
           onBeanStateTypeChange={onBeanStateTypeChange}
           showBeanStateSwitch
+          navigationToggleControl={navigationToggleControl}
+          navigationSwipeControl={navigationSwipeControl}
         />
       </div>
 
       {/* 内容区域 */}
-      <div className="mt-5">
+      <div className="scroll-with-bottom-bar min-h-0 flex-1 overflow-y-auto pt-5">
         {beanStateType === 'roasted' ? (
           <RoastedBeanStatsView
             beans={beans}
@@ -2042,6 +2043,8 @@ const StatsView: React.FC<StatsViewProps> = ({
   beans,
   showEmptyBeans,
   enableGreenBeanInventory = false,
+  navigationToggleControl,
+  navigationSwipeControl,
 }) => {
   // 初始化时从缓存读取状态
   const [beanStateType, setBeanStateType] = useState<StatsBeanStateType>(() => {
@@ -2104,13 +2107,24 @@ const StatsView: React.FC<StatsViewProps> = ({
   // 如果生豆库未启用或只有熟豆，直接显示熟豆统计（独立模式）
   if (!enableGreenBeanInventory || !hasGreenBeans) {
     return (
-      <RoastedBeanStatsView beans={beans} showEmptyBeans={showEmptyBeans} />
+      <RoastedBeanStatsView
+        beans={beans}
+        showEmptyBeans={showEmptyBeans}
+        navigationToggleControl={navigationToggleControl}
+        navigationSwipeControl={navigationSwipeControl}
+      />
     );
   }
 
   // 如果只有生豆，直接显示生豆统计（独立模式）
   if (!hasRoastedBeans) {
-    return <GreenBeanStatsView beans={beans} />;
+    return (
+      <GreenBeanStatsView
+        beans={beans}
+        navigationToggleControl={navigationToggleControl}
+        navigationSwipeControl={navigationSwipeControl}
+      />
+    );
   }
 
   // 两种都有，使用组合视图（共享 StatsFilterBar）
@@ -2120,6 +2134,8 @@ const StatsView: React.FC<StatsViewProps> = ({
       showEmptyBeans={showEmptyBeans}
       beanStateType={beanStateType}
       onBeanStateTypeChange={handleBeanStateChange}
+      navigationToggleControl={navigationToggleControl}
+      navigationSwipeControl={navigationSwipeControl}
     />
   );
 };

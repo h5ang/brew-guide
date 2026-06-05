@@ -40,7 +40,10 @@ import {
   CollapsedNavigationDockTrigger,
   useCollapsedNavigationDock,
 } from '@/components/layout/CollapsedNavigationDock';
-import { NavigationArrowButton } from '@/components/layout/NavigationControls';
+import {
+  NavigationArrowButton,
+  NavigationSettingsButton,
+} from '@/components/layout/NavigationControls';
 import { SettingsOptions } from '@/components/settings/Settings';
 import { useSettingsStore, getSettingsStore } from '@/lib/stores/settingsStore';
 import TabContent from '@/components/layout/TabContent';
@@ -672,31 +675,94 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       : activeMainTab === '笔记'
         ? navigationState.visibleTabs.notes && hasNavigationBrewingNotes
         : true;
+  const isNavigationContentCollapsible =
+    activeMainTab !== '冲煮' && hasActiveNavigationContent;
+  const isDesktopNavigationCollapsible =
+    isDesktopLayout && isNavigationContentCollapsible;
+  const isMobileNavigationCollapsible =
+    !isDesktopLayout && isNavigationContentCollapsible;
   const isNavigationCollapsible =
-    isDesktopLayout && activeMainTab !== '冲煮' && hasActiveNavigationContent;
+    isDesktopNavigationCollapsible || isMobileNavigationCollapsible;
   const isNavigationActuallyCollapsed =
     isNavigationCollapsed && isNavigationCollapsible;
+  const isDesktopNavigationActuallyCollapsed =
+    isNavigationActuallyCollapsed && isDesktopNavigationCollapsible;
+  const isMobileNavigationActuallyCollapsed =
+    isNavigationActuallyCollapsed && isMobileNavigationCollapsible;
   const canCollapseNavigation =
-    isNavigationCollapsible && !isNavigationActuallyCollapsed;
+    isDesktopNavigationCollapsible && !isNavigationActuallyCollapsed;
   const canToggleNavigation =
-    isNavigationCollapsible && !isNavResizing && !hasAnyModalOpen;
+    isDesktopNavigationCollapsible && !isNavResizing && !hasAnyModalOpen;
+  const canSwipeNavigation =
+    isMobileNavigationCollapsible && !hasAnyModalOpen;
+
+  const persistNavigationCollapsed = useCallback((isCollapsed: boolean) => {
+    localStorage.setItem(
+      NAVIGATION_COLLAPSED_STORAGE_KEY,
+      String(isCollapsed)
+    );
+    setIsNavigationCollapsed(isCollapsed);
+  }, []);
 
   const handleCollapseNavigation = useCallback(() => {
     if (!canCollapseNavigation) return;
     if (settings.hapticFeedback) {
       hapticsUtils.light();
     }
-    localStorage.setItem(NAVIGATION_COLLAPSED_STORAGE_KEY, 'true');
-    setIsNavigationCollapsed(true);
-  }, [canCollapseNavigation, settings.hapticFeedback]);
+    persistNavigationCollapsed(true);
+  }, [
+    canCollapseNavigation,
+    persistNavigationCollapsed,
+    settings.hapticFeedback,
+  ]);
 
   const handleExpandNavigation = useCallback(() => {
     if (settings.hapticFeedback) {
       hapticsUtils.light();
     }
-    localStorage.setItem(NAVIGATION_COLLAPSED_STORAGE_KEY, 'false');
-    setIsNavigationCollapsed(false);
-  }, [settings.hapticFeedback]);
+    persistNavigationCollapsed(false);
+  }, [persistNavigationCollapsed, settings.hapticFeedback]);
+
+  const handleMobileCollapseNavigation = useCallback(() => {
+    if (!canSwipeNavigation || isNavigationActuallyCollapsed) return;
+    if (settings.hapticFeedback) {
+      hapticsUtils.light();
+    }
+    persistNavigationCollapsed(true);
+  }, [
+    canSwipeNavigation,
+    isNavigationActuallyCollapsed,
+    persistNavigationCollapsed,
+    settings.hapticFeedback,
+  ]);
+
+  const handleMobileExpandNavigation = useCallback(() => {
+    if (!canSwipeNavigation || !isNavigationActuallyCollapsed) return;
+    if (settings.hapticFeedback) {
+      hapticsUtils.light();
+    }
+    persistNavigationCollapsed(false);
+  }, [
+    canSwipeNavigation,
+    isNavigationActuallyCollapsed,
+    persistNavigationCollapsed,
+    settings.hapticFeedback,
+  ]);
+
+  const mobileNavigationSwipeControl = React.useMemo(
+    () => ({
+      enabled: canSwipeNavigation,
+      isCollapsed: isMobileNavigationActuallyCollapsed,
+      onCollapse: handleMobileCollapseNavigation,
+      onExpand: handleMobileExpandNavigation,
+    }),
+    [
+      canSwipeNavigation,
+      isMobileNavigationActuallyCollapsed,
+      handleMobileCollapseNavigation,
+      handleMobileExpandNavigation,
+    ]
+  );
 
   useEffect(() => {
     if (!isNavigationCollapsed) return;
@@ -3813,7 +3879,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     />
   ) : null;
 
-  const collapsedSidebarControl = isNavigationActuallyCollapsed ? (
+  const collapsedSidebarControl = isDesktopNavigationActuallyCollapsed ? (
     <NavigationArrowButton
       direction="expand"
       placement="inline"
@@ -3823,15 +3889,22 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
 
   const collapsedNavigationDock = useCollapsedNavigationDock();
 
-  const contentNavigationControl = isNavigationActuallyCollapsed ? (
+  const contentNavigationControl = isDesktopNavigationActuallyCollapsed ? (
     <CollapsedNavigationDockTrigger
       triggerRef={collapsedNavigationDock.triggerRef}
       openOverlay={collapsedNavigationDock.openOverlay}
       closeOverlay={collapsedNavigationDock.closeOverlay}
     />
+  ) : isMobileNavigationActuallyCollapsed ? (
+    <NavigationSettingsButton
+      placement="inline"
+      title="显示导航"
+      ariaLabel="显示导航"
+      onClick={handleMobileExpandNavigation}
+    />
   ) : null;
 
-  const collapsedNavigationOverlay = isNavigationActuallyCollapsed ? (
+  const collapsedNavigationOverlay = isDesktopNavigationActuallyCollapsed ? (
     <CollapsedNavigationDockOverlay
       isOverlayOpen={collapsedNavigationDock.isOverlayOpen}
       overlayRef={collapsedNavigationDock.overlayRef}
@@ -3901,6 +3974,8 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
           {/* 主内容区域 - 桌面端独立滚动 */}
           <main
             className={`md:pt-safe-top h-full flex-1 ${
+              isMobileNavigationActuallyCollapsed ? 'pt-safe-top' : ''
+            } ${
               activeMainTab === '冲煮' &&
               activeBrewingStep === 'brewing' &&
               currentBrewingMethod &&
@@ -4069,6 +4144,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                 setShowAlternativeHeader={setShowAlternativeHeader}
                 settings={settings}
                 navigationToggleControl={contentNavigationControl}
+                navigationSwipeControl={mobileNavigationSwipeControl}
               />
             </div>
 
@@ -4106,6 +4182,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                   immersiveAdd: settings.immersiveAdd,
                 }}
                 navigationToggleControl={contentNavigationControl}
+                navigationSwipeControl={mobileNavigationSwipeControl}
               />
             </div>
 

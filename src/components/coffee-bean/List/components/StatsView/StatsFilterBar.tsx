@@ -4,6 +4,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AlignLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DateGroupingMode } from './types';
+import {
+  useNavigationSwipe,
+  type NavigationSwipeControl,
+} from '@/lib/navigation/navigationSwipe';
 
 export const DATE_GROUPING_LABELS: Record<DateGroupingMode, string> = {
   year: '按年统计',
@@ -221,6 +225,8 @@ interface StatsFilterBarProps {
   beanStateType?: 'roasted' | 'green';
   onBeanStateTypeChange?: (type: 'roasted' | 'green') => void;
   showBeanStateSwitch?: boolean; // 是否显示切换（当同时有生豆和熟豆时）
+  navigationToggleControl?: React.ReactNode;
+  navigationSwipeControl?: NavigationSwipeControl;
 }
 
 const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
@@ -233,10 +239,13 @@ const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
   beanStateType = 'roasted',
   onBeanStateTypeChange,
   showBeanStateSwitch = false,
+  navigationToggleControl,
+  navigationSwipeControl,
 }) => {
   // 筛选展开栏状态
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const filterExpandRef = useRef<HTMLDivElement>(null);
+  const navigationSwipeHandlers = useNavigationSwipe(navigationSwipeControl);
 
   // 滚动容器引用
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -287,11 +296,26 @@ const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
   }, [isFilterExpanded]);
 
   return (
-    <div className="relative pt-6 md:pt-0" ref={filterExpandRef}>
+    <div
+      className={`relative ${
+        navigationSwipeControl?.isCollapsed ? 'pt-0' : 'pt-6'
+      } md:pt-0`}
+      ref={filterExpandRef}
+      {...navigationSwipeHandlers}
+    >
       {/* 时间范围文案 - 可点击切换时间分组和豆子类型 */}
       {dateRangeLabel && (
         <div className="mb-6 flex items-center justify-between px-6">
-          <div className="text-left leading-none">
+          <div
+            className={`relative min-w-0 text-left leading-none ${
+              navigationToggleControl ? 'pl-6' : ''
+            }`}
+          >
+            {navigationToggleControl && (
+              <div className="absolute top-1/2 -left-1.5 -translate-y-1/2">
+                {navigationToggleControl}
+              </div>
+            )}
             <button
               onClick={() => {
                 const availableModes = getAvailableGroupingModes(

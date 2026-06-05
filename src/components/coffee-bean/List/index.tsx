@@ -122,6 +122,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   initialViewMode,
   activeBeanId,
   navigationToggleControl,
+  navigationSwipeControl,
   settings,
 }) => {
   const { copyText, failureDrawerProps } = useCopy();
@@ -1769,6 +1770,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
           : inventoryFilteredBeans
         ).some(bean => bean.beanState === 'green')}
         navigationToggleControl={navigationToggleControl}
+        navigationSwipeControl={navigationSwipeControl}
       />
 
       {/* 内容区域 - 可滚动 */}
@@ -1818,11 +1820,13 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
         )}
         {/* 添加统计视图 */}
         {viewMode === VIEW_OPTIONS.STATS && (
-          <div className="scroll-with-bottom-bar h-full w-full overflow-y-auto">
+          <div className="h-full w-full overflow-hidden">
             <StatsView
               beans={beans}
               showEmptyBeans={showEmptyBeans}
               enableGreenBeanInventory={enableGreenBeanInventory}
+              navigationToggleControl={navigationToggleControl}
+              navigationSwipeControl={navigationSwipeControl}
             />
           </div>
         )}

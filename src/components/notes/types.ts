@@ -2,6 +2,7 @@ import type { BrewingNote } from '@/lib/core/config';
 import type { BrewingNoteData, CoffeeBean } from '@/types/app';
 import type { CoffeeBeanLookup } from '@/lib/notes/noteDisplay';
 import type { ReactNode } from 'react';
+import type { NavigationSwipeControl } from '@/lib/navigation/navigationSwipe';
 
 // 排序类型定义
 export const SORT_OPTIONS = {
@@ -47,6 +48,7 @@ export interface BrewingHistoryProps {
   setShowAlternativeHeader?: (show: boolean) => void;
   settings?: import('@/components/settings/Settings').SettingsOptions; // 添加可选的设置参数
   navigationToggleControl?: ReactNode;
+  navigationSwipeControl?: NavigationSwipeControl;
 }
 
 // 单个笔记项属性

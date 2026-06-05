@@ -40,6 +40,10 @@ import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useInputFocus } from '@/lib/hooks/useInputFocus';
 import { useHorizontalWheelScroll } from '@/lib/hooks/useHorizontalWheelScroll';
 import {
+  useNavigationSwipe,
+  type NavigationSwipeControl,
+} from '@/lib/navigation/navigationSwipe';
+import {
   buildBeanSummaryDetailItems,
   getBeanSummaryDisplayLimit,
   getBeanSummaryLimitMode,
@@ -421,6 +425,7 @@ interface ViewSwitcherProps {
   // 是否有生豆（用于动态调整列标签）
   hasGreenBeans?: boolean;
   navigationToggleControl?: React.ReactNode;
+  navigationSwipeControl?: NavigationSwipeControl;
 }
 
 const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
@@ -505,6 +510,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   // 是否有生豆（用于动态调整列标签）
   hasGreenBeans = false,
   navigationToggleControl,
+  navigationSwipeControl,
 }) => {
   // 获取概要显示设置
   const showBeanSummary = useSettingsStore(
@@ -519,6 +525,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   const hasConfiguredBeanGroups = useSettingsStore(
     state => (state.settings.coffeeBeanGroups?.length || 0) > 0
   );
+  const navigationSwipeHandlers = useNavigationSwipe(navigationSwipeControl);
   const beanSummaryDisplayLimit = useSettingsStore(state =>
     getBeanSummaryDisplayLimit(state.settings)
   );
@@ -808,7 +815,12 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
   const newLocal =
     'shrink-0 bg-neutral-200/30 px-2 py-1 text-xs font-medium whitespace-nowrap text-neutral-400 transition-colors dark:bg-neutral-800/50 dark:text-neutral-400';
   return (
-    <div className="sticky top-0 flex-none space-y-6 bg-neutral-50 pt-6 md:pt-0 dark:bg-neutral-900">
+    <div
+      className={`sticky top-0 flex-none space-y-6 bg-neutral-50 ${
+        navigationSwipeControl?.isCollapsed ? 'pt-0' : 'pt-6'
+      } md:pt-0 dark:bg-neutral-900`}
+      {...navigationSwipeHandlers}
+    >
       {/* 视图切换与筛选栏 - 统一布局 */}
       <div className="mb-6 flex items-center justify-between px-6">
         <div
