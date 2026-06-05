@@ -203,9 +203,11 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   const [showEmptyBeanTip, setShowEmptyBeanTip] = useState(false);
 
   // 新增分类相关状态
-  const [filterMode, setFilterMode] = useState<BeanFilterMode>(
-    globalCache.filterMode
-  );
+  const [filterMode, setFilterMode] = useState<BeanFilterMode>(() => {
+    const mode = globalCache.filterModes[selectedBeanState];
+    globalCache.filterMode = mode;
+    return mode;
+  });
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>(
     globalCache.selectedOrigin
   );

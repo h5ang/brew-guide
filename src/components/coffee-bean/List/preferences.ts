@@ -85,8 +85,8 @@ export const globalCache: {
   selectedBeanType: 'all',
   selectedBeanTypes: { green: 'all', roasted: 'all' },
   selectedBeanState: 'roasted',
-  filterMode: 'variety',
-  filterModes: { green: 'variety', roasted: 'variety' },
+  filterMode: 'flavorPeriod',
+  filterModes: { green: 'variety', roasted: 'flavorPeriod' },
   selectedOrigin: null,
   selectedProcessingMethod: null,
   selectedFlavorPeriod: null,
@@ -247,11 +247,15 @@ export const saveRankingBeanTypePreference = (v: BeanType) =>
 
 // 筛选模式
 export const getFilterModePreference = () =>
-  getStringState(MODULE_NAME, 'filterMode', 'variety') as BeanFilterMode;
+  getStringState(MODULE_NAME, 'filterMode', 'flavorPeriod') as BeanFilterMode;
 export const saveFilterModePreference = (v: BeanFilterMode) =>
   saveStringState(MODULE_NAME, 'filterMode', v);
 export const getFilterModeByStatePreference = (s: BeanState) => {
-  const v = getStringState(MODULE_NAME, `filterMode_${s}`, 'variety');
+  const v = getStringState(
+    MODULE_NAME,
+    `filterMode_${s}`,
+    s === 'roasted' ? 'flavorPeriod' : 'variety'
+  );
   return s === 'green' && (v === 'flavorPeriod' || v === 'group')
     ? 'variety'
     : (v as BeanFilterMode);
