@@ -181,10 +181,6 @@ export const defaultSettings: AppSettings = {
   syncNewNoteDateWithSelectedDate: false,
   syncQuickDecrementDateWithSelectedDate: false,
 
-  // 隐藏二维码选项
-  hideGroupQRCode: false,
-  hideAppreciationQRCode: false,
-
   // 菜单栏图标设置
   showMenuBarIcon: true,
 

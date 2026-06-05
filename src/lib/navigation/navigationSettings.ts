@@ -30,14 +30,22 @@ export const MAIN_NAVIGATION_TABS: MainNavigationTab[] = [
   'notes',
 ];
 
+export const COFFEE_BEAN_MAIN_VIEW = VIEW_OPTIONS.INVENTORY;
+
 export const COFFEE_BEAN_VIEW_ORDER: ViewOption[] = [
   VIEW_OPTIONS.INVENTORY,
   VIEW_OPTIONS.RANKING,
   VIEW_OPTIONS.STATS,
 ];
 
+export const CONFIGURABLE_COFFEE_BEAN_VIEW_ORDER: ViewOption[] =
+  COFFEE_BEAN_VIEW_ORDER.filter(view => view !== COFFEE_BEAN_MAIN_VIEW);
+
 const isViewOption = (value: string): value is ViewOption =>
   COFFEE_BEAN_VIEW_ORDER.includes(value as ViewOption);
+
+const isConfigurableCoffeeBeanView = (value: string): value is ViewOption =>
+  isViewOption(value) && value !== COFFEE_BEAN_MAIN_VIEW;
 
 export const normalizeNavigationSettings = (
   navigationSettings?: AppSettings['navigationSettings']
@@ -50,10 +58,15 @@ export const normalizeNavigationSettings = (
   const coffeeBeanViews = {
     ...DEFAULT_NAVIGATION_SETTINGS.coffeeBeanViews,
     ...(navigationSettings?.coffeeBeanViews ?? {}),
+    [COFFEE_BEAN_MAIN_VIEW]: true,
   };
 
   const pinnedViews = Array.from(
-    new Set((navigationSettings?.pinnedViews ?? []).filter(isViewOption))
+    new Set(
+      (navigationSettings?.pinnedViews ?? []).filter(
+        isConfigurableCoffeeBeanView
+      )
+    )
   );
 
   return {
@@ -115,8 +128,7 @@ export const deriveNavigationSettings = (
     view => !pinnedViews.includes(view)
   );
 
-  const showCoffeeBeanMainTab =
-    isCoffeeBeanModuleVisible && enabledUnpinnedViews.length > 0;
+  const showCoffeeBeanMainTab = isCoffeeBeanModuleVisible;
 
   const renderedMainTabs = MAIN_NAVIGATION_TABS.filter(tab => {
     if (tab === 'coffeeBean') {

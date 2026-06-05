@@ -279,10 +279,6 @@ export interface AppSettings {
   syncNewNoteDateWithSelectedDate?: boolean;
   syncQuickDecrementDateWithSelectedDate?: boolean;
 
-  // 隐藏二维码选项
-  hideGroupQRCode?: boolean;
-  hideAppreciationQRCode?: boolean;
-
   // 菜单栏图标设置（桌面端）
   showMenuBarIcon?: boolean;
 
