@@ -137,6 +137,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
     noteName: string;
     noteSuffix?: string;
   } | null>(null);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
   // 加载搜索历史
   useEffect(() => {
@@ -161,6 +162,31 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
         'noteShareTriggered',
         handleNoteShareTriggered
       );
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleNoteDetailOpened = (event: Event) => {
+      const customEvent = event as CustomEvent<{ note?: BrewingNote }>;
+      setActiveNoteId(customEvent.detail?.note?.id ?? null);
+    };
+
+    const handleNoteDetailClosing = () => {
+      setActiveNoteId(null);
+    };
+
+    window.addEventListener(
+      'noteDetailOpened',
+      handleNoteDetailOpened as EventListener
+    );
+    window.addEventListener('noteDetailClosing', handleNoteDetailClosing);
+
+    return () => {
+      window.removeEventListener(
+        'noteDetailOpened',
+        handleNoteDetailOpened as EventListener
+      );
+      window.removeEventListener('noteDetailClosing', handleNoteDetailClosing);
     };
   }, []);
 
@@ -1188,6 +1214,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
             coffeeBeans={coffeeBeans}
             settings={settings}
             tableVisibleColumns={effectiveTableVisibleColumns}
+            activeNoteId={activeNoteId}
           />
         </div>
       </div>
