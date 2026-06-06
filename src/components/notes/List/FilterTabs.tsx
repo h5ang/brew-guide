@@ -7,6 +7,7 @@ import {
   SortOption,
   DateGroupingMode,
   DATE_GROUPING_LABELS,
+  NotesViewMode,
 } from '../types';
 import { X, AlignLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -306,8 +307,8 @@ const DateGroupingSection: React.FC<DateGroupingSectionProps> = ({
 
 // 显示模式选择组件
 interface ViewModeSectionProps {
-  viewMode: 'list' | 'gallery';
-  onViewModeChange: (mode: 'list' | 'gallery') => void;
+  viewMode: NotesViewMode;
+  onViewModeChange: (mode: NotesViewMode) => void;
   isImageFlowMode?: boolean;
   onToggleImageFlowMode?: () => void;
   isDateImageFlowMode?: boolean;
@@ -344,6 +345,20 @@ const ViewModeSection: React.FC<ViewModeSectionProps> = ({
           }}
         >
           列表
+        </FilterButton>
+        <FilterButton
+          isActive={viewMode === 'table'}
+          onClick={() => {
+            if (isImageFlowMode && onToggleImageFlowMode) {
+              onToggleImageFlowMode();
+            }
+            if (isDateImageFlowMode && onToggleDateImageFlowMode) {
+              onToggleDateImageFlowMode();
+            }
+            onViewModeChange('table');
+          }}
+        >
+          表格
         </FilterButton>
         <FilterButton
           isActive={
@@ -473,6 +488,9 @@ const FilterTabs: React.FC<FilterTabsProps> = memo(function FilterTabs({
   hasImageNotes = true,
   searchHistory,
   onSearchHistoryClick,
+  tableColumnOptions = [],
+  tableVisibleColumns = [],
+  onTableColumnsChange,
 }) {
   // 搜索输入框引用
   const { inputRef: searchInputRef, activateAndFocus } =
@@ -653,6 +671,7 @@ const FilterTabs: React.FC<FilterTabsProps> = memo(function FilterTabs({
                 >
                   <span onDoubleClick={() => onSmartToggleImageFlow?.()}>
                     全部
+                    {viewMode === 'table' && <span> · 表格</span>}
                     {isImageFlowMode && <span> · 图片流</span>}
                     {isDateImageFlowMode && <span> · 带日期图片流</span>}
                   </span>
@@ -935,10 +954,12 @@ const FilterTabs: React.FC<FilterTabsProps> = memo(function FilterTabs({
                       />
                     )}
 
-                    <SortSection
-                      sortOption={sortOption}
-                      onSortChange={onSortChange}
-                    />
+                    {viewMode !== 'table' && (
+                      <SortSection
+                        sortOption={sortOption}
+                        onSortChange={onSortChange}
+                      />
+                    )}
 
                     {onViewModeChange && (
                       <ViewModeSection
@@ -951,6 +972,48 @@ const FilterTabs: React.FC<FilterTabsProps> = memo(function FilterTabs({
                         hasImageNotes={hasImageNotes}
                       />
                     )}
+
+                    {viewMode === 'table' &&
+                      onTableColumnsChange &&
+                      tableColumnOptions.length > 0 && (
+                        <div>
+                          <div className="mb-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                            表格列
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {tableColumnOptions.map(column => (
+                              <FilterButton
+                                key={column.key}
+                                isActive={tableVisibleColumns.includes(
+                                  column.key
+                                )}
+                                onClick={() => {
+                                  const isVisible =
+                                    tableVisibleColumns.includes(column.key);
+
+                                  if (isVisible) {
+                                    if (tableVisibleColumns.length > 1) {
+                                      onTableColumnsChange(
+                                        tableVisibleColumns.filter(
+                                          key => key !== column.key
+                                        )
+                                      );
+                                    }
+                                    return;
+                                  }
+
+                                  onTableColumnsChange([
+                                    ...tableVisibleColumns,
+                                    column.key,
+                                  ]);
+                                }}
+                              >
+                                {column.label}
+                              </FilterButton>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
                 </div>
               </motion.div>

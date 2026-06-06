@@ -3,6 +3,10 @@ import type { BrewingNoteData, CoffeeBean } from '@/types/app';
 import type { CoffeeBeanLookup } from '@/lib/notes/noteDisplay';
 import type { ReactNode } from 'react';
 import type { NavigationSwipeControl } from '@/lib/navigation/navigationSwipe';
+import type {
+  NotesTableColumnConfig,
+  NotesTableColumnKey,
+} from './List/tableColumns';
 
 // 排序类型定义
 export const SORT_OPTIONS = {
@@ -13,6 +17,8 @@ export const SORT_OPTIONS = {
 } as const;
 
 export type SortOption = (typeof SORT_OPTIONS)[keyof typeof SORT_OPTIONS];
+
+export type NotesViewMode = 'list' | 'gallery' | 'table';
 
 // 日期分组粒度类型
 export type DateGroupingMode = 'year' | 'month' | 'day';
@@ -96,8 +102,8 @@ export interface FilterTabsProps {
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
   // 新增显示模式相关props
-  viewMode?: 'list' | 'gallery';
-  onViewModeChange?: (mode: 'list' | 'gallery') => void;
+  viewMode?: NotesViewMode;
+  onViewModeChange?: (mode: NotesViewMode) => void;
   // 新增图片流模式相关props
   isImageFlowMode?: boolean;
   onToggleImageFlowMode?: () => void;
@@ -113,6 +119,9 @@ export interface FilterTabsProps {
   // 搜索历史相关props
   searchHistory?: string[];
   onSearchHistoryClick?: (query: string) => void;
+  tableColumnOptions?: NotesTableColumnConfig[];
+  tableVisibleColumns?: NotesTableColumnKey[];
+  onTableColumnsChange?: (columns: NotesTableColumnKey[]) => void;
 }
 
 // 添加笔记按钮属性

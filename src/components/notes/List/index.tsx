@@ -50,7 +50,7 @@ import {
   addSearchHistory,
 } from './globalCache';
 import ListView from './ListView';
-import { SortOption, DateGroupingMode } from '../types';
+import { SortOption, DateGroupingMode, type NotesViewMode } from '../types';
 import { exportSelectedNotes } from '../Share/NotesExporter';
 import {
   buildNoteSearchableTexts,
@@ -76,6 +76,13 @@ import {
   EMPTY_EQUIPMENT_NAME_OVERRIDES,
 } from '@/lib/notes/noteDisplay';
 import { useNavigationSwipe } from '@/lib/navigation/navigationSwipe';
+import {
+  getDefaultVisibleNotesTableColumns,
+  getNotesTableColumnConfig,
+  type NotesTableColumnKey,
+} from './tableColumns';
+
+const NOTES_TABLE_COLUMNS_STORAGE_KEY = 'notes-table-visible-columns';
 
 const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   isOpen,
@@ -87,6 +94,8 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   navigationToggleControl,
   navigationSwipeControl,
 }) => {
+  const tableColumnOptions = getNotesTableColumnConfig();
+
   // 用于跟踪用户选择 - 从本地存储初始化
   const [sortOption, setSortOption] = useState<SortOption>(
     getSortOptionPreference()
@@ -156,14 +165,39 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   }, []);
 
   // 显示模式状态（持久化记忆 - 使用 localStorage 存储 UI 偏好设置）
-  const [viewMode, setViewMode] = useState<'list' | 'gallery'>(() => {
+  const [viewMode, setViewMode] = useState<NotesViewMode>(() => {
     if (typeof window !== 'undefined') {
-      return (
-        (localStorage.getItem('notes-view-mode') as 'list' | 'gallery') ||
-        'list'
-      );
+      const savedMode = localStorage.getItem('notes-view-mode');
+      if (
+        savedMode === 'list' ||
+        savedMode === 'gallery' ||
+        savedMode === 'table'
+      ) {
+        return savedMode;
+      }
     }
     return 'list';
+  });
+  const [tableVisibleColumns, setTableVisibleColumns] = useState<
+    NotesTableColumnKey[]
+  >(() => {
+    const defaultColumns = getDefaultVisibleNotesTableColumns();
+
+    if (typeof window === 'undefined') {
+      return defaultColumns;
+    }
+
+    try {
+      const saved = localStorage.getItem(NOTES_TABLE_COLUMNS_STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } catch {
+      return defaultColumns;
+    }
+
+    return defaultColumns;
   });
 
   // 图片流模式状态（持久化记忆 - 使用 localStorage 存储 UI 偏好设置）
@@ -207,12 +241,24 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   }, []);
 
   // 优雅的显示模式持久化管理
-  const updateViewMode = useCallback((mode: 'list' | 'gallery') => {
+  const updateViewMode = useCallback((mode: NotesViewMode) => {
     setViewMode(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('notes-view-mode', mode);
     }
   }, []);
+
+  const updateTableVisibleColumns = (columns: NotesTableColumnKey[]) => {
+    if (columns.length === 0) return;
+
+    setTableVisibleColumns(columns);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        NOTES_TABLE_COLUMNS_STORAGE_KEY,
+        JSON.stringify(columns)
+      );
+    }
+  };
 
   const updateImageFlowState = useCallback((normal: boolean, date: boolean) => {
     setIsImageFlowMode(normal);
@@ -248,8 +294,11 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
       const useDate = lastImageFlowType === 'date';
       updateImageFlowState(!useDate, useDate);
     }
-    // 如果是list模式但有图片流模式开启，关闭图片流模式
-    else if (viewMode === 'list' && (isImageFlowMode || isDateImageFlowMode)) {
+    // 如果离开gallery但有图片流模式开启，关闭图片流模式
+    else if (
+      viewMode !== 'gallery' &&
+      (isImageFlowMode || isDateImageFlowMode)
+    ) {
       updateImageFlowState(false, false);
     }
   }, [
@@ -259,6 +308,17 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
     updateImageFlowState,
     viewMode,
   ]); // 添加所有依赖项
+
+  const availableTableColumnKeys = new Set(
+    tableColumnOptions.map(column => column.key)
+  );
+  const normalizedTableVisibleColumns = tableVisibleColumns.filter(column =>
+    availableTableColumnKeys.has(column)
+  );
+  const effectiveTableVisibleColumns =
+    normalizedTableVisibleColumns.length > 0
+      ? normalizedTableVisibleColumns
+      : getDefaultVisibleNotesTableColumns();
 
   // 🔥 从 Zustand Store 订阅笔记数据
   const notes = useBrewingNoteStore(state => state.notes);
@@ -696,7 +756,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
 
   // 处理显示模式变化
   const handleViewModeChange = useCallback(
-    (mode: 'list' | 'gallery') => {
+    (mode: NotesViewMode) => {
       updateViewMode(mode);
     },
     [updateViewMode]
@@ -768,13 +828,13 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   const handleEquipmentClick = useCallback((equipment: string | null) => {
     setSelectedEquipment(equipment);
     saveSelectedEquipmentPreference(equipment);
-  }, []);
+  }, [setSelectedEquipment]);
 
   // 处理日期选择变化
   const handleDateClick = useCallback((date: string | null) => {
     setSelectedDate(date);
     saveSelectedDatePreference(date);
-  }, []);
+  }, [setSelectedDate]);
 
   // 处理日期分组模式变化
   const handleDateGroupingModeChange = useCallback((mode: DateGroupingMode) => {
@@ -784,7 +844,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
     saveSelectedDatePreference(null);
     globalCache.dateGroupingMode = mode;
     globalCache.selectedDate = null;
-  }, []);
+  }, [setDateGroupingMode, setSelectedDate]);
 
   // 处理笔记选择/取消选择
   const handleToggleSelect = (noteId: string, enterShareMode = false) => {
@@ -1087,6 +1147,9 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
             settings={settings}
             searchHistory={searchHistory}
             onSearchHistoryClick={handleSearchHistoryClick}
+            tableColumnOptions={tableColumnOptions}
+            tableVisibleColumns={effectiveTableVisibleColumns}
+            onTableColumnsChange={updateTableVisibleColumns}
           />
         </div>
       )}
@@ -1094,7 +1157,11 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
       {/* 内容区域 - 可滚动 */}
       <div className="flex-1 overflow-hidden">
         <div
-          className="scroll-with-bottom-bar h-full w-full overflow-y-auto"
+          className={
+            viewMode === 'table'
+              ? 'h-full w-full overflow-hidden'
+              : 'scroll-with-bottom-bar h-full w-full overflow-y-auto'
+          }
           ref={notesContainerRef}
         >
           {/* 笔记列表视图 - 始终传递正确的笔记数据 */}
@@ -1120,6 +1187,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
             equipmentNames={equipmentNames}
             coffeeBeans={coffeeBeans}
             settings={settings}
+            tableVisibleColumns={effectiveTableVisibleColumns}
           />
         </div>
       </div>

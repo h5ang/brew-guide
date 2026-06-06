@@ -11,17 +11,22 @@ import GalleryView from './GalleryView';
 import DateImageFlowView from './DateImageFlowView';
 import { useFlavorDimensions } from '@/lib/hooks/useFlavorDimensions';
 import { SettingsOptions } from '@/components/settings/Settings';
+import type { NotesViewMode } from '../types';
+import type { NotesTableColumnKey } from './tableColumns';
 import {
   buildCoffeeBeanLookup,
   getBeanUnitPrice,
   resolveNoteBean,
   resolveNoteEquipmentName,
 } from '@/lib/notes/noteDisplay';
+import TableView from './TableView';
+import { isChangeRecordNote, shouldHideNoteInList } from './noteListModel';
 
 const EMPTY_NOTES: BrewingNote[] = [];
 const EMPTY_SELECTED_NOTES: string[] = [];
 const EMPTY_EQUIPMENT_NAMES: Record<string, string> = {};
 const EMPTY_COFFEE_BEANS: CoffeeBean[] = [];
+const EMPTY_TABLE_COLUMNS: NotesTableColumnKey[] = [];
 
 // 定义组件属性接口
 interface NotesListViewProps {
@@ -36,7 +41,7 @@ interface NotesListViewProps {
   searchQuery?: string;
   isSearching?: boolean;
   preFilteredNotes?: BrewingNote[];
-  viewMode?: 'list' | 'gallery';
+  viewMode?: NotesViewMode;
   isDateImageFlowMode?: boolean;
   // 外部滚动容器（Virtuoso 使用）
   scrollParentRef?: HTMLElement;
@@ -46,6 +51,7 @@ interface NotesListViewProps {
   coffeeBeans?: CoffeeBean[];
   // 设置
   settings?: SettingsOptions;
+  tableVisibleColumns?: NotesTableColumnKey[];
 }
 
 const NotesListView: React.FC<NotesListViewProps> = ({
@@ -66,6 +72,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
   equipmentNames = EMPTY_EQUIPMENT_NAMES,
   coffeeBeans = EMPTY_COFFEE_BEANS,
   settings,
+  tableVisibleColumns = EMPTY_TABLE_COLUMNS,
 }) => {
   const [showQuickDecrementNotes, setShowQuickDecrementNotes] = useState(false);
 
@@ -79,38 +86,14 @@ const NotesListView: React.FC<NotesListViewProps> = ({
     [coffeeBeans]
   );
 
-  // 判断笔记是否为变动记录 - 纯函数，不需要缓存
   const isChangeRecord = useCallback(
-    (note: BrewingNote) => {
-      // 如果设置中关闭了容量调整记录显示，则不将其视为变动记录（直接过滤掉）
-      if (
-        note.source === 'capacity-adjustment' &&
-        !(settings?.showCapacityAdjustmentRecords ?? true)
-      ) {
-        return false;
-      }
-      return (
-        note.source === 'quick-decrement' ||
-        note.source === 'capacity-adjustment' ||
-        note.source === 'roasting'
-      );
-    },
-    [settings?.showCapacityAdjustmentRecords]
+    (note: BrewingNote) => isChangeRecordNote(note, settings),
+    [settings]
   );
 
-  // 判断笔记是否应该被过滤掉（不显示）
   const shouldFilterOut = useCallback(
-    (note: BrewingNote) => {
-      // 如果设置中关闭了容量调整记录显示，则过滤掉
-      if (
-        note.source === 'capacity-adjustment' &&
-        !(settings?.showCapacityAdjustmentRecords ?? true)
-      ) {
-        return true;
-      }
-      return false;
-    },
-    [settings?.showCapacityAdjustmentRecords]
+    (note: BrewingNote) => shouldHideNoteInList(note, settings),
+    [settings]
   );
 
   // 🔥 使用 useMemo 缓存分离后的笔记,避免重复计算
@@ -197,6 +180,20 @@ const NotesListView: React.FC<NotesListViewProps> = ({
             ? `[ 没有使用${equipmentNames[selectedEquipment] || selectedEquipment}的冲煮记录 ]`
             : '[ 暂无冲煮记录，请点击下方按钮添加 ]'}
       </div>
+    );
+  }
+
+  if (viewMode === 'table') {
+    return (
+      <TableView
+        notes={[...regularNotes, ...changeRecordNotes]}
+        equipmentNames={equipmentNames}
+        coffeeBeanLookup={coffeeBeanLookup}
+        visibleColumns={tableVisibleColumns}
+        isShareMode={isShareMode}
+        selectedNotes={selectedNotes}
+        onToggleSelect={handleToggleSelect}
+      />
     );
   }
 
