@@ -52,6 +52,7 @@ interface NotesListViewProps {
   // 设置
   settings?: SettingsOptions;
   tableVisibleColumns?: NotesTableColumnKey[];
+  activeNoteId?: string | null;
 }
 
 const NotesListView: React.FC<NotesListViewProps> = ({
@@ -73,6 +74,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
   coffeeBeans = EMPTY_COFFEE_BEANS,
   settings,
   tableVisibleColumns = EMPTY_TABLE_COLUMNS,
+  activeNoteId,
 }) => {
   const [showQuickDecrementNotes, setShowQuickDecrementNotes] = useState(false);
 
@@ -193,6 +195,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
         isShareMode={isShareMode}
         selectedNotes={selectedNotes}
         onToggleSelect={handleToggleSelect}
+        activeNoteId={activeNoteId}
       />
     );
   }

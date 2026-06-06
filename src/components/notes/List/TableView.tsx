@@ -40,6 +40,7 @@ interface NotesTableViewProps {
   isShareMode?: boolean;
   selectedNotes?: string[];
   onToggleSelect?: (noteId: string, enterShareMode?: boolean) => void;
+  activeNoteId?: string | null;
 }
 
 const DEFAULT_SORTING: SortingState = [];
@@ -227,6 +228,7 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
   isShareMode = false,
   selectedNotes = [],
   onToggleSelect,
+  activeNoteId,
 }) => {
   const [sorting, setSorting] = useState<SortingState>(loadSorting);
   const [columnSizing, setColumnSizing] =
@@ -656,6 +658,7 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
             {table.getRowModel().rows.map(row => {
               const note = row.original;
               const isSelected = selectedNotes.includes(note.id);
+              const isActive = activeNoteId === note.id;
               const isChangeRecord = isChangeRecordNote(note);
 
               return (
@@ -663,9 +666,9 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
                   key={row.id}
                   className={`cursor-pointer hover:bg-neutral-100 active:bg-neutral-100 dark:hover:bg-neutral-800/30 dark:active:bg-neutral-800/30 ${
                     isSelected ? 'bg-neutral-100 dark:bg-neutral-800/30' : ''
-                  } ${isChangeRecord ? 'opacity-50' : ''}`}
+                  } ${isActive ? 'bg-neutral-100 dark:bg-neutral-800/30' : ''} ${isChangeRecord ? 'opacity-50' : ''}`}
                   onClick={() => handleRowClick(note)}
-                  aria-selected={isSelected}
+                  aria-selected={isSelected || isActive}
                 >
                   {row.getVisibleCells().map((cell, index) => {
                     const isFirst = index === 0;
