@@ -83,6 +83,8 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   const currentBean = isAddMode ? tempBean : bean;
   const isGreenBeanType = currentBean?.beanState === 'green';
   const merchantLabel = isGreenBeanType ? '生豆商' : '烘焙商';
+  const fullNameInputLabel = `${merchantLabel}和咖啡豆名称`;
+  const fullNameInputHint = `格式：${merchantLabel} 咖啡豆名称`;
   const flavorInfo = getFlavorInfo(bean);
   const blendComponentSuggestions = useBlendComponentSuggestions();
   const roasterSuggestions = useRoasterSuggestions(!!roasterFieldEnabled);
@@ -207,7 +209,9 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
             type="text"
             value={tempBean.name || ''}
             onChange={e => handleNameChange(e.target.value)}
-            placeholder="输入咖啡豆名称"
+            placeholder={`输入${merchantLabel} 咖啡豆名称`}
+            aria-label={fullNameInputLabel}
+            title={fullNameInputHint}
             className="w-full border-b border-dashed border-neutral-300 bg-transparent pb-1 text-sm font-medium text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-neutral-500 dark:border-neutral-600 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
           />
         ) : (

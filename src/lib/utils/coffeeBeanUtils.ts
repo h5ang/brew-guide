@@ -351,6 +351,41 @@ export function formatCoffeeBeanDisplayName(
   return `${roaster}${separator}${name}`;
 }
 
+export function prepareCoffeeBeanRoasterFieldsForFormDraft<
+  T extends Pick<BeanIdentityLike, 'name' | 'roaster'>,
+>(
+  bean: T,
+  options: {
+    roasterFieldEnabled?: boolean;
+    separator?: ' ' | '/';
+  }
+): T {
+  const separator = options.separator || ' ';
+  const roaster = getBeanRoasterName(bean, separator);
+  const nameWithoutRoaster = getBeanNameWithoutRoaster(bean, separator);
+
+  if (options.roasterFieldEnabled) {
+    return {
+      ...bean,
+      roaster: roaster || bean.roaster,
+      name: nameWithoutRoaster || bean.name,
+    };
+  }
+
+  if (!roaster || !nameWithoutRoaster) {
+    return bean;
+  }
+
+  return {
+    ...bean,
+    roaster: '',
+    name: formatCoffeeBeanDisplayName(
+      { ...bean, roaster, name: nameWithoutRoaster },
+      ' '
+    ),
+  };
+}
+
 export function getCoffeeBeanRoasterSuggestions(
   beans: Array<Pick<BeanIdentityLike, 'name' | 'roaster'>>,
   enabled = true

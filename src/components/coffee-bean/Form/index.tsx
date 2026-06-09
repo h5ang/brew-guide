@@ -32,10 +32,9 @@ import { modalHistory } from '@/lib/hooks/useModalHistory';
 import { inferBeanType } from '@/lib/utils/beanTypeInference';
 import { useRoasterLogo, useSettingsStore } from '@/lib/stores/settingsStore';
 import {
-  formatCoffeeBeanDisplayName,
-  getBeanNameWithoutRoaster,
   getBeanRoasterName,
   getCoffeeBeanRoasterSuggestions,
+  prepareCoffeeBeanRoasterFieldsForFormDraft,
   prepareCoffeeBeanRoasterFieldsForSave,
   normalizeDelimitedTextList,
   updateBlendComponentsDelimitedField,
@@ -125,41 +124,32 @@ const createInitialBeanDraft = ({
   }
 
   const { id: _id, timestamp: _timestamp, ...beanData } = initialBean;
+  const preparedBeanData = prepareCoffeeBeanRoasterFieldsForFormDraft(
+    beanData,
+    { roasterFieldEnabled }
+  );
 
-  const roaster = getBeanRoasterName(beanData);
-  const nameWithoutRoaster = getBeanNameWithoutRoaster(beanData);
-
-  if (roasterFieldEnabled) {
-    beanData.roaster = roaster || beanData.roaster;
-    beanData.name = nameWithoutRoaster || beanData.name;
-  } else if (roaster && nameWithoutRoaster) {
-    beanData.name = formatCoffeeBeanDisplayName(
-      { ...beanData, roaster, name: nameWithoutRoaster },
-      ' '
-    );
-    beanData.roaster = '';
+  if (!preparedBeanData.beanType) {
+    preparedBeanData.beanType = 'filter';
   }
 
-  if (!beanData.beanType) {
-    beanData.beanType = 'filter';
+  if (isRoastingDraft(preparedBeanData, roastingSourceBeanId)) {
+    preparedBeanData.roastLevel = '';
+    preparedBeanData.startDay = 0;
+    preparedBeanData.endDay = 0;
   }
 
-  if (isRoastingDraft(beanData, roastingSourceBeanId)) {
-    beanData.roastLevel = '';
-    beanData.startDay = 0;
-    beanData.endDay = 0;
-  }
+  const needFlavorPeriodInit =
+    !preparedBeanData.startDay && !preparedBeanData.endDay;
 
-  const needFlavorPeriodInit = !beanData.startDay && !beanData.endDay;
-
-  if (needFlavorPeriodInit && beanData.roastLevel) {
+  if (needFlavorPeriodInit && preparedBeanData.roastLevel) {
     let startDay = 0;
     let endDay = 0;
 
-    if (beanData.roastLevel.includes('浅')) {
+    if (preparedBeanData.roastLevel.includes('浅')) {
       startDay = 7;
       endDay = 60;
-    } else if (beanData.roastLevel.includes('深')) {
+    } else if (preparedBeanData.roastLevel.includes('深')) {
       startDay = 14;
       endDay = 90;
     } else {
@@ -167,11 +157,11 @@ const createInitialBeanDraft = ({
       endDay = 60;
     }
 
-    beanData.startDay = startDay;
-    beanData.endDay = endDay;
+    preparedBeanData.startDay = startDay;
+    preparedBeanData.endDay = endDay;
   }
 
-  return beanData;
+  return preparedBeanData;
 };
 
 const CoffeeBeanForm = forwardRef<CoffeeBeanFormHandle, CoffeeBeanFormProps>(

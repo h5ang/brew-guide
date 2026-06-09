@@ -33,6 +33,7 @@ import {
 } from '@/lib/notes/noteDisplay';
 import { getCoffeeBeanImageSource } from '@/lib/coffee-beans/imageRepository';
 import { getRelatedNotesForBean } from '@/lib/notes/relatedNotes';
+import { prepareCoffeeBeanRoasterFieldsForFormDraft } from '@/lib/utils/coffeeBeanUtils';
 import {
   clearCoffeeBeanFormDraftSession,
   hasCoffeeBeanFormDraftContent,
@@ -47,15 +48,13 @@ import {
   isSimpleChangeRecord,
   isRoastingRecord,
 } from './types';
-import {
-  HeaderBar,
-  BeanImageSection,
-  BasicInfoSection,
-  OriginInfoSection,
-  BlendComponentsSection,
-  FlavorNotesSection,
-  RatingSection,
-} from './components';
+import HeaderBar from './components/HeaderBar';
+import BeanImageSection from './components/BeanImageSection';
+import BasicInfoSection from './components/BasicInfoSection';
+import OriginInfoSection from './components/OriginInfoSection';
+import BlendComponentsSection from './components/BlendComponentsSection';
+import FlavorNotesSection from './components/FlavorNotesSection';
+import RatingSection from './components/RatingSection';
 
 // 延迟加载记录部分，因为它通常在页面下方
 const RelatedRecordsSection = dynamic(
@@ -111,34 +110,54 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   const isEditMode = mode === 'edit';
   const isFormMode = isAddMode || isEditMode;
   const isRepurchaseMode = isAddMode && !!propBean;
+  const storeSettings = useSettingsStore(state => state.settings);
 
   const createTempBean = React.useCallback(
     (sourceBean?: CoffeeBean | null): Partial<CoffeeBean> => {
       if (sourceBean) {
-        return {
-          ...sourceBean,
-          blendComponents:
-            sourceBean.blendComponents && sourceBean.blendComponents.length > 0
-              ? sourceBean.blendComponents
-              : [{ origin: '', estate: '', process: '', variety: '' }],
-        };
+        return prepareCoffeeBeanRoasterFieldsForFormDraft(
+          {
+            ...sourceBean,
+            blendComponents:
+              sourceBean.blendComponents &&
+              sourceBean.blendComponents.length > 0
+                ? sourceBean.blendComponents
+                : [{ origin: '', estate: '', process: '', variety: '' }],
+          },
+          {
+            roasterFieldEnabled: storeSettings.roasterFieldEnabled,
+            separator: storeSettings.roasterSeparator,
+          }
+        );
       }
 
-      return {
-        name: '',
-        beanState: initialBeanState,
-        beanType: 'filter',
-        capacity: '',
-        remaining: '',
-        roastLevel: '',
-        roastDate: '',
-        purchaseDate: '',
-        flavor: [],
-        notes: '',
-        blendComponents: [{ origin: '', estate: '', process: '', variety: '' }],
-      };
+      return prepareCoffeeBeanRoasterFieldsForFormDraft(
+        {
+          name: '',
+          beanState: initialBeanState,
+          beanType: 'filter',
+          capacity: '',
+          remaining: '',
+          roastLevel: '',
+          roastDate: '',
+          purchaseDate: '',
+          flavor: [],
+          notes: '',
+          blendComponents: [
+            { origin: '', estate: '', process: '', variety: '' },
+          ],
+        },
+        {
+          roasterFieldEnabled: storeSettings.roasterFieldEnabled,
+          separator: storeSettings.roasterSeparator,
+        }
+      );
     },
-    [initialBeanState]
+    [
+      initialBeanState,
+      storeSettings.roasterFieldEnabled,
+      storeSettings.roasterSeparator,
+    ]
   );
 
   // 临时 bean 数据（添加模式）
@@ -174,7 +193,14 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
 
     if (isAddMode) {
       const savedDraft = propBean ? null : loadCoffeeBeanFormDraftSession();
-      setTempBean(savedDraft ? savedDraft.bean : baseBean);
+      setTempBean(
+        savedDraft
+          ? prepareCoffeeBeanRoasterFieldsForFormDraft(savedDraft.bean, {
+              roasterFieldEnabled: storeSettings.roasterFieldEnabled,
+              separator: storeSettings.roasterSeparator,
+            })
+          : baseBean
+      );
       return;
     }
 
@@ -187,6 +213,8 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
     isOpen,
     persistedBean,
     propBean,
+    storeSettings.roasterFieldEnabled,
+    storeSettings.roasterSeparator,
   ]);
 
   const bean = isFormMode ? (tempBean as CoffeeBean) : persistedBean;
@@ -330,7 +358,6 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   }, [bean?.id, bean?.beanState, relatedNotes, relatedBeans, isOpen]);
 
   // 设置加载（优化：移除 isOpen 依赖，避免每次打开都重新设置）
-  const storeSettings = useSettingsStore(state => state.settings);
   const navigationState = deriveNavigationSettings(
     storeSettings.navigationSettings
   );
