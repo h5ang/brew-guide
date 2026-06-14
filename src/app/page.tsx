@@ -197,9 +197,27 @@ const createBrewingNoteDraftFromBean = (
   },
 });
 
+const loadBrewingTimer = () => import('@/components/brewing/BrewingTimer');
+
+let brewingTimerPreloadPromise: ReturnType<typeof loadBrewingTimer> | null =
+  null;
+
+const preloadBrewingTimer = () => {
+  if (typeof window === 'undefined') return;
+
+  if (!brewingTimerPreloadPromise) {
+    brewingTimerPreloadPromise = loadBrewingTimer().catch(error => {
+      brewingTimerPreloadPromise = null;
+      throw error;
+    });
+  }
+
+  void brewingTimerPreloadPromise.catch(() => undefined);
+};
+
 // 动态导入客户端组件
 const BrewingTimer = dynamic(
-  () => import('@/components/brewing/BrewingTimer'),
+  loadBrewingTimer,
   { ssr: false, loading: () => null }
 );
 const BrewingHistory = dynamic(() => import('@/components/notes/List'), {
@@ -2216,6 +2234,8 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       const effectiveMethodType =
         (step as ExtendedStep)?.explicitMethodType || methodType;
 
+      preloadBrewingTimer();
+
       // 将正确的参数传递给 handleMethodSelect
       await handleMethodSelect(
         selectedEquipment,
@@ -3010,9 +3030,13 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       if (!step) return;
 
       if (directToBrewing && step === 'brewing') {
+        preloadBrewingTimer();
         // 直接跳转到注水步骤，延迟确保UI已更新
         setTimeout(() => navigateToStep('brewing', { force: true }), 300);
       } else {
+        if (step === 'brewing') {
+          preloadBrewingTimer();
+        }
         navigateToStep(step, { force: fromHistory || directToBrewing });
       }
     };
@@ -3212,6 +3236,15 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
   const isBeansMainTab = activeMainTab === '咖啡豆';
   const shouldShowBrewingTimer =
     activeBrewingStep === 'brewing' && currentBrewingMethod && !showHistory;
+
+  useEffect(() => {
+    if (activeMainTab !== '冲煮' || !currentBrewingMethod) return;
+    if (activeBrewingStep !== 'method' && activeBrewingStep !== 'brewing') {
+      return;
+    }
+
+    preloadBrewingTimer();
+  }, [activeBrewingStep, activeMainTab, currentBrewingMethod]);
 
   const brewingTimerRef = useRef<HTMLDivElement | null>(null);
   const [brewingTimerHeight, setBrewingTimerHeight] = useState(0);
