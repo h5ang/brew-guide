@@ -1,9 +1,12 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import {
-  APP_IMAGE_MIME_TYPE,
-  getAppImageFileName,
+  getImageFormatFromMimeType,
+  IMAGE_FILE_ACCEPT,
+  isSupportedSourceImageFile,
+  normalizeImageMimeType,
 } from '@/lib/images/imageFormat';
+export { compressBase64Image } from '@/lib/utils/imageCompression';
 
 export interface ImageCaptureOptions {
   source: 'camera' | 'gallery';
@@ -71,9 +74,7 @@ function captureImageWithHtmlInput(
     try {
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
-      // 仅支持 JPG、PNG、WebP、HEIC 格式
-      fileInput.accept =
-        'image/jpeg,image/png,image/webp,image/heic,image/heif';
+      fileInput.accept = IMAGE_FILE_ACCEPT;
       fileInput.style.display = 'none';
 
       // 根据来源设置不同的capture属性
@@ -119,19 +120,10 @@ function captureImageWithHtmlInput(
 
           const file = input.files[0];
 
-          // 验证文件类型
-          // 仅支持 JPG、PNG、WebP、HEIC 格式
-          const allowedTypes = [
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-            'image/heic',
-            'image/heif',
-          ];
-          if (!allowedTypes.includes(file.type)) {
+          if (!isSupportedSourceImageFile(file)) {
             isResolved = true;
             cleanup();
-            reject(new Error('请上传 JPG、PNG 或 WebP 格式的图片'));
+            reject(new Error('请上传 JPG、PNG、WebP 或 HEIF/HEIC 格式的图片'));
             return;
           }
 
@@ -160,7 +152,7 @@ function captureImageWithHtmlInput(
 
             resolve({
               dataUrl: result,
-              format: file.type.split('/')[1] || 'jpeg',
+              format: getImageFormatFromMimeType(normalizeImageMimeType(file)),
             });
           };
 
@@ -249,169 +241,5 @@ function captureImageWithHtmlInput(
         )
       );
     }
-  });
-}
-
-/**
- * 图片压缩配置接口
- */
-export interface ImageCompressionOptions {
-  /** 最大文件大小（MB），默认 0.1MB (100KB) */
-  maxSizeMB?: number;
-  /** 最大宽度或高度，默认 1200px */
-  maxWidthOrHeight?: number;
-  /** 图片质量，0-1之间，默认 0.8 */
-  initialQuality?: number;
-  /** 输出格式，默认应用内图片格式 */
-  fileType?: string;
-}
-
-/**
- * 内部图片压缩工具函数
- * 使用 Canvas 进行高质量图片压缩
- */
-async function compressImage(
-  file: File,
-  options: ImageCompressionOptions = {}
-): Promise<File> {
-  const {
-    maxSizeMB = 0.1,
-    maxWidthOrHeight = 1200,
-    initialQuality = 0.8,
-    fileType = APP_IMAGE_MIME_TYPE,
-  } = options;
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = event => {
-      const img = new Image();
-
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          let { width, height } = img;
-
-          // 计算缩放比例
-          if (width > maxWidthOrHeight || height > maxWidthOrHeight) {
-            const scale = maxWidthOrHeight / Math.max(width, height);
-            width = Math.floor(width * scale);
-            height = Math.floor(height * scale);
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            throw new Error('无法创建Canvas上下文');
-          }
-
-          // 设置高质量渲染
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-
-          // 绘制图片
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // 递归压缩直到达到目标大小
-          let quality = initialQuality;
-          const targetSize = maxSizeMB * 1024 * 1024;
-
-          const tryCompress = () => {
-            canvas.toBlob(
-              blob => {
-                if (!blob) {
-                  reject(new Error('Canvas压缩失败'));
-                  return;
-                }
-
-                if (blob.size <= targetSize || quality <= 0.1) {
-                  // 创建新的File对象
-                  const compressedFile = new File(
-                    [blob],
-                    getAppImageFileName(file.name),
-                    {
-                      type: fileType,
-                      lastModified: Date.now(),
-                    }
-                  );
-                  resolve(compressedFile);
-                } else {
-                  // 降低质量继续压缩
-                  quality = Math.max(0.1, quality - 0.1);
-                  tryCompress();
-                }
-              },
-              fileType,
-              quality
-            );
-          };
-
-          tryCompress();
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      img.onerror = () => reject(new Error('图片加载失败'));
-      img.src = event.target?.result as string;
-    };
-
-    reader.onerror = () => reject(new Error('文件读取失败'));
-    reader.readAsDataURL(file);
-  });
-}
-
-/**
- * 压缩base64格式的图片
- * 将base64转换为File，压缩后再转回base64
- */
-export async function compressBase64Image(
-  base64: string,
-  options: ImageCompressionOptions = {}
-): Promise<string> {
-  try {
-    // 将base64转换为File对象
-    const file = base64ToFile(base64, 'image.jpg');
-
-    // 使用统一的压缩函数
-    const compressedFile = await compressImage(file, options);
-
-    // 转换回base64
-    return await fileToBase64(compressedFile);
-  } catch (error) {
-    console.error('Base64图片压缩失败:', error);
-    throw error;
-  }
-}
-
-/**
- * 将base64字符串转换为File对象
- * 使用手动解析方式，避免在原生App环境中fetch data URL 的兼容性问题
- */
-function base64ToFile(base64: string, filename: string): File {
-  // 解析 base64 data URL
-  const arr = base64.split(',');
-  const mimeMatch = arr[0].match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new File([u8arr], filename, { type: mime });
-}
-
-/**
- * 将File对象转换为base64字符串
- */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
   });
 }

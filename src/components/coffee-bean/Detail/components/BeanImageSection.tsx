@@ -5,7 +5,10 @@ import Image from 'next/image';
 import { CoffeeBean } from '@/types/app';
 import { Camera, Image as ImageIcon } from 'lucide-react';
 import { captureImage } from '@/lib/utils/imageCapture';
-import { compressImage } from '@/lib/utils/imageCompression';
+import {
+  ImageProcessingError,
+  processImageFile,
+} from '@/lib/images/imageProcessing';
 import {
   getBeanDisplayInitial,
   getRoasterName,
@@ -17,7 +20,6 @@ import {
   getCoffeeBeanImageSource,
   type CoffeeBeanImageSide,
 } from '@/lib/coffee-beans/imageRepository';
-import { APP_IMAGE_MIME_TYPE } from '@/lib/images/imageFormat';
 
 // 获取烘焙商名称用于 alt 文本的辅助函数
 const getRoasterAltText = (
@@ -278,32 +280,28 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
       const response = await fetch(result.dataUrl);
       const blob = await response.blob();
       const file = new File([blob], `image.${result.format}`, {
-        type: `image/${result.format}`,
+        type: blob.type || `image/${result.format}`,
+      });
+      const image = await processImageFile(file, {
+        compression: {
+          maxSizeMB: 0.3,
+          maxWidthOrHeight: 1024,
+          initialQuality: 0.8,
+        },
       });
 
-      const compressedFile = await compressImage(file, {
-        maxWidth: 1024,
-        maxHeight: 1024,
-        quality: 0.8,
-        mimeType: APP_IMAGE_MIME_TYPE,
-        maxSizeMB: 0.3,
-      });
-
-      const reader = new FileReader();
-      reader.onload = e => {
-        const base64 = e.target?.result as string;
-        const fieldName = imageType === 'back' ? 'backImage' : 'image';
-        if (isAddMode) {
-          setTempBean(prev => ({ ...prev, [fieldName]: base64 }));
-        } else if (bean) {
-          handleUpdateField({ [fieldName]: base64 });
-        }
-      };
-      reader.readAsDataURL(compressedFile);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('图片选择失败:', error);
+      const fieldName = imageType === 'back' ? 'backImage' : 'image';
+      if (isAddMode) {
+        setTempBean(prev => ({ ...prev, [fieldName]: image }));
+      } else if (bean) {
+        handleUpdateField({ [fieldName]: image });
       }
+    } catch (error) {
+      alert(
+        error instanceof ImageProcessingError
+          ? error.message
+          : '图片选择失败，请更换图片后重试'
+      );
     }
   };
 
@@ -394,11 +392,7 @@ const AddModeImages: React.FC<{
             onError={() => markImageError(tempFrontImage)}
             onClick={e => {
               if (!hasImageError(tempFrontImage)) {
-                onImageClick(
-                  tempFrontImage,
-                  tempBackImage,
-                  e.currentTarget
-                );
+                onImageClick(tempFrontImage, tempBackImage, e.currentTarget);
               }
             }}
           />
@@ -425,11 +419,7 @@ const AddModeImages: React.FC<{
             onError={() => markImageError(tempBackImage)}
             onClick={e => {
               if (!hasImageError(tempBackImage)) {
-                onImageClick(
-                  tempBackImage,
-                  tempFrontImage,
-                  e.currentTarget
-                );
+                onImageClick(tempBackImage, tempFrontImage, e.currentTarget);
               }
             }}
           />

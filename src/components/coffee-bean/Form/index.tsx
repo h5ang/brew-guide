@@ -26,7 +26,10 @@ import {
   DEFAULT_VARIETIES,
 } from './constants';
 import { defaultSettings } from '@/components/settings/Settings';
-import { compressBase64Image } from '@/lib/utils/imageCapture';
+import {
+  ImageProcessingError,
+  processImageFile,
+} from '@/lib/images/imageProcessing';
 import { getDefaultFlavorPeriodByRoastLevelSync } from '@/lib/utils/flavorPeriodUtils';
 import { modalHistory } from '@/lib/hooks/useModalHistory';
 import { inferBeanType } from '@/lib/utils/beanTypeInference';
@@ -700,88 +703,42 @@ const CoffeeBeanForm = forwardRef<CoffeeBeanFormHandle, CoffeeBeanFormProps>(
 
     // 处理图片上传
     const handleImageUpload = async (file: File) => {
-      // 仅支持 JPG、PNG、WebP、HEIC 格式
-      const allowedTypes = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'image/heic',
-        'image/heif',
-      ];
-      if (!allowedTypes.includes(file.type)) return;
-
-      const reader = new FileReader();
-
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result as string;
-          if (!base64) return;
-
-          const compressedBase64 = await compressBase64Image(base64, {
-            maxSizeMB: 0.1, // 100KB
+      try {
+        const image = await processImageFile(file, {
+          compression: {
+            maxSizeMB: 0.1,
             maxWidthOrHeight: 1200,
             initialQuality: 0.8,
-          });
-          setBean(prev => ({ ...prev, image: compressedBase64 }));
-        } catch (error) {
-          // Log error in development only
-          if (process.env.NODE_ENV === 'development') {
-            console.error('图片处理失败:', error);
-          }
-        }
-      };
-
-      reader.onerror = () => {
-        // Log error in development only
-        if (process.env.NODE_ENV === 'development') {
-          console.error('文件读取失败');
-        }
-      };
-
-      reader.readAsDataURL(file);
+          },
+        });
+        setBean(prev => ({ ...prev, image }));
+      } catch (error) {
+        alert(
+          error instanceof ImageProcessingError
+            ? error.message
+            : '图片处理失败，请更换图片后重试'
+        );
+      }
     };
 
     // 处理背面图片上传
     const handleBackImageUpload = async (file: File) => {
-      // 仅支持 JPG、PNG、WebP、HEIC 格式
-      const allowedTypes = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'image/heic',
-        'image/heif',
-      ];
-      if (!allowedTypes.includes(file.type)) return;
-
-      const reader = new FileReader();
-
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result as string;
-          if (!base64) return;
-
-          const compressedBase64 = await compressBase64Image(base64, {
-            maxSizeMB: 0.1, // 100KB
+      try {
+        const backImage = await processImageFile(file, {
+          compression: {
+            maxSizeMB: 0.1,
             maxWidthOrHeight: 1200,
             initialQuality: 0.8,
-          });
-          setBean(prev => ({ ...prev, backImage: compressedBase64 }));
-        } catch (error) {
-          // Log error in development only
-          if (process.env.NODE_ENV === 'development') {
-            console.error('背面图片处理失败:', error);
-          }
-        }
-      };
-
-      reader.onerror = () => {
-        // Log error in development only
-        if (process.env.NODE_ENV === 'development') {
-          console.error('背面图片文件读取失败');
-        }
-      };
-
-      reader.readAsDataURL(file);
+          },
+        });
+        setBean(prev => ({ ...prev, backImage }));
+      } catch (error) {
+        alert(
+          error instanceof ImageProcessingError
+            ? error.message
+            : '背面图片处理失败，请更换图片后重试'
+        );
+      }
     };
 
     // 验证当前步骤是否可以进行下一步

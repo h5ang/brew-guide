@@ -17,7 +17,12 @@ import type {
 } from '@/types/app';
 import { isPendingCoffeeBean } from '@/lib/utils/coffeeBeanUtils';
 
-import { captureImage, compressBase64Image } from '@/lib/utils/imageCapture';
+import { captureImage } from '@/lib/utils/imageCapture';
+import { IMAGE_FILE_ACCEPT } from '@/lib/images/imageFormat';
+import {
+  getImageProcessingErrorMessage,
+  processImageFiles,
+} from '@/lib/images/imageProcessing';
 import {
   Camera,
   Image as ImageIcon,
@@ -235,7 +240,9 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
   onDraftChange,
   syncInitialDataChanges = true,
 }) => {
-  const navigationState = deriveNavigationSettings(settings?.navigationSettings);
+  const navigationState = deriveNavigationSettings(
+    settings?.navigationSettings
+  );
   const canUseCoffeeBeanModule = navigationState.visibleTabs.coffeeBean;
 
   // 获取烘焙商显示设置
@@ -1093,69 +1100,40 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
     }
   }, [initialData?.taste]);
 
-  // 处理相册图片上传（使用 HTML input，与咖啡豆图片识别保持一致）
+  // 处理相册图片上传
   const handleGalleryUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
       if (!files || files.length === 0) return;
 
       const remainCount = 9 - formData.images.length;
-      const allowedTypes = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'image/heic',
-        'image/heif',
-      ];
-      const validFiles: File[] = [];
-
-      for (let i = 0; i < Math.min(files.length, remainCount); i++) {
-        const file = files[i];
-        if (allowedTypes.includes(file.type) && file.size <= 50 * 1024 * 1024) {
-          validFiles.push(file);
-        }
-      }
-
-      if (validFiles.length === 0) return;
 
       try {
-        // 读取所有文件为 base64
-        const newImagesBase64 = await Promise.all(
-          validFiles.map(
-            file =>
-              new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-              })
-          )
-        );
-
-        // 压缩所有新图片
-        const compressedImages = await Promise.all(
-          newImagesBase64.map(base64 =>
-            compressBase64Image(base64, {
-              maxSizeMB: 0.1,
-              maxWidthOrHeight: 1200,
-              initialQuality: 0.8,
-            })
-          )
-        );
-
-        // 更新表单数据
-        setFormData(prev => {
-          const newImages = [...prev.images, ...compressedImages];
-          return {
-            ...prev,
-            image: newImages[0],
-            images: newImages,
-          };
+        const { images, errors } = await processImageFiles(files, {
+          limit: remainCount,
+          compression: {
+            maxSizeMB: 0.1,
+            maxWidthOrHeight: 1200,
+            initialQuality: 0.8,
+          },
         });
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('图片处理失败:', error);
+
+        if (images.length > 0) {
+          setFormData(prev => {
+            const newImages = [...prev.images, ...images];
+            return {
+              ...prev,
+              image: newImages[0],
+              images: newImages,
+            };
+          });
         }
+
+        if (errors.length > 0) {
+          alert(getImageProcessingErrorMessage(errors));
+        }
+      } catch (error) {
+        alert(error instanceof Error ? error.message : '图片处理失败，请重试');
       }
 
       // 清除 input 值，允许再次选择同一文件
@@ -1175,7 +1153,6 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
       }
 
       if (source === 'gallery') {
-        // 使用 HTML input 选择图片（与咖啡豆图片识别保持一致）
         imageInputRef.current?.click();
         return;
       }
@@ -1183,22 +1160,31 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
       // 拍照使用 captureImage
       try {
         const result = await captureImage({ source });
-        const newImagesBase64 = [result.dataUrl];
+        const response = await fetch(result.dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `image.${result.format}`, {
+          type: blob.type || `image/${result.format}`,
+        });
+        const { images, errors } = await processImageFiles([file], {
+          compression: {
+            maxSizeMB: 0.1,
+            maxWidthOrHeight: 1200,
+            initialQuality: 0.8,
+          },
+        });
 
-        // 压缩所有新图片
-        const compressedImages = await Promise.all(
-          newImagesBase64.map(base64 =>
-            compressBase64Image(base64, {
-              maxSizeMB: 0.1,
-              maxWidthOrHeight: 1200,
-              initialQuality: 0.8,
-            })
-          )
-        );
+        if (errors.length > 0) {
+          alert(getImageProcessingErrorMessage(errors));
+          return;
+        }
+
+        if (images.length === 0) {
+          return;
+        }
 
         // 更新表单数据
         setFormData(prev => {
-          const newImages = [...prev.images, ...compressedImages];
+          const newImages = [...prev.images, ...images];
           return {
             ...prev,
             image: newImages[0], // 始终保持第一张为封面图
@@ -1206,9 +1192,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
           };
         });
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('打开相机失败:', error);
-        }
+        alert(error instanceof Error ? error.message : '打开相机失败，请重试');
       }
     },
     [formData.images.length]
@@ -2210,7 +2194,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
       <input
         ref={imageInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        accept={IMAGE_FILE_ACCEPT}
         multiple
         className="hidden"
         onChange={handleGalleryUpload}

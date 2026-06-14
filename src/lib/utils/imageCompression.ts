@@ -5,6 +5,7 @@
 
 import {
   APP_IMAGE_MIME_TYPE,
+  getAppImageFileName,
   JPEG_IMAGE_MIME_TYPE,
 } from '@/lib/images/imageFormat';
 
@@ -143,6 +144,75 @@ export async function compressImage(
     };
 
     reader.readAsDataURL(file);
+  });
+}
+
+export interface Base64CompressionOptions {
+  /** 最大文件大小（MB），默认 0.1MB (100KB) */
+  maxSizeMB?: number;
+  /** 最大宽度或高度，默认 1200px */
+  maxWidthOrHeight?: number;
+  /** 图片质量，0-1之间，默认 0.8 */
+  initialQuality?: number;
+  /** 输出格式，默认应用内图片格式 */
+  fileType?: string;
+}
+
+export async function compressBase64Image(
+  base64: string,
+  options: Base64CompressionOptions = {}
+): Promise<string> {
+  const {
+    maxSizeMB = 0.1,
+    maxWidthOrHeight = 1200,
+    initialQuality = 0.8,
+    fileType = APP_IMAGE_MIME_TYPE,
+  } = options;
+
+  const sourceFile = base64ToFile(base64, 'image');
+  const compressedFile = await compressImage(sourceFile, {
+    maxWidth: maxWidthOrHeight,
+    maxHeight: maxWidthOrHeight,
+    quality: initialQuality,
+    mimeType: fileType,
+    maxSizeMB,
+  });
+
+  return readFileAsDataUrl(
+    new File([compressedFile], getAppImageFileName(sourceFile.name), {
+      type: fileType,
+      lastModified: compressedFile.lastModified,
+    })
+  );
+}
+
+export function readFileAsDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('图片读取失败'));
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function base64ToFile(base64: string, fileName: string): File {
+  const [header = '', payload = ''] = base64.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || JPEG_IMAGE_MIME_TYPE;
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new File([bytes], `${fileName}.${mime.split('/')[1] || 'jpg'}`, {
+    type: mime,
   });
 }
 
