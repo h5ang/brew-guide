@@ -11,15 +11,27 @@ import {
 
 const DEFAULT_MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
 
+type ImageProcessingErrorCode =
+  | 'unsupported-type'
+  | 'too-large'
+  | 'decode-failed'
+  | 'read-failed';
+
+interface ImageFailureDiagnostics {
+  fileName: string;
+  declaredType: string;
+  size: string;
+  runtime: string;
+  reason: string;
+}
+
 export class ImageProcessingError extends Error {
   constructor(
     message: string,
-    readonly code:
-      | 'unsupported-type'
-      | 'too-large'
-      | 'decode-failed'
-      | 'read-failed',
-    readonly file?: File
+    readonly code: ImageProcessingErrorCode,
+    readonly file?: File,
+    readonly originalError?: unknown,
+    readonly diagnostics?: ImageFailureDiagnostics
   ) {
     super(message);
     this.name = 'ImageProcessingError';
@@ -38,6 +50,71 @@ export interface ImageBatchProcessingOptions extends ImageProcessingOptions {
 export interface ImageBatchProcessingResult {
   images: string[];
   errors: ImageProcessingError[];
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes)) return '未知';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)}${units[unitIndex]}`;
+}
+
+function getRuntimeLabel() {
+  if (typeof navigator === 'undefined') return 'unknown';
+
+  const userAgent = navigator.userAgent || '';
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return 'macOS';
+  if (/Windows/i.test(userAgent)) return 'Windows';
+  return navigator.platform || 'browser';
+}
+
+function getErrorReason(error: unknown) {
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return `${error.name}: ${error.message || '无详细信息'}`;
+  }
+
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+
+  return typeof error === 'string' ? error : '未知错误';
+}
+
+function getImageFailureDiagnostics(
+  file: File,
+  error: unknown
+): ImageFailureDiagnostics {
+  return {
+    fileName: file.name || '未命名文件',
+    declaredType: file.type || '空',
+    size: formatBytes(file.size),
+    runtime: getRuntimeLabel(),
+    reason: getErrorReason(error),
+  };
+}
+
+function createImageReadFailedError(file: File, error: unknown) {
+  const diagnostics = getImageFailureDiagnostics(file, error);
+  return new ImageProcessingError(
+    [
+      '图片读取失败，请重试',
+      `诊断信息：文件=${diagnostics.fileName}，类型=${diagnostics.declaredType}，大小=${diagnostics.size}，平台=${diagnostics.runtime}，原因=${diagnostics.reason}`,
+    ].join('\n'),
+    'read-failed',
+    file,
+    error,
+    diagnostics
+  );
 }
 
 export async function processImageFile(
@@ -67,17 +144,19 @@ export async function processImageFile(
   let dataUrl: string;
   try {
     dataUrl = await readFileAsDataUrl(file);
-  } catch {
-    throw new ImageProcessingError('图片读取失败，请重试', 'read-failed', file);
+  } catch (error) {
+    const readError = createImageReadFailedError(file, error);
+    console.error('Image file read failed', readError.diagnostics);
+    throw readError;
   }
 
   try {
     return await compressBase64Image(dataUrl, compression);
-  } catch {
+  } catch (error) {
     const message = isHeifImageMimeType(mimeType)
       ? '当前浏览器无法解码 HEIF/HEIC 图片，请在系统相册中转换为 JPG 或 PNG 后再添加'
       : '图片解码或压缩失败，请更换图片后重试';
-    throw new ImageProcessingError(message, 'decode-failed', file);
+    throw new ImageProcessingError(message, 'decode-failed', file, error);
   }
 }
 

@@ -1,4 +1,9 @@
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import {
+  Camera,
+  CameraResultType,
+  CameraSource,
+  type GalleryPhoto,
+} from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import {
   getImageFormatFromMimeType,
@@ -15,9 +20,74 @@ export interface ImageCaptureOptions {
   resultType?: CameraResultType;
 }
 
+export interface NativeGalleryImageOptions {
+  quality?: number;
+  limit?: number;
+}
+
 export interface ImageCaptureResult {
   dataUrl: string;
   format: string;
+}
+
+export function shouldUseNativeGalleryPicker() {
+  return Capacitor.isNativePlatform();
+}
+
+export function isImageSelectionCancelled(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return /cancel|cancelled|canceled|用户取消|未选择/i.test(message);
+}
+
+function normalizeImageFormat(format?: string) {
+  if (!format) return 'jpeg';
+  return format === 'jpg' ? 'jpeg' : format.toLowerCase();
+}
+
+function getGalleryPhotoFileName(photo: GalleryPhoto, index: number) {
+  const format = normalizeImageFormat(photo.format);
+  const fallback = `gallery-image-${Date.now()}-${index + 1}.${format}`;
+  const sourcePath = photo.path || photo.webPath;
+
+  try {
+    const urlPath = new URL(sourcePath).pathname;
+    const fileName = decodeURIComponent(urlPath.split('/').pop() || '');
+    return /\.[^/.]+$/.test(fileName) ? fileName : fallback;
+  } catch {
+    const fileName = sourcePath.split(/[/?#]/).filter(Boolean).pop() || '';
+    return /\.[^/.]+$/.test(fileName) ? fileName : fallback;
+  }
+}
+
+async function galleryPhotoToFile(photo: GalleryPhoto, index: number) {
+  const response = await fetch(photo.webPath);
+
+  if (!response.ok) {
+    throw new Error(`系统相册图片读取失败：HTTP ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const format = normalizeImageFormat(photo.format);
+  const type = blob.type || `image/${format}`;
+
+  return new File([blob], getGalleryPhotoFileName(photo, index), {
+    type,
+    lastModified: Date.now(),
+  });
+}
+
+export async function pickNativeGalleryImageFiles(
+  options: NativeGalleryImageOptions = {}
+) {
+  const { quality = 90, limit } = options;
+  const { photos } = await Camera.pickImages({
+    quality,
+    limit,
+    correctOrientation: true,
+  });
+
+  return Promise.all(photos.map(galleryPhotoToFile));
 }
 
 /**

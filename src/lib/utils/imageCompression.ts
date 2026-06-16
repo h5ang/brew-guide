@@ -202,9 +202,10 @@ export function readFileAsDataUrl(file: Blob): Promise<string> {
         resolve(reader.result);
         return;
       }
-      reject(new Error('图片读取失败'));
+      reject(new Error(`图片读取结果异常：${typeof reader.result}`));
     };
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'));
+    reader.onabort = () => reject(new Error('文件读取被中断'));
     reader.readAsDataURL(file);
   });
 }
