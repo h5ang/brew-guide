@@ -45,6 +45,7 @@ const BeanPrintModal: React.FC<BeanPrintModalProps> = ({
   const {
     content,
     updateField,
+    updateIcon,
     updateFlavorItem,
     addFlavor,
     removeFlavor,
@@ -140,13 +141,23 @@ const BeanPrintModal: React.FC<BeanPrintModalProps> = ({
                 content={content}
                 onToggleField={toggleField}
                 onUpdateField={updateField}
+                onUpdateIcon={updateIcon}
+                onUpdateIconPlacement={placement =>
+                  updateConfig('iconPlacement', placement)
+                }
                 onUpdateFlavorItem={updateFlavorItem}
                 onAddFlavor={addFlavor}
                 onRemoveFlavor={removeFlavor}
                 onResetContent={resetContent}
               />
 
-              <PrintPreview config={config} content={content} />
+              <PrintPreview
+                config={config}
+                content={content}
+                onUpdateIconPlacement={placement =>
+                  updateConfig('iconPlacement', placement)
+                }
+              />
             </div>
           </div>
 

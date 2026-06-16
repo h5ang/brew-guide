@@ -100,7 +100,13 @@ export const DetailedTemplate: React.FC<TemplateProps> = ({
   ] as const;
 
   return (
-    <div style={{ display: 'flex',height: '100%', flexDirection: 'column' }}>
+    <div
+      style={{
+        display: 'flex',
+        height: '100%',
+        flexDirection: 'column',
+      }}
+    >
       {/* 标题 */}
       {isPrintFieldVisible('name', config, content) && (
         <div
@@ -128,7 +134,7 @@ export const DetailedTemplate: React.FC<TemplateProps> = ({
           display: 'flex',
           flex: '1 1 0%',
           flexWrap: 'wrap',
-          alignContent: 'flex-start',
+          alignContent: 'flex-end',
           fontSize: `${fontSize}px`,
           gap: `${Math.max(fontSize * 0.4, 4)}px`,
           lineHeight: 1,

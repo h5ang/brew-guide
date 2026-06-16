@@ -99,7 +99,8 @@ const extractComponentInfo = (
 // 从 bean 创建初始内容
 export const createInitialContent = (
   bean: CoffeeBean | null,
-  _roasterSettings: RoasterSettings
+  _roasterSettings: RoasterSettings,
+  icon = ''
 ): EditableContent => {
   if (!bean) {
     return {
@@ -114,6 +115,7 @@ export const createInitialContent = (
       flavor: [],
       notes: '',
       weight: '',
+      icon,
     };
   }
   return {
@@ -128,6 +130,7 @@ export const createInitialContent = (
     flavor: bean.flavor || [],
     notes: bean.notes || '',
     weight: '',
+    icon,
   };
 };
 
@@ -143,6 +146,59 @@ const waitForFonts = async (): Promise<void> => {
   } catch {
     // 字体加载 API 不支持时忽略
   }
+};
+
+const waitForImages = async (element: HTMLElement): Promise<void> => {
+  const images = Array.from(element.querySelectorAll('img'));
+  const backgroundIconSources = Array.from(
+    element.querySelectorAll<HTMLElement>('[data-print-icon-src]')
+  )
+    .map(icon => icon.dataset.printIconSrc)
+    .filter((src): src is string => Boolean(src));
+
+  await Promise.all(
+    images
+      .map(
+        image =>
+          new Promise<void>((resolve, reject) => {
+            if (image.complete) {
+              if (image.naturalWidth > 0) {
+                resolve();
+              } else {
+                reject(new Error('图片加载失败'));
+              }
+              return;
+            }
+
+            const cleanup = () => {
+              image.removeEventListener('load', handleLoad);
+              image.removeEventListener('error', handleError);
+            };
+            const handleLoad = () => {
+              cleanup();
+              resolve();
+            };
+            const handleError = () => {
+              cleanup();
+              reject(new Error('图片加载失败'));
+            };
+
+            image.addEventListener('load', handleLoad);
+            image.addEventListener('error', handleError);
+          })
+      )
+      .concat(
+        backgroundIconSources.map(
+          src =>
+            new Promise<void>((resolve, reject) => {
+              const image = new Image();
+              image.onload = () => resolve();
+              image.onerror = () => reject(new Error('图片加载失败'));
+              image.src = src;
+            })
+        )
+      )
+  );
 };
 
 // 将 Tailwind 类名转换为内联样式的映射表
@@ -218,6 +274,7 @@ export async function savePreviewAsImage(
 
   // 1. 等待字体加载完成
   await waitForFonts();
+  await waitForImages(el);
 
   // 2. 等待浏览器渲染完成
   await new Promise(resolve => requestAnimationFrame(resolve));
@@ -259,6 +316,7 @@ export async function savePreviewAsImage(
   `;
   offscreenContainer.appendChild(clonedEl);
   document.body.appendChild(offscreenContainer);
+  await waitForImages(clonedEl);
 
   // 7. 再次等待渲染
   await new Promise(resolve => requestAnimationFrame(resolve));

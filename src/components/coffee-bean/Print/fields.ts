@@ -2,7 +2,7 @@ import { EditableContent, PrintConfig, PrintFieldKey } from './types';
 
 export type PrintTextFieldKey = Exclude<
   keyof EditableContent,
-  'roaster' | 'roastDate' | 'flavor' | 'notes'
+  'roaster' | 'roastDate' | 'flavor' | 'notes' | 'icon'
 >;
 
 export const PRINT_FIELD_ORDER: PrintFieldKey[] = [
@@ -16,7 +16,22 @@ export const PRINT_FIELD_ORDER: PrintFieldKey[] = [
   'flavor',
   'weight',
   'notes',
+  'icon',
 ];
+
+const DETAIL_ONLY_PRINT_FIELDS = new Set<PrintFieldKey>(['icon']);
+
+export const isPrintFieldAvailableForTemplate = (
+  field: PrintFieldKey,
+  template: PrintConfig['template']
+): boolean => template === 'detailed' || !DETAIL_ONLY_PRINT_FIELDS.has(field);
+
+export const getPrintFieldOrder = (
+  template: PrintConfig['template']
+): PrintFieldKey[] =>
+  PRINT_FIELD_ORDER.filter(field =>
+    isPrintFieldAvailableForTemplate(field, template)
+  );
 
 export const PRINT_FIELD_LABELS: Record<PrintFieldKey, string> = {
   name: '名称',
@@ -29,6 +44,7 @@ export const PRINT_FIELD_LABELS: Record<PrintFieldKey, string> = {
   flavor: '风味',
   weight: '克重',
   notes: '备注',
+  icon: '图标',
 };
 
 export const PRINT_EDITOR_FIELD_LABELS: Record<PrintFieldKey, string> = {
@@ -42,17 +58,19 @@ export const PRINT_EDITOR_FIELD_LABELS: Record<PrintFieldKey, string> = {
   flavor: '风味',
   weight: '克重',
   notes: '备注',
+  icon: '图标',
 };
 
-export const PRINT_TEXT_FIELD_PLACEHOLDERS: Record<PrintTextFieldKey, string> = {
-  name: '例如：野草莓',
-  origin: '产地信息',
-  estate: '庄园信息',
-  roastLevel: '烘焙度',
-  process: '例如：水洗、日晒',
-  variety: '例如：卡杜拉、瑰夏',
-  weight: '例如：250',
-};
+export const PRINT_TEXT_FIELD_PLACEHOLDERS: Record<PrintTextFieldKey, string> =
+  {
+    name: '例如：野草莓',
+    origin: '产地信息',
+    estate: '庄园信息',
+    roastLevel: '烘焙度',
+    process: '例如：水洗、日晒',
+    variety: '例如：卡杜拉、瑰夏',
+    weight: '例如：250',
+  };
 
 const hasValue = (value: string): boolean => value.trim().length > 0;
 
@@ -87,6 +105,8 @@ export const hasPrintFieldContent = (
       return hasValue(content.weight);
     case 'notes':
       return hasValue(content.notes);
+    case 'icon':
+      return template === 'detailed' && hasValue(content.icon);
     default:
       return false;
   }
@@ -96,4 +116,7 @@ export const isPrintFieldVisible = (
   field: PrintFieldKey,
   config: PrintConfig,
   content: EditableContent
-): boolean => config.fields[field] && hasPrintFieldContent(field, content, config.template);
+): boolean =>
+  isPrintFieldAvailableForTemplate(field, config.template) &&
+  config.fields[field] &&
+  hasPrintFieldContent(field, content, config.template);

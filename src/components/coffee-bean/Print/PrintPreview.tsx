@@ -1,18 +1,22 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { PrintConfig, EditableContent } from './types';
+import { PrintConfig, EditableContent, PrintIconPlacement } from './types';
 import { formatDate, getPreviewDimensions } from './utils';
 import { getTemplateComponent } from './Templates';
+import { isPrintFieldVisible } from './fields';
+import { PrintIconLayer } from './PrintIconLayer';
 
 interface PrintPreviewProps {
   config: PrintConfig;
   content: EditableContent;
+  onUpdateIconPlacement: (placement: PrintIconPlacement) => void;
 }
 
 export const PrintPreview: React.FC<PrintPreviewProps> = ({
   config,
   content,
+  onUpdateIconPlacement,
 }) => {
   const dimensions = getPreviewDimensions(config);
   const formattedDate = useMemo(
@@ -34,6 +38,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
             width: dimensions.width,
             height: dimensions.height,
             padding: `${config.margin}mm`,
+            position: 'relative',
             fontSize: `${config.fontSize}px`,
             backgroundColor: '#ffffff',
             color: '#000000',
@@ -52,6 +57,14 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
             content={content}
             formattedDate={formattedDate}
           />
+          {isPrintFieldVisible('icon', config, content) && (
+            <PrintIconLayer
+              icon={content.icon}
+              margin={config.margin}
+              placement={config.iconPlacement}
+              onPlacementChange={onUpdateIconPlacement}
+            />
+          )}
         </div>
       </div>
     </div>

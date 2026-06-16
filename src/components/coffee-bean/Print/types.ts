@@ -15,6 +15,13 @@ export interface EditableContent {
   flavor: string[];
   notes: string;
   weight: string;
+  icon: string;
+}
+
+export interface PrintIconPlacement {
+  x: number;
+  y: number;
+  size: number;
 }
 
 // 打印配置
@@ -33,12 +40,14 @@ export interface PrintConfig {
     variety: boolean;
     notes: boolean;
     weight: boolean;
+    icon: boolean;
   };
   margin: number;
   fontSize: number;
   titleFontSize: number;
   fontWeight: number;
   template: 'minimal' | 'detailed';
+  iconPlacement: PrintIconPlacement;
 }
 
 export type PrintFieldKey = keyof PrintConfig['fields'];
