@@ -83,7 +83,7 @@ export const defaultSettings: AppSettings = {
 
   // 安全区域设置
   safeAreaMargins: {
-    top: 38,
+    top: 12,
     bottom: 38,
   },
 
@@ -206,6 +206,11 @@ export const defaultSettings: AppSettings = {
   roasterMigrationCompleted: false, // @deprecated 已废弃，按需迁移策略不再使用此标记
 };
 
+const LEGACY_DEFAULT_SAFE_AREA_MARGINS = {
+  top: 38,
+  bottom: 38,
+};
+
 /**
  * 设置 Store 状态接口
  */
@@ -308,10 +313,20 @@ const mergeSettingsWithDefaults = (
 ): AppSettings => {
   const { searchSort: _legacySearchSort, ...supportedSettings } = (settings ??
     {}) as Partial<AppSettings> & { searchSort?: unknown };
+  const safeAreaMargins = settings?.safeAreaMargins;
+  const normalizedSafeAreaMargins =
+    safeAreaMargins?.top === LEGACY_DEFAULT_SAFE_AREA_MARGINS.top &&
+    safeAreaMargins.bottom === LEGACY_DEFAULT_SAFE_AREA_MARGINS.bottom
+      ? {
+          ...safeAreaMargins,
+          top: defaultSettings.safeAreaMargins?.top ?? 12,
+        }
+      : (safeAreaMargins ?? defaultSettings.safeAreaMargins);
 
   return {
     ...defaultSettings,
     ...supportedSettings,
+    safeAreaMargins: normalizedSafeAreaMargins,
     layoutSettings: normalizeLayoutSettings(settings?.layoutSettings),
     navigationSettings: normalizeNavigationSettings(
       settings?.navigationSettings
@@ -360,10 +375,13 @@ export const useSettingsStore = create<SettingsStore>()(
           // 合并默认设置和存储的设置，确保新字段和嵌套字段都有默认值
           const mergedSettings =
             mergeSettingsWithDefaults(normalizedStoredData);
+          const legacySettings = stored.data as AppSettings & {
+            notesListStyle?: string;
+          };
 
           // 兼容旧字段：notesListStyle -> useClassicNotesListStyle
           if (
-            (stored.data as any).notesListStyle === 'standard' &&
+            legacySettings.notesListStyle === 'standard' &&
             mergedSettings.useClassicNotesListStyle === undefined
           ) {
             mergedSettings.useClassicNotesListStyle = true;
