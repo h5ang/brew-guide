@@ -109,10 +109,10 @@ const StatsSectionEditorDrawer: React.FC<StatsSectionEditorDrawerProps> = ({
   useEffect(() => {
     if (isOpen) {
       setDraftSections(sections);
-    } else {
-      setIsDraggingSection(false);
     }
   }, [isOpen, sections]);
+
+  const isDraggingActive = isOpen && isDraggingSection;
 
   const updateDraftSections = (nextSections: StatsSectionOption[]) => {
     setDraftSections(nextSections);
@@ -127,11 +127,13 @@ const StatsSectionEditorDrawer: React.FC<StatsSectionEditorDrawerProps> = ({
   };
 
   const handleCancel = () => {
+    setIsDraggingSection(false);
     setDraftSections(sections);
     onClose();
   };
 
   const handleDone = () => {
+    setIsDraggingSection(false);
     onChange(draftSections);
     onClose();
   };
@@ -172,7 +174,7 @@ const StatsSectionEditorDrawer: React.FC<StatsSectionEditorDrawerProps> = ({
 
             <div
               className={`min-h-0 px-6 pb-6 ${
-                isDraggingSection
+                isDraggingActive
                   ? 'touch-none overflow-y-hidden'
                   : 'overflow-y-auto overscroll-contain'
               }`}

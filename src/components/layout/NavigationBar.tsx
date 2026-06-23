@@ -84,6 +84,12 @@ interface EditableParams {
   time?: string;
 }
 
+interface DisplayOverlayState {
+  step: BrewingStep;
+  params: EditableParams;
+  value: Partial<EditableParams>;
+}
+
 // 意式咖啡相关工具函数
 const espressoUtils = {
   isEspresso: (
@@ -628,8 +634,39 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   };
 
   // 🎯 笔记步骤中参数显示的叠加层状态（仅用于UI显示，不影响实际数据）
-  const [displayOverlay, setDisplayOverlay] =
-    useState<Partial<EditableParams> | null>(null);
+  const [displayOverlayState, setDisplayOverlayState] =
+    useState<DisplayOverlayState | null>(null);
+  const displayOverlay =
+    activeBrewingStep === 'notes' &&
+    editableParams &&
+    displayOverlayState?.step === activeBrewingStep &&
+    displayOverlayState.params === editableParams
+      ? displayOverlayState.value
+      : null;
+  const updateDisplayOverlay = useCallback(
+    (
+      updater: (
+        current: Partial<EditableParams> | null
+      ) => Partial<EditableParams>
+    ) => {
+      if (activeBrewingStep !== 'notes' || !editableParams) return;
+
+      setDisplayOverlayState(current => {
+        const currentValue =
+          current?.step === activeBrewingStep &&
+          current.params === editableParams
+            ? current.value
+            : null;
+
+        return {
+          step: activeBrewingStep,
+          params: editableParams,
+          value: updater(currentValue),
+        };
+      });
+    },
+    [activeBrewingStep, editableParams]
+  );
 
   // ==================== 下拉上传状态和逻辑 ====================
   const [pullDistance, setPullDistance] = useState(0);
@@ -928,7 +965,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       }
 
       // 🎯 步骤改变时清除显示叠加层
-      setDisplayOverlay(null);
+      setDisplayOverlayState(null);
     };
 
     return listenToEvent(BREWING_EVENTS.STEP_CHANGED, handleStepChanged);
@@ -970,7 +1007,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           if (isNaN(coffeeValue) || coffeeValue <= 0) return;
 
           const calculatedWater = Math.round(coffeeValue * currentRatioNum);
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             coffee: `${coffeeValue}g`,
             water: `${calculatedWater}g`,
@@ -982,7 +1019,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           if (isNaN(ratioValue) || ratioValue <= 0) return;
 
           const calculatedWater = Math.round(currentCoffeeNum * ratioValue);
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             ratio: `1:${ratioValue}`,
             water: `${calculatedWater}g`,
@@ -990,7 +1027,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           break;
         }
         case 'grindSize': {
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             grindSize: value,
           }));
@@ -998,7 +1035,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         }
         case 'temp': {
           const formattedTemp = value.includes('°C') ? value : `${value}°C`;
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             temp: formattedTemp,
           }));
@@ -1006,7 +1043,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         }
         case 'water': {
           const waterValue = value.includes('g') ? value : `${value}g`;
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             water: waterValue,
           }));
@@ -1014,7 +1051,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         }
         case 'time': {
           const timeValue = value.replace(/[sS秒]/g, '');
-          setDisplayOverlay(prev => ({
+          updateDisplayOverlay(prev => ({
             ...prev,
             time: timeValue,
           }));
@@ -1034,14 +1071,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         handleNavbarDisplayUpdate as EventListener
       );
     };
-  }, [activeBrewingStep, editableParams, displayOverlay]);
-
-  // 🎯 当 editableParams 变为 null 或步骤不是 notes 时，清除显示叠加层
-  useEffect(() => {
-    if (!editableParams || activeBrewingStep !== 'notes') {
-      setDisplayOverlay(null);
-    }
-  }, [editableParams, activeBrewingStep]);
+  }, [activeBrewingStep, editableParams, displayOverlay, updateDisplayOverlay]);
 
   const shouldHideHeader =
     activeBrewingStep === 'brewing' && isTimerRunning && !showComplete;

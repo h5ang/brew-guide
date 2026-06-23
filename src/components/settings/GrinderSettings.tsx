@@ -379,6 +379,7 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
                 )}
               </div>
               <button
+                type="button"
                 onClick={e => {
                   e.stopPropagation();
                   if (deletingId === grinder.id) {
@@ -424,6 +425,7 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
               className="flex-1 appearance-none bg-transparent text-sm font-medium text-neutral-900 placeholder:text-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder:text-neutral-500"
             />
             <button
+              type="button"
               onClick={() =>
                 newGrinderName.trim() && setAddingStep('grindSize')
               }
@@ -463,6 +465,7 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
               className="flex-1 appearance-none bg-transparent text-sm font-medium text-neutral-900 placeholder:text-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder:text-neutral-500"
             />
             <button
+              type="button"
               onClick={handleAddGrinder}
               disabled={!newGrindSize.trim()}
               className="ml-auto text-xs font-medium text-neutral-800 transition-colors hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-neutral-200 dark:hover:text-neutral-100"
@@ -472,6 +475,7 @@ const GrinderSettings: React.FC<GrinderSettingsProps> = ({
           </div>
         ) : (
           <button
+            type="button"
             onClick={() => setAddingStep('name')}
             className="flex w-full items-center justify-center gap-2 rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           >

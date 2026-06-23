@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { CustomEquipment, Method } from '@/lib/core/config';
 import CustomEquipmentForm, {
   CustomEquipmentFormHandle,
@@ -35,19 +35,39 @@ const CustomEquipmentFormModal: React.FC<CustomEquipmentFormModalProps> = ({
   onClearPendingImport,
 }) => {
   const formRef = useRef<CustomEquipmentFormHandle>(null);
-  const [drawerChrome, setDrawerChrome] = useState<EquipmentFormDrawerChrome>({
-    title: editingEquipment ? '编辑器具' : '添加器具',
-    doneDisabled: false,
-    canGoBack: false,
-  });
-  // 用于回填的器具数据（来自导入或编辑）
-  const [currentEquipment, setCurrentEquipment] = useState<
-    CustomEquipment | undefined
-  >(editingEquipment);
-  // 待保存的方案数据（来自导入）
-  const [pendingMethods, setPendingMethods] = useState<Method[] | undefined>(
-    undefined
+  const defaultDrawerChrome = useMemo<EquipmentFormDrawerChrome>(
+    () => ({
+      title: editingEquipment ? '编辑器具' : '添加器具',
+      doneDisabled: false,
+      canGoBack: false,
+    }),
+    [editingEquipment]
   );
+  const currentEquipment = pendingImportData?.equipment ?? editingEquipment;
+  const pendingMethods = pendingImportData?.methods;
+  const formContextKey = `${showForm ? 'open' : 'closed'}-${
+    currentEquipment?.id || 'new'
+  }-${pendingImportData ? 'imported' : 'manual'}`;
+  const [drawerChromeState, setDrawerChromeState] = useState(() => ({
+    key: formContextKey,
+    chrome: defaultDrawerChrome,
+  }));
+  const drawerChrome =
+    drawerChromeState.key === formContextKey
+      ? drawerChromeState.chrome
+      : defaultDrawerChrome;
+  const handleChromeChange = useCallback(
+    (chrome: EquipmentFormDrawerChrome) => {
+      setDrawerChromeState({ key: formContextKey, chrome });
+    },
+    [formContextKey]
+  );
+  const resetDrawerChrome = useCallback(() => {
+    setDrawerChromeState({
+      key: `closed-${formContextKey}`,
+      chrome: defaultDrawerChrome,
+    });
+  }, [defaultDrawerChrome, formContextKey]);
 
   const pageStack = useDrawerPageStack<'form' | 'equipment-picker'>(
     'form',
@@ -56,38 +76,10 @@ const CustomEquipmentFormModal: React.FC<CustomEquipmentFormModalProps> = ({
     onClose
   );
 
-  // 处理导入数据回填
-  useEffect(() => {
-    if (pendingImportData && showForm) {
-      setCurrentEquipment(pendingImportData.equipment);
-      setPendingMethods(pendingImportData.methods);
-      onClearPendingImport?.();
-    }
-  }, [pendingImportData, showForm, onClearPendingImport]);
-
-  // 当 editingEquipment 变化时同步
-  useEffect(() => {
-    if (editingEquipment) {
-      setCurrentEquipment(editingEquipment);
-      setPendingMethods(undefined);
-    }
-  }, [editingEquipment]);
-
-  // 当模态框关闭时重置状态
-  useEffect(() => {
-    if (!showForm) {
-      setCurrentEquipment(undefined);
-      setPendingMethods(undefined);
-      setDrawerChrome({
-        title: editingEquipment ? '编辑器具' : '添加器具',
-        doneDisabled: false,
-        canGoBack: false,
-      });
-    }
-  }, [editingEquipment, showForm]);
-
   // 处理关闭 - 使用统一历史栈
   const handleClose = () => {
+    resetDrawerChrome();
+    onClearPendingImport?.();
     modalHistory.back();
   };
 
@@ -154,11 +146,13 @@ const CustomEquipmentFormModal: React.FC<CustomEquipmentFormModalProps> = ({
           key={`equipment-form-${currentEquipment?.id || 'new'}-${pendingImportData ? 'imported' : 'manual'}`}
           activeDrawerPage={pageStack.currentPage}
           onOpenEquipmentPicker={() => pageStack.push('equipment-picker')}
-          onChromeChange={setDrawerChrome}
+          onChromeChange={handleChromeChange}
           onImport={currentEquipment ? undefined : onImport}
           onSave={equipment => {
             // 保存时传递待保存的方案
             onSave(equipment, pendingMethods);
+            resetDrawerChrome();
+            onClearPendingImport?.();
             onClose();
           }}
           onCancel={handleClose}

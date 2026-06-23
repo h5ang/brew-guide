@@ -308,10 +308,7 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
   return (
     <>
       <SettingPage title="评分维度" isVisible={isVisible} onClose={handleClose}>
-        <SettingSection
-          title={dimensionSectionTitle}
-          className="-mt-4"
-        >
+        <SettingSection title={dimensionSectionTitle} className="-mt-4">
           {dimensions.length === 0 ? (
             <button
               type="button"
@@ -346,9 +343,7 @@ const FlavorDimensionSettings: React.FC<FlavorDimensionSettingsProps> = ({
                   <SettingReorderableRow
                     key={dimension.id}
                     value={dimension}
-                    label={
-                      dimension.label
-                    }
+                    label={dimension.label}
                     isLast={index === dimensions.length - 1}
                     isReorderMode={isReorderMode}
                     onOpen={openEditDrawer}

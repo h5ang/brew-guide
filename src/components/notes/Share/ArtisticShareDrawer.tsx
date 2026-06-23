@@ -9,11 +9,9 @@ import { useFlavorDimensions } from '@/lib/hooks/useFlavorDimensions';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useCopy } from '@/lib/hooks/useCopy';
 import CopyFailureDrawer from '@/components/common/feedback/CopyFailureDrawer';
-import { CoffeeBean } from '@/types/app';
 import { TempFileManager } from '@/lib/utils/tempFileManager';
 import { showToast } from '@/components/common/feedback/LightToast';
 import { formatNoteBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
-import { Loader2 } from 'lucide-react';
 import { normalizeBrewingNoteParams } from '@/lib/notes/noteDisplay';
 import { useCoffeeBeanImage } from '@/lib/hooks/useCoffeeBeanImage';
 
@@ -31,10 +29,8 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
   note,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('text');
-  const [bean, setBean] = useState<CoffeeBean | null>(null);
   const [equipmentName, setEquipmentName] = useState(note.equipment || '');
   const [isEspresso, setIsEspresso] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +41,11 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
 
   // 从 Store 获取咖啡豆数据
   const allBeans = useCoffeeBeanStore(state => state.beans);
+  const bean = useMemo(
+    () =>
+      note.beanId ? allBeans.find(b => b.id === note.beanId) || null : null,
+    [allBeans, note.beanId]
+  );
   const beanImage = useCoffeeBeanImage(bean?.id, {
     fallback: bean?.image,
     preferThumbnail: false,
@@ -105,24 +106,13 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
     loadEquipmentName();
   }, [note.equipment]);
 
-  // Load bean data
   useEffect(() => {
-    if (isOpen) {
-      if (note.beanId) {
-        setIsLoading(true);
-        // 直接从 Store 查找
-        const loadedBean = allBeans.find(b => b.id === note.beanId) || null;
-        setBean(loadedBean);
-        setIsLoading(false);
-      } else {
-        setBean(null);
-      }
-    } else {
+    if (!isOpen) {
       // Reset to text tab when closed
       const resetTimer = window.setTimeout(() => setActiveTab('text'), 300);
       return () => window.clearTimeout(resetTimer);
     }
-  }, [isOpen, note.beanId, allBeans]);
+  }, [isOpen]);
 
   const tabs = useMemo(() => {
     const list: { id: Tab; label: string }[] = [{ id: 'text', label: '文案' }];
@@ -348,70 +338,65 @@ const ArtisticShareDrawer: React.FC<ArtisticShareDrawerProps> = ({
 
   return (
     <ActionDrawer isOpen={isOpen} onClose={onClose} historyId="artistic-share">
-      {isLoading ? (
-        <div className="flex h-[300px] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
-        </div>
-      ) : (
-        <>
-          {/* Tabs */}
-          {tabs.length > 1 && (
-            <div className="mb-4 flex justify-start">
-              <div className="inline-flex rounded-full bg-neutral-100 p-1 dark:bg-neutral-800">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white'
-                        : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+      <>
+        {/* Tabs */}
+        {tabs.length > 1 && (
+          <div className="mb-4 flex justify-start">
+            <div className="inline-flex rounded-full bg-neutral-100 p-1 dark:bg-neutral-800">
+              {tabs.map(tab => (
+                <button
+                  type="button"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white'
+                      : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          )}
-
-          {/* Content */}
-          <ActionDrawer.Switcher activeKey={activeTab}>
-            {activeTab === 'text' ? (
-              <div
-                ref={textRef}
-                onClick={handleTextClick}
-                data-vaul-no-drag
-                className="max-h-[300px] w-full cursor-text overflow-y-auto rounded-2xl bg-neutral-50 p-5 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-600 select-text dark:bg-neutral-800/50 dark:text-neutral-400"
-              >
-                {generateShareText()}
-              </div>
-            ) : activeTab === 'bean-image' ? (
-              renderImagePreview(beanImage)
-            ) : (
-              renderImagePreview(note.image)
-            )}
-          </ActionDrawer.Switcher>
-
-          {/* Actions */}
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <ActionDrawer.SecondaryButton onClick={onClose} className="w-full">
-              取消
-            </ActionDrawer.SecondaryButton>
-            <ActionDrawer.PrimaryButton
-              onClick={activeTab === 'text' ? handleCopyText : handleSaveImage}
-              disabled={isGenerating}
-              className="w-full"
-            >
-              {isGenerating
-                ? '生成中...'
-                : activeTab === 'text'
-                  ? '复制文案'
-                  : '保存图片'}
-            </ActionDrawer.PrimaryButton>
           </div>
-        </>
-      )}
+        )}
+
+        {/* Content */}
+        <ActionDrawer.Switcher activeKey={activeTab}>
+          {activeTab === 'text' ? (
+            <div
+              ref={textRef}
+              onClick={handleTextClick}
+              data-vaul-no-drag
+              className="max-h-[300px] w-full cursor-text overflow-y-auto rounded-2xl bg-neutral-50 p-5 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-600 select-text dark:bg-neutral-800/50 dark:text-neutral-400"
+            >
+              {generateShareText()}
+            </div>
+          ) : activeTab === 'bean-image' ? (
+            renderImagePreview(beanImage)
+          ) : (
+            renderImagePreview(note.image)
+          )}
+        </ActionDrawer.Switcher>
+
+        {/* Actions */}
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <ActionDrawer.SecondaryButton onClick={onClose} className="w-full">
+            取消
+          </ActionDrawer.SecondaryButton>
+          <ActionDrawer.PrimaryButton
+            onClick={activeTab === 'text' ? handleCopyText : handleSaveImage}
+            disabled={isGenerating}
+            className="w-full"
+          >
+            {isGenerating
+              ? '生成中...'
+              : activeTab === 'text'
+                ? '复制文案'
+                : '保存图片'}
+          </ActionDrawer.PrimaryButton>
+        </div>
+      </>
 
       {/* 复制失败抽屉 */}
       <CopyFailureDrawer {...failureDrawerProps} />

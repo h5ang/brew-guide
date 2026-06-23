@@ -95,10 +95,7 @@ const resolveStartDay = (
   const customPeriod = options.customFlavorPeriod
     ? selectPeriodByRoastLevel(bean.roastLevel, options.customFlavorPeriod)
     : undefined;
-  const presetPeriod = selectPeriodByRoastLevel(
-    bean.roastLevel,
-    PRESET_VALUES
-  );
+  const presetPeriod = selectPeriodByRoastLevel(bean.roastLevel, PRESET_VALUES);
 
   return customPeriod?.startDay || presetPeriod.startDay;
 };

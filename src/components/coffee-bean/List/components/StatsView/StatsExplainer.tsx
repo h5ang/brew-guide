@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 export interface StatsExplanation {
   title: string;
@@ -34,15 +34,9 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
   onClose,
   anchorRect,
 }) => {
-  const [displayState, setDisplayState] = useState<
-    'hidden' | 'entering' | 'visible' | 'leaving'
-  >('hidden');
-  const [currentData, setCurrentData] = useState<{
-    explanation: StatsExplanation;
-    anchorRect: DOMRect;
-  } | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const outsideTouchPointerIdRef = useRef<number | null>(null);
+  const isOpen = explanation !== null && anchorRect !== null;
 
   // 计算位置
   const calculatePosition = useCallback((rect: DOMRect) => {
@@ -77,46 +71,9 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
     return { top, left, arrowLeft, isAbove };
   }, []);
 
-  // 处理显示/隐藏
-  useEffect(() => {
-    if (explanation && anchorRect) {
-      setCurrentData({ explanation, anchorRect });
-      setDisplayState(previousState => {
-        if (previousState === 'hidden') {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setDisplayState('visible');
-            });
-          });
-          return 'entering';
-        }
-
-        return previousState === 'leaving' ? 'visible' : previousState;
-      });
-      return;
-    }
-
-    let leaveTimer: ReturnType<typeof setTimeout> | undefined;
-    setDisplayState(previousState => {
-      if (previousState === 'visible' || previousState === 'entering') {
-        leaveTimer = setTimeout(() => {
-          setDisplayState('hidden');
-          setCurrentData(null);
-        }, 120);
-        return 'leaving';
-      }
-
-      return previousState;
-    });
-
-    return () => {
-      if (leaveTimer) clearTimeout(leaveTimer);
-    };
-  }, [explanation, anchorRect]);
-
   // 统一处理弹层外部交互：统计卡片点击由卡片自身负责切换，其他外部触碰直接关闭。
   useEffect(() => {
-    if (displayState === 'hidden') return;
+    if (!isOpen) return;
 
     const isInsidePopover = (event: Event) => {
       const popover = popoverRef.current;
@@ -178,14 +135,12 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
       document.removeEventListener('scroll', handleScroll, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [displayState, onClose]);
+  }, [isOpen, onClose]);
 
-  if (displayState === 'hidden' || !currentData) return null;
+  if (!explanation || !anchorRect) return null;
 
-  const position = calculatePosition(currentData.anchorRect);
-  const isVisible = displayState === 'visible';
-  const rows =
-    currentData.explanation.rows ?? currentData.explanation.dataSource ?? [];
+  const position = calculatePosition(anchorRect);
+  const rows = explanation.rows ?? explanation.dataSource ?? [];
 
   return (
     <div
@@ -194,12 +149,8 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
       style={{
         top: position.top,
         left: position.left,
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible
-          ? 'translateY(0)'
-          : position.isAbove
-            ? 'translateY(4px)'
-            : 'translateY(-4px)',
+        opacity: 1,
+        transform: 'translateY(0)',
         transition: 'opacity 0.12s ease-out, transform 0.12s ease-out',
       }}
     >
@@ -221,21 +172,21 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
       <div className="w-[200px] rounded-lg border border-neutral-200/50 bg-white shadow-lg shadow-black/5 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
         <div className="space-y-1.5 px-3 py-2.5">
           {/* 公式 */}
-          {currentData.explanation.formula && (
+          {explanation.formula && (
             <div className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-              {currentData.explanation.formula}
+              {explanation.formula}
             </div>
           )}
 
           {/* 分隔线 */}
-          {currentData.explanation.formula && rows.length > 0 && (
+          {explanation.formula && rows.length > 0 && (
             <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
           )}
 
           {/* 数据来源 */}
-          {currentData.explanation.dataSource && (
+          {explanation.dataSource && (
             <div className="space-y-0.5">
-              {currentData.explanation.dataSource.map(item => (
+              {explanation.dataSource.map(item => (
                 <div
                   key={item.label}
                   className="flex items-center justify-between text-[11px]"
@@ -252,35 +203,34 @@ const StatsExplainer: React.FC<StatsExplainerProps> = ({
           )}
 
           {/* 豆种补充 */}
-          {currentData.explanation.rows &&
-            currentData.explanation.rows.length > 0 && (
-              <>
-                <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
-                <div className="space-y-0.5">
-                  {currentData.explanation.rows.map(item => (
-                    <div
-                      key={item.label}
-                      className="flex items-center justify-between text-[11px]"
-                    >
-                      <span className="text-neutral-400 dark:text-neutral-500">
-                        {item.label}
-                      </span>
-                      <span className="font-medium text-neutral-700 tabular-nums dark:text-neutral-200">
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+          {explanation.rows && explanation.rows.length > 0 && (
+            <>
+              <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
+              <div className="space-y-0.5">
+                {explanation.rows.map(item => (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between text-[11px]"
+                  >
+                    <span className="text-neutral-400 dark:text-neutral-500">
+                      {item.label}
+                    </span>
+                    <span className="font-medium text-neutral-700 tabular-nums dark:text-neutral-200">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* 备注 */}
-          {currentData.explanation.note && (
+          {explanation.note && (
             <>
               <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
               <div className="text-[10px] leading-relaxed text-neutral-400 dark:text-neutral-500">
                 <span className="mr-1">&gt;</span>
-                {currentData.explanation.note}
+                {explanation.note}
               </div>
             </>
           )}

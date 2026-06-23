@@ -6,7 +6,7 @@
  * 2025-12-21 重构：使用共享 Hook 和组件减少代码重复
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { WebDAVSyncManager } from '@/lib/webdav/syncManager';
 import type { SyncResult as WebDAVSyncResult } from '@/lib/webdav/types';
@@ -67,8 +67,6 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
     copySuccess,
     handleCopyLogs,
     handleSelectAll,
-    getStatusColor,
-    getStatusText,
     notifyCloudSyncStatusChange,
     triggerHaptic,
   } = useSyncSection(enabled, { hapticFeedback, onSyncComplete });
@@ -86,31 +84,48 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const isConfigComplete = Boolean(
+    settings.url && settings.username && settings.password
+  );
+  const effectiveStatus: typeof status =
+    !enabled || !isConfigComplete
+      ? 'disconnected'
+      : status === 'disconnected' && settings.lastConnectionSuccess
+        ? 'connected'
+        : status;
+  const effectiveError = enabled ? error : '';
+  const activeSyncManager = enabled && isConfigComplete ? syncManager : null;
 
   // ============================================
   // 状态初始化（不自动连接，连接在用户操作时按需建立）
   // ============================================
-
-  useEffect(() => {
-    if (!enabled) {
-      setStatus('disconnected');
-      setSyncManager(null);
-      setError('');
-      return;
+  const getEffectiveStatusColor = () => {
+    if (!enabled) return 'bg-neutral-300 dark:bg-neutral-600';
+    switch (effectiveStatus) {
+      case 'connected':
+        return 'bg-green-500';
+      case 'connecting':
+        return 'bg-yellow-500 animate-pulse';
+      case 'error':
+        return 'bg-red-500';
+      default:
+        return 'bg-neutral-300 dark:bg-neutral-600';
     }
+  };
 
-    const isConfigComplete =
-      settings.url && settings.username && settings.password;
-
-    if (!isConfigComplete) {
-      setStatus('disconnected');
-      return;
+  const getEffectiveStatusText = () => {
+    if (!enabled) return '点击启用';
+    switch (effectiveStatus) {
+      case 'connected':
+        return '已连接';
+      case 'connecting':
+        return '连接中...';
+      case 'error':
+        return '连接失败';
+      default:
+        return '未配置';
     }
-
-    // 如果之前成功连接过，显示为已连接状态
-    setStatus(settings.lastConnectionSuccess ? 'connected' : 'disconnected');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, settings.lastConnectionSuccess]);
+  };
 
   // ============================================
   // 教程完成回调
@@ -198,7 +213,7 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
 
     try {
       // 按需建立连接（已验证过的连接跳过测试）
-      let manager = syncManager;
+      let manager = activeSyncManager;
       if (!manager || !manager.isInitialized()) {
         manager = new WebDAVSyncManager();
         const skipTest = settings.lastConnectionSuccess === true;
@@ -296,7 +311,7 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
   const handleShowBackups = async () => {
     setIsLoadingBackups(true);
     try {
-      let manager = syncManager;
+      let manager = activeSyncManager;
       if (!manager || !manager.isInitialized()) {
         manager = new WebDAVSyncManager();
         const connected = await manager.initialize(
@@ -324,10 +339,10 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
   };
 
   const handleRestoreBackup = async (backupKey: string): Promise<boolean> => {
-    if (!syncManager) return false;
+    if (!activeSyncManager) return false;
     setIsRestoring(true);
     try {
-      const success = await syncManager.restoreFromBackup(backupKey);
+      const success = await activeSyncManager.restoreFromBackup(backupKey);
       if (success) {
         showToast({
           type: 'success',
@@ -355,10 +370,10 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
       <SyncHeaderButton
         serviceName="WebDAV"
         enabled={enabled}
-        status={status}
+        status={effectiveStatus}
         expanded={expanded}
-        statusColor={getStatusColor()}
-        statusText={getStatusText()}
+        statusColor={getEffectiveStatusColor()}
+        statusText={getEffectiveStatusText()}
         onClick={() => {
           if (!enabled && onEnable) {
             onEnable();
@@ -463,19 +478,20 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
           </div>
 
           {/* 错误信息 */}
-          {error && (
+          {effectiveError && (
             <div className="rounded-md bg-red-50 p-3 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
-              {error}
+              {effectiveError}
             </div>
           )}
 
           {/* 测试连接按钮 */}
           <button
+            type="button"
             onClick={testConnection}
-            disabled={status === 'connecting'}
+            disabled={effectiveStatus === 'connecting'}
             className="w-full rounded-md bg-neutral-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-900 disabled:bg-neutral-400 dark:bg-neutral-700 dark:hover:bg-neutral-600"
           >
-            {status === 'connecting' ? '连接中...' : '测试连接'}
+            {effectiveStatus === 'connecting' ? '连接中...' : '测试连接'}
           </button>
         </div>
       )}
@@ -483,7 +499,7 @@ export const WebDAVSyncSection: React.FC<WebDAVSyncSectionProps> = ({
       {/* 同步按钮 */}
       <SyncButtons
         enabled={enabled}
-        isConnected={status === 'connected'}
+        isConnected={effectiveStatus === 'connected'}
         isSyncing={isSyncing}
         onUpload={() => performSync('upload')}
         onDownload={() => performSync('download')}

@@ -49,7 +49,7 @@ const PickerDrawerFrame: React.FC<PickerDrawerFrameProps> = ({
   useEffect(() => {
     if (isOpen) {
       hasOpenedRef.current = true;
-      setShouldRender(true);
+      setShouldRender(isOpen);
 
       const showTimer = setTimeout(() => setIsVisible(true), OPEN_DELAY_MS);
       const openTimer = setTimeout(() => {
@@ -64,7 +64,7 @@ const PickerDrawerFrame: React.FC<PickerDrawerFrameProps> = ({
 
     if (!hasOpenedRef.current) return;
 
-    setIsVisible(false);
+    setIsVisible(isOpen);
     const closeTimer = setTimeout(() => {
       setShouldRender(false);
       onAfterCloseRef.current?.();

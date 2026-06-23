@@ -56,14 +56,22 @@ const CustomMethodFormModal: React.FC<CustomMethodFormModalProps> = ({
   );
   const [currentCustomEquipment, setCurrentCustomEquipment] =
     useState<CustomEquipment | null>(null);
-  const [drawerChrome, setDrawerChrome] = useState({
-    doneLabel: '下一步',
-    doneDisabled: false,
-    canGoBack: false,
-  });
-
   // 多步骤表单的当前步骤状态
   const [currentFormStep, setCurrentFormStep] = useState(1);
+  const defaultDrawerChrome = useMemo(
+    () => ({
+      doneLabel: '下一步',
+      doneDisabled: false,
+      canGoBack: false,
+    }),
+    []
+  );
+  const [drawerChrome, setDrawerChrome] = useState(defaultDrawerChrome);
+  const resetFormShell = useCallback(() => {
+    setCurrentFormStep(1);
+    setDrawerChrome(defaultDrawerChrome);
+  }, [defaultDrawerChrome]);
+
   const isCustomMethodDrawerOpen = showCustomForm && !!currentCustomEquipment;
 
   // 步骤变化回调 - 用于浏览器返回时
@@ -154,6 +162,7 @@ const CustomMethodFormModal: React.FC<CustomMethodFormModalProps> = ({
 
         // 保存成功后直接关闭表单，不通过历史栈返回
         // 直接调用父组件的关闭回调，避免触发 popstate 事件导致表单返回上一步
+        resetFormShell();
         onCloseCustomForm();
 
         return methodWithId.id;
@@ -163,25 +172,16 @@ const CustomMethodFormModal: React.FC<CustomMethodFormModalProps> = ({
         return null;
       }
     },
-    [onCloseCustomForm, onSaveCustomMethod]
+    [onCloseCustomForm, onSaveCustomMethod, resetFormShell]
   );
-
-  // 重置表单步骤当表单关闭时
-  useEffect(() => {
-    if (!showCustomForm) {
-      setCurrentFormStep(1);
-      setDrawerChrome({
-        doneLabel: '下一步',
-        doneDisabled: false,
-        canGoBack: false,
-      });
-    }
-  }, [showCustomForm]);
 
   // 处理自定义方案表单关闭（使用新的历史栈系统）
   const handleCloseCustomForm = useCallback(() => {
+    if (currentFormStep <= 1) {
+      resetFormShell();
+    }
     modalHistory.back();
-  }, []);
+  }, [currentFormStep, resetFormShell]);
 
   const handleDoneCustomForm = useCallback(() => {
     formRef.current?.done();

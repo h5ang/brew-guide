@@ -72,6 +72,7 @@ const RatingSection: React.FC<RatingSectionProps> = ({
             评分
           </div>
           <button
+            type="button"
             onClick={onOpenRatingModal}
             className="text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-400"
           >

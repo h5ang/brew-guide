@@ -59,7 +59,9 @@ const BeanImage: React.FC<{
     roasterSeparator?: ' ' | '/';
   };
 }> = ({ bean, roasterSettings }) => {
-  const [imageError, setImageError] = useState(false);
+  const [failedImageSource, setFailedImageSource] = useState<string | null>(
+    null
+  );
 
   const beanImage = useCoffeeBeanImage(bean.id, {
     fallback: bean.image,
@@ -80,9 +82,8 @@ const BeanImage: React.FC<{
     return configuredRoasterLogo;
   }, [bean.name, beanImage, configuredRoasterLogo, roasterName]);
 
-  useEffect(() => {
-    setImageError(false);
-  }, [beanImage, roasterLogo]);
+  const imageSource = beanImage || roasterLogo;
+  const imageError = failedImageSource === imageSource;
 
   return (
     <>
@@ -98,7 +99,7 @@ const BeanImage: React.FC<{
           sizes="48px"
           priority={true}
           loading="eager"
-          onError={() => setImageError(true)}
+          onError={() => setFailedImageSource(beanImage)}
           placeholder="blur"
           blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
         />
@@ -114,7 +115,7 @@ const BeanImage: React.FC<{
           sizes="48px"
           priority={true}
           loading="eager"
-          onError={() => setImageError(true)}
+          onError={() => setFailedImageSource(roasterLogo)}
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-400 dark:text-neutral-600">

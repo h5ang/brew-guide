@@ -158,6 +158,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
     <div className="py-1">
       {items.map(item => (
         <button
+          type="button"
           key={item.id}
           onClick={e => handleItemClick(e, item.onClick)}
           className={cn(
@@ -299,6 +300,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
         <>
           {/* 无动画触发按钮 */}
           <button
+            type="button"
             ref={triggerRef}
             onClick={handleTriggerClick}
             className={cn(

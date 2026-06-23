@@ -44,6 +44,7 @@ const SettingPage: React.FC<SettingPageProps> = ({
       ) : (
         <div className="pt-safe-top z-20 flex items-center justify-between px-6">
           <button
+            type="button"
             onClick={onClose}
             className="flex flex-5 cursor-pointer items-center rounded-full text-neutral-700 dark:text-neutral-300"
           >

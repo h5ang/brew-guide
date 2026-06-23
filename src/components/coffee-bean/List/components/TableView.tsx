@@ -324,6 +324,13 @@ const TableView: React.FC<TableViewProps> = ({
 
   // 多重排序状态（持久化）
   const [sorting, setSorting] = useState<SortingState>(loadSorting);
+  const effectiveSorting = useMemo(() => {
+    const hasInvisibleSortColumn = sorting.some(
+      sort => !visibleColumns.includes(sort.id as TableColumnKey)
+    );
+
+    return hasInvisibleSortColumn ? DEFAULT_SORTING : sorting;
+  }, [visibleColumns, sorting]);
 
   // 排序变化时持久化
   const handleSortingChange = useCallback(
@@ -337,18 +344,6 @@ const TableView: React.FC<TableViewProps> = ({
     },
     []
   );
-
-  // 列配置变化时，检查排序列是否仍可见，不可见则重置
-  useEffect(() => {
-    const sortingColumnIds = sorting.map(s => s.id);
-    const hasInvisibleSortColumn = sortingColumnIds.some(
-      id => !visibleColumns.includes(id as TableColumnKey)
-    );
-    if (hasInvisibleSortColumn) {
-      setSorting(DEFAULT_SORTING);
-      saveSorting(DEFAULT_SORTING);
-    }
-  }, [visibleColumns, sorting]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -499,15 +494,15 @@ const TableView: React.FC<TableViewProps> = ({
   const columns = useMemo<ColumnDef<ExtendedCoffeeBean, any>[]>(() => {
     const showRoasterColumn = visibleColumns.includes('roaster');
     const basicSortingFn = createBeanSortingFn(
-      sorting,
+      effectiveSorting,
       sortingFns.basic as SortingFn<ExtendedCoffeeBean>
     );
     const alphanumericSortingFn = createBeanSortingFn(
-      sorting,
+      effectiveSorting,
       sortingFns.alphanumeric as SortingFn<ExtendedCoffeeBean>
     );
     const dateDisplaySortingFn = createDirectionAwareBeanSortingFn(
-      sorting,
+      effectiveSorting,
       (rowA, rowB, desc) =>
         compareDateDisplayBeans(
           rowA.original,
@@ -746,18 +741,18 @@ const TableView: React.FC<TableViewProps> = ({
   }, [
     visibleColumns,
     dateDisplayMode,
+    effectiveSorting,
     hasGreenBeans,
     handleRateClick,
     onRate,
     roasterSettings,
-    sorting,
   ]);
 
   // 创建表格实例
   const table = useReactTable({
     data: allBeans,
     columns,
-    state: { sorting },
+    state: { sorting: effectiveSorting },
     onSortingChange: handleSortingChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -802,7 +797,9 @@ const TableView: React.FC<TableViewProps> = ({
                   const isFirst = index === 0;
                   const isLast = index === headerGroup.headers.length - 1;
                   const paddingClass = `py-2 ${isFirst ? 'pl-6 pr-3' : isLast ? 'pl-3 pr-6' : 'px-3'}`;
-                  const sortIndex = sorting.findIndex(s => s.id === header.id);
+                  const sortIndex = effectiveSorting.findIndex(
+                    s => s.id === header.id
+                  );
                   const isSorted = header.column.getIsSorted();
                   const canSort = header.column.getCanSort();
                   const canResize = header.column.getCanResize();
@@ -843,7 +840,11 @@ const TableView: React.FC<TableViewProps> = ({
                             )}
                             <SortIcon
                               direction={isSorted}
-                              index={sorting.length > 1 ? sortIndex : undefined}
+                              index={
+                                effectiveSorting.length > 1
+                                  ? sortIndex
+                                  : undefined
+                              }
                             />
                           </button>
                           {canResize && (

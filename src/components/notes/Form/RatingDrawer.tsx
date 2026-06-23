@@ -211,8 +211,7 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
           0,
           Math.min(1, (touch.clientX - rect.left) / rect.width)
         );
-        const newValue =
-          Math.round((percentage * 5) / tasteStep) * tasteStep;
+        const newValue = Math.round((percentage * 5) / tasteStep) * tasteStep;
         if (newValue !== currentSliderValue) {
           updateTasteRating(key, newValue);
           setCurrentSliderValue(newValue);

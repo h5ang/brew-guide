@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import ActionDrawer from '@/components/common/ui/ActionDrawer';
 import { showToast } from '@/components/common/feedback/LightToast';
@@ -186,19 +186,16 @@ const MethodImportModal: React.FC<MethodImportModalProps> = ({
     setIsRecognizing(false);
   }, [recognizingImageUrl]);
 
-  // 重置状态（当弹窗关闭或重新打开时）
-  useEffect(() => {
-    if (showForm) {
-      setClipboardStatus('idle');
-      setCurrentStep('main');
-      setJsonInputValue('');
-      setIsRecognizing(false);
-      if (recognizingImageUrl) {
-        URL.revokeObjectURL(recognizingImageUrl);
-        setRecognizingImageUrl(null);
-      }
+  const resetImportState = useCallback(() => {
+    setClipboardStatus('idle');
+    setCurrentStep('main');
+    setJsonInputValue('');
+    setIsRecognizing(false);
+    if (recognizingImageUrl) {
+      URL.revokeObjectURL(recognizingImageUrl);
+      setRecognizingImageUrl(null);
     }
-  }, [showForm]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [recognizingImageUrl]);
 
   // 关闭抽屉
   const handleClose = useCallback(() => {
@@ -463,6 +460,7 @@ const MethodImportModal: React.FC<MethodImportModalProps> = ({
           </span>
           添加冲煮方案，也可将图片和
           <button
+            type="button"
             onClick={handleCopyPrompt}
             className="mx-0.5 text-neutral-800 underline decoration-neutral-400 underline-offset-2 hover:opacity-80 dark:text-neutral-200"
           >
@@ -582,6 +580,7 @@ const MethodImportModal: React.FC<MethodImportModalProps> = ({
       <ActionDrawer
         isOpen={showForm}
         onClose={handleClose}
+        onExitComplete={resetImportState}
         historyId={historyId}
         disableHistory={disableHistory}
       >

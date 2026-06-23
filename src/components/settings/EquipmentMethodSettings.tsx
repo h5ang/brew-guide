@@ -380,18 +380,14 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
   const [orderedVisibleEquipments, setOrderedVisibleEquipments] =
     React.useState<ManagedEquipment[]>(visibleEquipments);
   const isDrawerOpen = Boolean(activeEquipment);
+  const isEquipmentReorderMode =
+    isReorderMode && orderedVisibleEquipments.length > 1;
 
   React.useEffect(() => {
     setOrderedVisibleEquipments(visibleEquipments);
     orderedVisibleEquipmentsRef.current = visibleEquipments;
     hasPendingEquipmentOrderRef.current = false;
   }, [visibleEquipments]);
-
-  React.useEffect(() => {
-    if (orderedVisibleEquipments.length <= 1 && isReorderMode) {
-      setIsReorderMode(false);
-    }
-  }, [isReorderMode, orderedVisibleEquipments.length]);
 
   const drawerStack = useDrawerPageStack<DrawerPage>(
     'overview',
@@ -419,16 +415,9 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
     }
   );
 
-  React.useEffect(() => {
-    if (activeEquipmentId && !activeEquipment) {
-      setActiveEquipmentId(null);
-    }
-  }, [activeEquipment, activeEquipmentId]);
-
   const selectedCustomMethods = React.useMemo(
-    () =>
-      activeEquipmentId ? methodsByEquipment[activeEquipmentId] || [] : [],
-    [activeEquipmentId, methodsByEquipment]
+    () => (activeEquipment ? methodsByEquipment[activeEquipment.id] || [] : []),
+    [activeEquipment, methodsByEquipment]
   );
   const [orderedCustomMethods, setOrderedCustomMethods] = React.useState<
     Method[]
@@ -451,10 +440,10 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
   }, [activeEquipment]);
   const hiddenMethodIds = React.useMemo(
     () =>
-      activeEquipmentId
-        ? effectiveSettings.hiddenCommonMethods?.[activeEquipmentId] || []
+      activeEquipment
+        ? effectiveSettings.hiddenCommonMethods?.[activeEquipment.id] || []
         : [],
-    [activeEquipmentId, effectiveSettings.hiddenCommonMethods]
+    [activeEquipment, effectiveSettings.hiddenCommonMethods]
   );
   const visibleCommonMethods = React.useMemo(
     () =>
@@ -857,7 +846,7 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
   }, [effectiveSettings.equipmentOrder, setEquipmentOrder, visibleEquipments]);
 
   const toggleReorderMode = React.useCallback(async () => {
-    if (isReorderMode) {
+    if (isEquipmentReorderMode) {
       await persistEquipmentOrder();
       setIsReorderMode(false);
       triggerHaptic();
@@ -866,7 +855,7 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
 
     setIsReorderMode(true);
     triggerHaptic();
-  }, [isReorderMode, persistEquipmentOrder, triggerHaptic]);
+  }, [isEquipmentReorderMode, persistEquipmentOrder, triggerHaptic]);
 
   const handlePageClose = React.useCallback(() => {
     void persistEquipmentOrder();
@@ -908,7 +897,7 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
           onClick={() => void toggleReorderMode()}
           className="flex shrink-0 cursor-pointer items-center rounded-full px-3 text-sm font-medium whitespace-nowrap text-neutral-600 transition-transform active:scale-[0.96] dark:text-neutral-300"
         >
-          {isReorderMode ? '完成' : '编辑'}
+          {isEquipmentReorderMode ? '完成' : '编辑'}
         </button>
       )}
     </div>
@@ -988,7 +977,7 @@ const EquipmentMethodSettings: React.FC<EquipmentMethodSettingsProps> = ({
                   value={equipment}
                   label={equipment.name}
                   isLast={index === orderedVisibleEquipments.length - 1}
-                  isReorderMode={isReorderMode}
+                  isReorderMode={isEquipmentReorderMode}
                   onOpen={equipment => openEquipmentDrawer(equipment.id)}
                   onDragEnd={triggerHaptic}
                 />

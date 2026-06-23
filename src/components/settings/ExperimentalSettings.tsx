@@ -242,6 +242,7 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
                     API Key
                   </p>
                   <button
+                    type="button"
                     onClick={() => setShowApiKey(v => !v)}
                     className="text-xs text-neutral-500 dark:text-neutral-400"
                   >
@@ -277,6 +278,7 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
                     System Prompt
                   </p>
                   <button
+                    type="button"
                     onClick={restoreDefaultPrompt}
                     className="text-xs text-neutral-500 dark:text-neutral-400"
                   >
@@ -293,6 +295,7 @@ const ExperimentalSettings: React.FC<ExperimentalSettingsProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={testConfig}
                 disabled={isTestingConfig}
                 className={`w-full rounded-xl px-3 py-2 text-sm font-medium transition-colors ${

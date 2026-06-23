@@ -79,6 +79,8 @@ const contentFadeTransition = {
   },
 } as const;
 
+type RelatedRecordsTab = 'primary' | 'change' | 'green';
+
 const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   isOpen,
   bean: propBean,
@@ -233,7 +235,14 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   }, [bean, allBeans]);
 
   // 状态
-  const [lazyRelatedNotes, setLazyRelatedNotes] = useState<BrewingNote[]>([]);
+  const [lazyRelatedNotesState, setLazyRelatedNotesState] = useState<{
+    beanId: string;
+    notes: BrewingNote[];
+  } | null>(null);
+  const lazyRelatedNotes =
+    lazyRelatedNotesState && lazyRelatedNotesState.beanId === bean?.id
+      ? lazyRelatedNotesState.notes
+      : [];
   const relatedNotes = useMemo(() => {
     if (!bean?.id) return [];
 
@@ -256,13 +265,15 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   const [shouldRender, setShouldRender] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [printEnabled, setPrintEnabled] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [isTitleVisible, setIsTitleVisible] = useState(true);
-  const [showBeanRating, setShowBeanRating] = useState(false);
-  const [showEstateField, setShowEstateField] = useState(false);
-  const [showChangeRecords, setShowChangeRecords] = useState(false);
-  const [showGreenBeanRecords, setShowGreenBeanRecords] = useState(false);
+  const [observedTitleVisible, setObservedTitleVisible] = useState(true);
+  const printEnabled = storeSettings.enableBeanPrint === true;
+  const showBeanRating = storeSettings.showBeanRating === true;
+  const showEstateField = storeSettings.showEstateField === true;
+  const [relatedRecordsTabOverride, setRelatedRecordsTabOverride] = useState<{
+    beanId: string;
+    tab: RelatedRecordsTab;
+  } | null>(null);
   const [editingCapacity, setEditingCapacity] = useState(false);
   const [editingRemaining, setEditingRemaining] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
@@ -305,27 +316,26 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   // 动画处理（优化：使用 flushSync 确保立即渲染，然后触发动画）
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true);
+      setShouldRender(isOpen);
       // 使用 setTimeout(0) 让浏览器先完成 DOM 渲染，然后立即触发动画
       // 比 requestAnimationFrame 更快（~4ms vs ~16ms）
-      setTimeout(() => {
-        setIsVisible(true);
-      }, 0);
-    } else {
-      setIsVisible(false);
-      setPrintModalOpen(false);
       const timer = setTimeout(() => {
-        setShouldRender(false);
+        setIsVisible(isOpen);
+      }, 0);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(isOpen);
+      setPrintModalOpen(isOpen);
+      const timer = setTimeout(() => {
+        setShouldRender(isOpen);
       }, 350);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
   // 记录显示状态
-  useEffect(() => {
-    if (!bean?.id || !isOpen) return;
-
-    const isGreen = bean.beanState === 'green';
+  const relatedRecordAvailability = useMemo(() => {
+    const isGreen = bean?.beanState === 'green';
     const roastingRecords = relatedNotes.filter(note => isRoastingRecord(note));
     const brewingRecords = relatedNotes.filter(
       note => !isSimpleChangeRecord(note) && !isRoastingRecord(note)
@@ -336,44 +346,125 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
     const primaryRecords = isGreen ? roastingRecords : brewingRecords;
     const hasSourceGreenBean = !isGreen && relatedBeans.length > 0;
 
-    if (primaryRecords.length > 0) {
-      setShowChangeRecords(false);
-      setShowGreenBeanRecords(false);
-    } else if (changeRecords.length > 0) {
-      setShowChangeRecords(true);
-      setShowGreenBeanRecords(false);
-    } else if (hasSourceGreenBean) {
-      setShowChangeRecords(false);
-      setShowGreenBeanRecords(true);
-    } else {
-      setShowChangeRecords(false);
-      setShowGreenBeanRecords(false);
+    return {
+      hasPrimaryRecords: primaryRecords.length > 0,
+      hasChangeRecords: changeRecords.length > 0,
+      hasSourceGreenBean,
+    };
+  }, [bean?.beanState, relatedBeans.length, relatedNotes]);
+
+  const defaultRelatedRecordsTab: RelatedRecordsTab =
+    relatedRecordAvailability.hasPrimaryRecords
+      ? 'primary'
+      : relatedRecordAvailability.hasChangeRecords
+        ? 'change'
+        : relatedRecordAvailability.hasSourceGreenBean
+          ? 'green'
+          : 'primary';
+
+  const relatedRecordsTab = useMemo<RelatedRecordsTab>(() => {
+    const currentBeanId = bean?.id;
+    const overrideTab =
+      currentBeanId && relatedRecordsTabOverride?.beanId === currentBeanId
+        ? relatedRecordsTabOverride.tab
+        : null;
+
+    if (
+      overrideTab === 'primary' &&
+      relatedRecordAvailability.hasPrimaryRecords
+    ) {
+      return overrideTab;
     }
-  }, [bean?.id, bean?.beanState, relatedNotes, relatedBeans, isOpen]);
+    if (
+      overrideTab === 'change' &&
+      relatedRecordAvailability.hasChangeRecords
+    ) {
+      return overrideTab;
+    }
+    if (
+      overrideTab === 'green' &&
+      relatedRecordAvailability.hasSourceGreenBean
+    ) {
+      return overrideTab;
+    }
+
+    return defaultRelatedRecordsTab;
+  }, [
+    bean?.id,
+    defaultRelatedRecordsTab,
+    relatedRecordAvailability,
+    relatedRecordsTabOverride,
+  ]);
+
+  const showChangeRecords = relatedRecordsTab === 'change';
+  const showGreenBeanRecords = relatedRecordsTab === 'green';
+  const currentBeanId = bean?.id;
+
+  const setRelatedRecordsTabForCurrentBean = React.useCallback(
+    (tab: RelatedRecordsTab) => {
+      if (!currentBeanId) return;
+      setRelatedRecordsTabOverride({ beanId: currentBeanId, tab });
+    },
+    [currentBeanId]
+  );
+
+  const setShowChangeRecords = React.useCallback(
+    (show: boolean) => {
+      if (show) {
+        setRelatedRecordsTabForCurrentBean('change');
+        return;
+      }
+
+      setRelatedRecordsTabOverride(current => {
+        if (
+          current &&
+          current.beanId === currentBeanId &&
+          current.tab === 'change'
+        ) {
+          return currentBeanId
+            ? { beanId: currentBeanId, tab: 'primary' }
+            : null;
+        }
+        return current;
+      });
+    },
+    [currentBeanId, setRelatedRecordsTabForCurrentBean]
+  );
+
+  const setShowGreenBeanRecords = React.useCallback(
+    (show: boolean) => {
+      if (show) {
+        setRelatedRecordsTabForCurrentBean('green');
+        return;
+      }
+
+      setRelatedRecordsTabOverride(current => {
+        if (
+          current &&
+          current.beanId === currentBeanId &&
+          current.tab === 'green'
+        ) {
+          return currentBeanId
+            ? { beanId: currentBeanId, tab: 'primary' }
+            : null;
+        }
+        return current;
+      });
+    },
+    [currentBeanId, setRelatedRecordsTabForCurrentBean]
+  );
 
   // 设置加载（优化：移除 isOpen 依赖，避免每次打开都重新设置）
   const navigationState = deriveNavigationSettings(
     storeSettings.navigationSettings
   );
 
-  useEffect(() => {
-    if (storeSettings) {
-      setPrintEnabled(storeSettings.enableBeanPrint === true);
-      setShowBeanRating(storeSettings.showBeanRating === true);
-      setShowEstateField(storeSettings.showEstateField === true);
-    } else {
-      setPrintEnabled(false);
-      setShowBeanRating(false);
-      setShowEstateField(false);
-    }
-  }, [storeSettings]);
-
   // 标题可见性（优化：减少延迟）
+  const shouldObserveTitle = isOpen && isVisible && !isFormMode;
+  const isTitleVisible = shouldObserveTitle ? observedTitleVisible : true;
+
   useEffect(() => {
-    if (!isOpen || !isVisible || isFormMode) {
-      setIsTitleVisible(true);
-      return;
-    }
+    if (!shouldObserveTitle) return;
 
     let observer: IntersectionObserver | null = null;
 
@@ -381,15 +472,15 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
     const timer = setTimeout(() => {
       const titleElement = document.getElementById('bean-detail-title');
       if (!titleElement) {
-        setIsTitleVisible(true);
+        setObservedTitleVisible(true);
         return;
       }
 
       const rect = titleElement.getBoundingClientRect();
-      setIsTitleVisible(rect.top >= 60);
+      setObservedTitleVisible(rect.top >= 60);
 
       observer = new IntersectionObserver(
-        ([entry]) => setIsTitleVisible(entry.isIntersecting),
+        ([entry]) => setObservedTitleVisible(entry.isIntersecting),
         { threshold: 0, rootMargin: '-60px 0px 0px 0px' }
       );
 
@@ -400,7 +491,7 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       clearTimeout(timer);
       if (observer) observer.disconnect();
     };
-  }, [bean?.id, isFormMode, isOpen, isVisible]);
+  }, [bean?.id, shouldObserveTitle]);
 
   const completeClose = React.useCallback(
     ({
@@ -475,28 +566,25 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   }, [customEquipmentInitialized, isOpen, loadEquipments]);
 
   useEffect(() => {
-    if (!isOpen || !bean?.id || notesInitialized) {
-      setLazyRelatedNotes([]);
-      return;
-    }
+    if (!isOpen || !bean?.id || notesInitialized) return;
 
     let cancelled = false;
+    const beanId = bean.id;
 
     const loadRelatedNotes = async () => {
       try {
-        const notes = await getRelatedNotesForBean(bean.id);
+        const notes = await getRelatedNotesForBean(beanId);
         if (!cancelled) {
-          setLazyRelatedNotes(notes);
+          setLazyRelatedNotesState({ beanId, notes });
         }
       } catch (error) {
         console.warn('[BeanDetailModal] 加载关联记录失败:', error);
         if (!cancelled) {
-          setLazyRelatedNotes([]);
+          setLazyRelatedNotesState({ beanId, notes: [] });
         }
       }
     };
 
-    setLazyRelatedNotes([]);
     void loadRelatedNotes();
 
     if (typeof window === 'undefined') {
@@ -518,12 +606,6 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       window.removeEventListener('brewingNotesUpdated', handleNotesChanged);
     };
   }, [bean?.id, isOpen, notesInitialized]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setRemainingEditorTarget(null);
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !isAddMode) {
@@ -924,6 +1006,7 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
   if (!shouldRender) return null;
 
   const contentModeKey = isEditMode ? 'edit' : isAddMode ? 'add' : 'view';
+  const activeRemainingEditorTarget = isOpen ? remainingEditorTarget : null;
 
   return (
     <>
@@ -1083,8 +1166,8 @@ const BeanDetailModal: React.FC<BeanDetailModalProps> = ({
       </div>
 
       <RemainingEditor
-        targetElement={remainingEditorTarget}
-        isOpen={!!remainingEditorTarget}
+        targetElement={activeRemainingEditorTarget}
+        isOpen={!!activeRemainingEditorTarget}
         onOpenChange={open => {
           if (!open) {
             setRemainingEditorTarget(null);

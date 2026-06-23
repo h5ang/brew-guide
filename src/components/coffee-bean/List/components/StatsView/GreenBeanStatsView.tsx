@@ -381,20 +381,13 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
   initialLimit = 5,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const contentRef = React.useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number>(0);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight);
-    }
-  }, [data, isExpanded]);
 
   if (data.length === 0) return null;
 
   const hasMore = data.length > initialLimit;
   const listItemHeight = 26;
   const listCollapsedHeight = initialLimit * listItemHeight;
+  const listExpandedHeight = data.length * listItemHeight;
 
   const handleToggle = () => {
     if (hasMore) {
@@ -412,11 +405,10 @@ const AttributeCard: React.FC<AttributeCardProps> = ({
         <div className="text-right">数量</div>
       </div>
       <div
-        ref={contentRef}
         className="space-y-1.5 overflow-hidden transition-[max-height] duration-300 ease-out"
         style={{
           maxHeight: isExpanded
-            ? `${contentHeight}px`
+            ? `${listExpandedHeight}px`
             : `${listCollapsedHeight}px`,
         }}
       >

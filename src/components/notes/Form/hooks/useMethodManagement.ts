@@ -34,11 +34,41 @@ export function useMethodManagement({
   customEquipments,
   settings,
 }: UseMethodManagementProps): UseMethodManagementResult {
-  const [methodType, setMethodType] = useState<'common' | 'custom'>('common');
+  const [methodTypePreference, setMethodTypePreference] = useState<
+    'common' | 'custom'
+  >('common');
   const [selectedMethod, setSelectedMethod] = useState<string>(
     initialMethod || ''
   );
   const [customMethods, setCustomMethods] = useState<Method[]>([]);
+  const selectedCustomEquipment = useMemo(
+    () => customEquipments.find(e => e.id === selectedEquipment),
+    [customEquipments, selectedEquipment]
+  );
+  const isCustomPresetEquipment =
+    selectedCustomEquipment?.animationType === 'custom';
+  const hasCommonMethodsForSelectedEquipment = useMemo(() => {
+    if (!selectedEquipment) {
+      return false;
+    }
+
+    if (selectedCustomEquipment) {
+      const baseEquipmentId = getBaseEquipmentIdByAnimationType(
+        selectedCustomEquipment.animationType
+      );
+      return (brewingMethods[baseEquipmentId]?.length || 0) > 0;
+    }
+
+    return (brewingMethods[selectedEquipment]?.length || 0) > 0;
+  }, [selectedCustomEquipment, selectedEquipment]);
+  const methodType =
+    isCustomPresetEquipment && methodTypePreference === 'common'
+      ? 'custom'
+      : !isCustomPresetEquipment &&
+          methodTypePreference === 'custom' &&
+          hasCommonMethodsForSelectedEquipment
+        ? 'common'
+        : methodTypePreference;
 
   // 计算可用方法
   const availableMethods = useMemo(() => {
@@ -211,43 +241,6 @@ export function useMethodManagement({
     };
   }, [selectedEquipment]);
 
-  // 处理器具变化时的方案类型调整
-  useEffect(() => {
-    if (selectedEquipment && customEquipments.length > 0) {
-      const customEquipment = customEquipments.find(
-        e => e.id === selectedEquipment
-      );
-      const isCustomPresetEquipment =
-        customEquipment?.animationType === 'custom';
-
-      // 如果是自定义预设器具，强制使用自定义方案类型
-      if (isCustomPresetEquipment && methodType === 'common') {
-        setMethodType('custom');
-      }
-      // 如果不是自定义预设器具，且当前是自定义方案类型，可以切换回通用方案
-      else if (!isCustomPresetEquipment && methodType === 'custom') {
-        // 检查是否有通用方案可用
-        let hasCommonMethods = false;
-        if (customEquipment) {
-          // 自定义器具，检查基础器具是否有通用方案
-          const baseEquipmentId = getBaseEquipmentIdByAnimationType(
-            customEquipment.animationType
-          );
-          hasCommonMethods = (brewingMethods[baseEquipmentId]?.length || 0) > 0;
-        } else {
-          // 预定义器具
-          hasCommonMethods =
-            (brewingMethods[selectedEquipment]?.length || 0) > 0;
-        }
-
-        // 如果有通用方案，切换到通用方案类型
-        if (hasCommonMethods) {
-          setMethodType('common');
-        }
-      }
-    }
-  }, [selectedEquipment, customEquipments, methodType]);
-
   // 切换方案类型
   const handleMethodTypeChange = (type: 'common' | 'custom') => {
     // 检查是否是自定义预设器具
@@ -262,7 +255,7 @@ export function useMethodManagement({
       if (isCustomPresetEquipment && type === 'common') {
         // 强制切换到自定义方案
         if (methodType !== 'custom') {
-          setMethodType('custom');
+          setMethodTypePreference('custom');
           if (customMethods.length > 0) {
             setSelectedMethod(
               customMethods[0]?.id || customMethods[0]?.name || ''
@@ -275,7 +268,7 @@ export function useMethodManagement({
 
     // 只有当类型实际变化时才执行操作
     if (type !== methodType) {
-      setMethodType(type);
+      setMethodTypePreference(type);
 
       // 确保有选择的器具
       if (!selectedEquipment) return;

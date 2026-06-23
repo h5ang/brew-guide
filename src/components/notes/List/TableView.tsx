@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -97,10 +103,7 @@ const loadColumnSizing = (): ColumnSizingState => {
 
 const saveColumnSizing = (columnSizing: ColumnSizingState) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(
-    COLUMN_SIZING_STORAGE_KEY,
-    JSON.stringify(columnSizing)
-  );
+  localStorage.setItem(COLUMN_SIZING_STORAGE_KEY, JSON.stringify(columnSizing));
 };
 
 const SortIcon: React.FC<{
@@ -304,11 +307,10 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const columns = useMemo<ColumnDef<BrewingNote, any>[]>(() => {
-    const alphanumericSortingFn =
-      createGroupedSortingFn(
-        sorting,
-        sortingFns.alphanumeric as SortingFn<BrewingNote>
-      );
+    const alphanumericSortingFn = createGroupedSortingFn(
+      sorting,
+      sortingFns.alphanumeric as SortingFn<BrewingNote>
+    );
     const basicSortingFn = createGroupedSortingFn(
       sorting,
       sortingFns.basic as SortingFn<BrewingNote>
@@ -328,11 +330,7 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
       }),
       bean: columnHelper.accessor(
         row =>
-          resolveNoteBeanDisplayName(
-            row,
-            coffeeBeanLookup,
-            roasterSettings
-          ),
+          resolveNoteBeanDisplayName(row, coffeeBeanLookup, roasterSettings),
         {
           id: 'bean',
           header: '咖啡豆',
@@ -374,7 +372,8 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
       params: columnHelper.accessor(row => getParamsDisplay(row), {
         id: 'params',
         header: '参数',
-        cell: info => (info.getValue() === '-' ? <EmptyCell /> : info.getValue()),
+        cell: info =>
+          info.getValue() === '-' ? <EmptyCell /> : info.getValue(),
         sortingFn: alphanumericSortingFn,
         ...getColumnSizing('params'),
       }),
@@ -598,7 +597,7 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
                         >
                           <button
                             type="button"
-                            className={`min-w-0 inline-flex items-center ${
+                            className={`inline-flex min-w-0 items-center ${
                               canSort
                                 ? 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200'
                                 : 'cursor-default'
@@ -640,7 +639,7 @@ const NotesTableView: React.FC<NotesTableViewProps> = ({
                               onClick={event => event.stopPropagation()}
                             >
                               <span
-                                className={`absolute top-1/2 left-1/2 h-3 w-px rounded-full -translate-x-1/2 -translate-y-1/2 bg-neutral-200 transition-opacity dark:bg-neutral-800 ${
+                                className={`absolute top-1/2 left-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-200 transition-opacity dark:bg-neutral-800 ${
                                   isResizing ? 'opacity-100' : 'opacity-70'
                                 }`}
                               />

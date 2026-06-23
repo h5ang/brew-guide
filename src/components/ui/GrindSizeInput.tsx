@@ -448,8 +448,8 @@ const GrindSizeInput = forwardRef<GrindSizeInputRef, GrindSizeInputProps>(
       measureRef.current.textContent = text;
       // 获取实际渲染宽度，加上一点 padding
       const width = measureRef.current.offsetWidth + 4;
-      setMeasuredWidth(width);
-    }, [autoWidth, value, placeholder]);
+      setMeasuredWidth(current => (current === width ? current : width));
+    });
 
     return (
       <div className={`relative ${className}`}>

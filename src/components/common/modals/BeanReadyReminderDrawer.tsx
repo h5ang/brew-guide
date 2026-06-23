@@ -33,13 +33,11 @@ const BeanReadyReminderDrawer: React.FC<BeanReadyReminderDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => onBeanClick(item.beanId)}
-                className="inline appearance-none border-0 bg-transparent p-0 text-left [font:inherit] text-neutral-800 dark:text-neutral-200"
+                className="inline appearance-none border-0 bg-transparent p-0 text-left text-neutral-800 [font:inherit] dark:text-neutral-200"
               >
                 {item.coffeeBean}
               </button>
-              {item.daysUntilReady === 0
-                ? '，今天可以喝了'
-                : '，明天可以喝了'}
+              {item.daysUntilReady === 0 ? '，今天可以喝了' : '，明天可以喝了'}
             </React.Fragment>
           ))}
           。

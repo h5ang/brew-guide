@@ -169,18 +169,23 @@ const PageStackDrawer: React.FC<PageStackDrawerProps> = ({
     if (typeof window === 'undefined') return;
 
     const headerHeight = headerRef.current?.offsetHeight || 0;
-    setMaxBodyHeight(Math.max(160, window.innerHeight * 0.88 - headerHeight));
+    const nextMaxBodyHeight = Math.max(
+      160,
+      window.innerHeight * 0.88 - headerHeight
+    );
+    setMaxBodyHeight(current =>
+      current === nextMaxBodyHeight ? current : nextMaxBodyHeight
+    );
   }, []);
 
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+  React.useLayoutEffect(() => {
     updateMaxBodyHeight();
+  });
+
+  React.useEffect(() => {
     window.addEventListener('resize', updateMaxBodyHeight);
     return () => window.removeEventListener('resize', updateMaxBodyHeight);
-  }, [isOpen, updateMaxBodyHeight]);
+  }, [updateMaxBodyHeight]);
 
   const updateBodyHeight = React.useCallback(() => {
     const content = pageContentRef.current;

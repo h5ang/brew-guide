@@ -217,10 +217,10 @@ const preloadBrewingTimer = () => {
 };
 
 // 动态导入客户端组件
-const BrewingTimer = dynamic(
-  loadBrewingTimer,
-  { ssr: false, loading: () => null }
-);
+const BrewingTimer = dynamic(loadBrewingTimer, {
+  ssr: false,
+  loading: () => null,
+});
 const BrewingHistory = dynamic(() => import('@/components/notes/List'), {
   ssr: false,
   loading: () => null,
@@ -2264,8 +2264,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       !hasAutoNavigatedToNotes
     ) {
       // 确保清理替代头部状态
-      setShowAlternativeHeader(false);
-      setAlternativeHeaderContent(null);
+      window.dispatchEvent(new CustomEvent('clearAlternativeHeader'));
 
       // 使用setTimeout确保状态更新完成后再跳转
       const navigationTimer = window.setTimeout(() => {

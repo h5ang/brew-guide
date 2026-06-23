@@ -8,10 +8,7 @@ export interface TasteRatings {
 }
 
 export type BrewingNoteParams = Partial<
-  Pick<
-    BrewingMethodParams,
-    'coffee' | 'water' | 'ratio' | 'grindSize' | 'temp'
-  >
+  Pick<BrewingMethodParams, 'coffee' | 'water' | 'ratio' | 'grindSize' | 'temp'>
 >;
 
 // 拼配成分接口定义

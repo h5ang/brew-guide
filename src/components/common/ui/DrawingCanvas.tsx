@@ -33,6 +33,27 @@ interface DrawingCanvasProps {
   _customReferenceSvg?: string;
 }
 
+type ThemeMode = 'light' | 'dark';
+
+interface ReferenceImageState {
+  svg: string;
+  theme: ThemeMode;
+  image: HTMLImageElement;
+}
+
+type UrlReferenceImageState =
+  | {
+      type: 'url';
+      url: string;
+      image: HTMLImageElement;
+    }
+  | {
+      type: 'custom';
+      svg: string;
+      theme: ThemeMode;
+      image: HTMLImageElement;
+    };
+
 // 定义暴露给父组件的API接口
 export interface DrawingCanvasRef {
   clear: () => void;
@@ -79,14 +100,37 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     const [_color, _setColor] = useState(strokeColor || '#000000');
     const [isReady, setIsReady] = useState(false);
     const [isDark, setIsDark] = useState(false); // 追踪深色模式状态
+    const themeMode: ThemeMode = isDark ? 'dark' : 'light';
 
-    // 绘图参考图像是否加载
-    const [referenceLoaded, setReferenceLoaded] = useState(false);
-    const referenceImageRef = useRef<HTMLImageElement | null>(null);
+    // 绘图参考图像
+    const [loadedReferenceImage, setLoadedReferenceImage] =
+      useState<ReferenceImageState | null>(null);
+    const referenceSvgToUse =
+      referenceSvg && referenceSvg.trim() ? referenceSvg : undefined;
+    const referenceImage =
+      loadedReferenceImage &&
+      referenceSvgToUse &&
+      loadedReferenceImage.svg === referenceSvgToUse &&
+      loadedReferenceImage.theme === themeMode
+        ? loadedReferenceImage.image
+        : null;
+    const referenceLoaded = Boolean(referenceImage);
 
     // 添加状态跟踪URL参考图像
-    const [urlReferenceLoaded, setUrlReferenceLoaded] = useState(false);
-    const urlReferenceImageRef = useRef<HTMLImageElement | null>(null);
+    const [loadedUrlReferenceImage, setLoadedUrlReferenceImage] =
+      useState<UrlReferenceImageState | null>(null);
+    const urlReferenceImage = _customReferenceSvg
+      ? loadedUrlReferenceImage?.type === 'custom' &&
+        loadedUrlReferenceImage.svg === _customReferenceSvg &&
+        loadedUrlReferenceImage.theme === themeMode
+        ? loadedUrlReferenceImage.image
+        : null
+      : referenceSvgUrl &&
+          loadedUrlReferenceImage?.type === 'url' &&
+          loadedUrlReferenceImage.url === referenceSvgUrl
+        ? loadedUrlReferenceImage.image
+        : null;
+    const urlReferenceLoaded = Boolean(urlReferenceImage);
 
     // 检测并更新当前主题模式
     const updateThemeMode = useCallback(() => {
@@ -173,13 +217,10 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       let mounted = true;
       let currentBlobUrl: string | null = null;
 
-      // 清理上一个引用
-      setReferenceLoaded(false);
-      referenceImageRef.current = null;
       cleanupBlobUrl();
 
       // 优先使用自定义杯型SVG
-      const svgToUse = referenceSvg;
+      const svgToUse = referenceSvgToUse;
 
       if (!svgToUse || !svgToUse.trim()) {
         // Log in development only
@@ -226,8 +267,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             if (process.env.NODE_ENV === 'development') {
               console.warn('[SVG加载] 图像加载完成');
             }
-            referenceImageRef.current = img;
-            setReferenceLoaded(true);
+            setLoadedReferenceImage({
+              svg: svgToUse,
+              theme: themeMode,
+              image: img,
+            });
           }
         };
 
@@ -259,7 +303,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           URL.revokeObjectURL(currentBlobUrl);
         }
       }
-    }, [referenceSvg, isDark, cleanupBlobUrl]);
+    }, [referenceSvgToUse, themeMode, isDark, cleanupBlobUrl]);
 
     // 加载URL参考图像（杯型等）
     useEffect(() => {
@@ -271,16 +315,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         if (process.env.NODE_ENV === 'development') {
           console.warn('[杯型加载] 使用自定义杯型');
         }
-        setUrlReferenceLoaded(false);
-        urlReferenceImageRef.current = null;
         return () => {
           mounted = false;
         };
       }
 
       if (!referenceSvgUrl) {
-        setUrlReferenceLoaded(false);
-        urlReferenceImageRef.current = null;
         return () => {
           mounted = false;
         };
@@ -300,8 +340,11 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           if (process.env.NODE_ENV === 'development') {
             console.warn('[杯型加载] 默认杯型图像加载完成');
           }
-          urlReferenceImageRef.current = img;
-          setUrlReferenceLoaded(true);
+          setLoadedUrlReferenceImage({
+            type: 'url',
+            url: referenceSvgUrl,
+            image: img,
+          });
         }
       };
 
@@ -370,8 +413,12 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             if (process.env.NODE_ENV === 'development') {
               console.warn('[自定义杯型] 图像加载完成');
             }
-            urlReferenceImageRef.current = img;
-            setUrlReferenceLoaded(true);
+            setLoadedUrlReferenceImage({
+              type: 'custom',
+              svg: _customReferenceSvg,
+              theme: themeMode,
+              image: img,
+            });
           }
         };
 
@@ -401,7 +448,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           URL.revokeObjectURL(currentBlobUrl);
         }
       }
-    }, [_customReferenceSvg, isDark]);
+    }, [_customReferenceSvg, themeMode, isDark]);
 
     // 设置画布偏移 - 优化版本，添加更多时机更新位置
     const updateCanvasOffset = useCallback(() => {
@@ -457,7 +504,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       // 首先绘制SVG参考图像（前帧）
-      if (showReference && referenceLoaded && referenceImageRef.current) {
+      if (showReference && referenceImage) {
         context.save();
         context.globalAlpha = isDark ? 0.6 : 0.4;
 
@@ -465,19 +512,13 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           context.filter = 'brightness(1.2)';
         }
 
-        context.drawImage(
-          referenceImageRef.current,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
+        context.drawImage(referenceImage, 0, 0, canvas.width, canvas.height);
 
         context.restore();
       }
 
       // 然后绘制URL参考图像（杯型等）
-      if (urlReferenceLoaded && urlReferenceImageRef.current) {
+      if (urlReferenceImage) {
         context.save();
 
         // 设置透明度 - 深色模式下进一步提高透明度使图像更清晰
@@ -487,7 +528,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           // 在深色模式下使用更柔和的效果
           context.filter = 'invert(1) contrast(1.5) brightness(1.5)';
           context.drawImage(
-            urlReferenceImageRef.current,
+            urlReferenceImage,
             0,
             0,
             canvas.width,
@@ -498,7 +539,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
           context.globalAlpha = 0.3;
           context.filter = 'invert(1) contrast(2) brightness(2) saturate(0)';
           context.drawImage(
-            urlReferenceImageRef.current,
+            urlReferenceImage,
             0,
             0,
             canvas.width,
@@ -507,7 +548,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
         } else {
           // 浅色模式正常绘制
           context.drawImage(
-            urlReferenceImageRef.current,
+            urlReferenceImage,
             0,
             0,
             canvas.width,
@@ -557,7 +598,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
     }, [
       lines,
       currentLine,
+      referenceImage,
       referenceLoaded,
+      urlReferenceImage,
       urlReferenceLoaded,
       showReference,
       isDark,
@@ -781,7 +824,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       // 如果需要显示参考图像
       if (showReference) {
         // 优先显示前帧底图（referenceSvg）
-        if (referenceLoaded && referenceImageRef.current) {
+        if (referenceImage) {
           ctx.save();
           ctx.globalAlpha = isDark ? 0.4 : 0.3; // 调整前帧底图的透明度
 
@@ -790,27 +833,27 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
             ctx.filter = 'brightness(1.2)';
           }
 
-          ctx.drawImage(referenceImageRef.current, 0, 0, width, height);
+          ctx.drawImage(referenceImage, 0, 0, width, height);
           ctx.restore();
         }
 
         // 然后显示杯型参考图像
-        if (urlReferenceLoaded && urlReferenceImageRef.current) {
+        if (urlReferenceImage) {
           ctx.save();
           ctx.globalAlpha = isDark ? 0.4 : 0.2;
 
           if (isDark) {
             // 在深色模式下使用更柔和的效果
             ctx.filter = 'invert(1) contrast(1.5) brightness(1.5)';
-            ctx.drawImage(urlReferenceImageRef.current, 0, 0, width, height);
+            ctx.drawImage(urlReferenceImage, 0, 0, width, height);
 
             // 添加一次轮廓增强，但保持较低的不透明度
             ctx.globalAlpha = 0.3;
             ctx.filter = 'invert(1) contrast(2) brightness(2) saturate(0)';
-            ctx.drawImage(urlReferenceImageRef.current, 0, 0, width, height);
+            ctx.drawImage(urlReferenceImage, 0, 0, width, height);
           } else {
             // 浅色模式正常绘制
-            ctx.drawImage(urlReferenceImageRef.current, 0, 0, width, height);
+            ctx.drawImage(urlReferenceImage, 0, 0, width, height);
           }
 
           ctx.restore();
@@ -861,7 +904,9 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(
       isReady,
       showReference,
       isDark,
+      referenceImage,
       urlReferenceLoaded,
+      urlReferenceImage,
       referenceLoaded,
       getCurrentDrawingColor,
     ]);

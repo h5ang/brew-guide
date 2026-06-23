@@ -638,9 +638,11 @@ const BrewingTimer: React.FC<BrewingTimerProps> = ({
     ) {
       // 使用setTimeout将handleComplete的调用推迟到下一个事件循环
 
-      setTimeout(() => {
+      const completeTimer = setTimeout(() => {
         handleComplete();
       }, 0);
+
+      return () => clearTimeout(completeTimer);
     }
   }, [currentTime, handleComplete, isCompleted]);
 
@@ -955,14 +957,6 @@ const BrewingTimer: React.FC<BrewingTimerProps> = ({
     };
   }, [isRunning, resetTimer, processExpansion, markExpandedStagesUpdated]);
 
-  // 简化状态同步：只在明确重置时同步
-  useEffect(() => {
-    if (isCoffeeBrewed === false) {
-      setShowComplete(false);
-      setIsCompleted(false);
-    }
-  }, [isCoffeeBrewed]);
-
   // 监听从记录页面返回到冲煮页面的事件，确保状态正确重置
   useEffect(() => {
     const handleBrewingReset = () => {
@@ -1105,6 +1099,7 @@ const BrewingTimer: React.FC<BrewingTimerProps> = ({
           <div className="relative w-full border-t border-neutral-200/50 dark:border-neutral-800/50">
             <div className="absolute top-1/2 right-6 flex -translate-y-1/2 items-center">
               <button
+                type="button"
                 onClick={() => setShowSettings(!showSettings)}
                 className="-mr-2 flex h-4 items-center gap-1 bg-neutral-50 px-2 dark:bg-neutral-900"
               >

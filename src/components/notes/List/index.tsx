@@ -851,26 +851,35 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   };
 
   // 处理设备选择变化
-  const handleEquipmentClick = useCallback((equipment: string | null) => {
-    setSelectedEquipment(equipment);
-    saveSelectedEquipmentPreference(equipment);
-  }, [setSelectedEquipment]);
+  const handleEquipmentClick = useCallback(
+    (equipment: string | null) => {
+      setSelectedEquipment(equipment);
+      saveSelectedEquipmentPreference(equipment);
+    },
+    [setSelectedEquipment]
+  );
 
   // 处理日期选择变化
-  const handleDateClick = useCallback((date: string | null) => {
-    setSelectedDate(date);
-    saveSelectedDatePreference(date);
-  }, [setSelectedDate]);
+  const handleDateClick = useCallback(
+    (date: string | null) => {
+      setSelectedDate(date);
+      saveSelectedDatePreference(date);
+    },
+    [setSelectedDate]
+  );
 
   // 处理日期分组模式变化
-  const handleDateGroupingModeChange = useCallback((mode: DateGroupingMode) => {
-    setDateGroupingMode(mode);
-    saveDateGroupingModePreference(mode);
-    setSelectedDate(null);
-    saveSelectedDatePreference(null);
-    globalCache.dateGroupingMode = mode;
-    globalCache.selectedDate = null;
-  }, [setDateGroupingMode, setSelectedDate]);
+  const handleDateGroupingModeChange = useCallback(
+    (mode: DateGroupingMode) => {
+      setDateGroupingMode(mode);
+      saveDateGroupingModePreference(mode);
+      setSelectedDate(null);
+      saveSelectedDatePreference(null);
+      globalCache.dateGroupingMode = mode;
+      globalCache.selectedDate = null;
+    },
+    [setDateGroupingMode, setSelectedDate]
+  );
 
   // 处理笔记选择/取消选择
   const handleToggleSelect = (noteId: string, enterShareMode = false) => {

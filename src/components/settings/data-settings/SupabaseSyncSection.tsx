@@ -224,6 +224,7 @@ export const SupabaseSyncSection: React.FC<SupabaseSyncSectionProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={() => setShowSQLDrawer(true)}
             className="flex w-full items-center justify-between rounded-md border border-neutral-200/50 bg-neutral-50 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
@@ -288,6 +289,7 @@ export const SupabaseSyncSection: React.FC<SupabaseSyncSectionProps> = ({
               realtimeStatus !== 'connecting' &&
               !isConnecting && (
                 <button
+                  type="button"
                   onClick={connectRealtimeSync}
                   className="mt-2 w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >

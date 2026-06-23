@@ -18,6 +18,7 @@ import {
 import DottedMap from 'dotted-map/without-countries';
 import mapDataJson from './mapData.json';
 import { findRegionsByNames, type CoffeeRegion } from './coffeeRegions';
+import { sanitizeSvgMarkup } from '@/lib/utils/svgUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapData = mapDataJson as any;
@@ -160,7 +161,7 @@ const CoffeeOriginMap: React.FC<CoffeeOriginMapProps> = memo(
     }, [originCounts]);
 
     // 生成基础 SVG 地图
-    const baseSvgContent = useMemo(() => {
+    const sanitizedBaseSvgContent = useMemo(() => {
       const map = new DottedMap({ map: mapData });
       const svgString = map.getSVG({
         radius: 0.22,
@@ -169,7 +170,10 @@ const CoffeeOriginMap: React.FC<CoffeeOriginMapProps> = memo(
         backgroundColor: 'transparent',
       });
       const match = svgString.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
-      return match ? match[1] : '';
+      return sanitizeSvgMarkup(match ? `<svg>${match[1]}</svg>` : '').replace(
+        /^<svg[^>]*>|<\/svg>$/g,
+        ''
+      );
     }, []);
 
     // 限制平移范围
@@ -492,7 +496,9 @@ const CoffeeOriginMap: React.FC<CoffeeOriginMapProps> = memo(
               preserveAspectRatio="xMidYMid meet"
             >
               {/* 基础地图点阵 */}
-              <g dangerouslySetInnerHTML={{ __html: baseSvgContent }} />
+              <g
+                dangerouslySetInnerHTML={{ __html: sanitizedBaseSvgContent }}
+              />
 
               {/* 产区标记点 */}
               {regionsWithCoords.map(region => {

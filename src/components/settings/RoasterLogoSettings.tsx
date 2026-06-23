@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import Image from 'next/image';
-import {
-  getRoasterConfigsSync,
-  getSettingsStore,
-} from '@/lib/stores/settingsStore';
+import { getSettingsStore, useSettingsStore } from '@/lib/stores/settingsStore';
 import { RoasterConfig } from '@/lib/core/db';
-import {
-  extractUniqueRoasters,
-  RoasterSettings,
-} from '@/lib/utils/beanVarietyUtils';
+import { extractUniqueRoasters } from '@/lib/utils/beanVarietyUtils';
 import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { ExtendedCoffeeBean } from '@/components/coffee-bean/List/types';
 import hapticsUtils from '@/lib/ui/haptics';
@@ -43,10 +43,6 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
 }) => {
   const [shouldRender, setShouldRender] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [roasters, setRoasters] = useState<string[]>([]);
-  const [roasterConfigs, setRoasterConfigs] = useState<
-    Map<string, RoasterConfig>
-  >(new Map());
   const [uploading, setUploading] = useState<string | null>(null);
   const [roasterEditState, setRoasterEditState] = useState<RoasterEditState>({
     isEditing: false,
@@ -63,6 +59,33 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
   const [focusedRoasterName, setFocusedRoasterName] = useState<string | null>(
     null
   );
+  const beans = useCoffeeBeanStore(
+    state => state.beans as ExtendedCoffeeBean[]
+  );
+  const roasterFieldEnabled = useSettingsStore(
+    state => state.settings.roasterFieldEnabled
+  );
+  const roasterSeparator = useSettingsStore(
+    state => state.settings.roasterSeparator
+  );
+  const roasterConfigList = useSettingsStore(
+    state => state.settings.roasterConfigs || []
+  );
+  const roasters = useMemo(
+    () =>
+      extractUniqueRoasters(beans, {
+        roasterFieldEnabled,
+        roasterSeparator,
+      }),
+    [beans, roasterFieldEnabled, roasterSeparator]
+  );
+  const roasterConfigs = useMemo(() => {
+    const configMap = new Map<string, RoasterConfig>();
+    roasterConfigList.forEach(config => {
+      configMap.set(config.roasterName, config);
+    });
+    return configMap;
+  }, [roasterConfigList]);
 
   // 删除确认抽屉状态
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -100,56 +123,18 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
   // 处理显示/隐藏动画
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true);
+      setShouldRender(isOpen);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setIsVisible(true);
         });
       });
     } else {
-      setIsVisible(false);
+      setIsVisible(isOpen);
       const timer = setTimeout(() => setShouldRender(false), 350);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
-
-  // 加载烘焙商列表
-  const loadRoasters = useCallback(() => {
-    try {
-      const beans = useCoffeeBeanStore.getState().beans as ExtendedCoffeeBean[];
-      const settings = getSettingsStore().settings;
-      const roasterSettings: RoasterSettings = {
-        roasterFieldEnabled: settings.roasterFieldEnabled,
-        roasterSeparator: settings.roasterSeparator,
-      };
-      const uniqueRoasters = extractUniqueRoasters(beans, roasterSettings);
-      setRoasters(uniqueRoasters);
-    } catch (error) {
-      console.error('Failed to load roasters:', error);
-    }
-  }, []);
-
-  // 加载烘焙商配置
-  const loadConfigs = useCallback(() => {
-    try {
-      const allConfigs = getRoasterConfigsSync();
-      const configMap = new Map<string, RoasterConfig>();
-      allConfigs.forEach(config => {
-        configMap.set(config.roasterName, config);
-      });
-      setRoasterConfigs(configMap);
-    } catch (error) {
-      console.error('Failed to load configs:', error);
-    }
-  }, []);
-
-  // 加载烘焙商列表和配置
-  useEffect(() => {
-    if (isOpen) {
-      loadRoasters();
-      loadConfigs();
-    }
-  }, [isOpen, loadRoasters, loadConfigs]);
 
   const handleClose = () => {
     if (isEditingRoasters) {
@@ -207,8 +192,6 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
       await getSettingsStore().updateRoasterConfig(roasterName, {
         logoData: compressedBase64,
       });
-      // 重新加载配置
-      loadConfigs();
       if (hapticFeedback) {
         hapticsUtils.success();
       }
@@ -238,7 +221,6 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
           flavorPeriod: currentConfig.flavorPeriod,
         });
       }
-      loadConfigs();
       if (hapticFeedback) {
         hapticsUtils.success();
       }
@@ -270,10 +252,8 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     setShowImportExport(true);
   }, []);
 
-  // 导入完成后刷新配置
-  const handleImportComplete = useCallback(() => {
-    loadConfigs();
-  }, [loadConfigs]);
+  // 导入后 settings store 会触发配置刷新
+  const handleImportComplete = useCallback(() => {}, []);
 
   const handleStartEditRoasters = useCallback(() => {
     setRoasterEditState({
@@ -377,8 +357,6 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     try {
       const result = await renameRoasters(renameEntries);
 
-      loadRoasters();
-      loadConfigs();
       setRoasterEditState({
         isEditing: false,
         drafts: {},
@@ -410,8 +388,6 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     hasInvalidDraftRoasterName,
     hapticFeedback,
     isSavingRoasters,
-    loadConfigs,
-    loadRoasters,
   ]);
 
   if (!shouldRender) return null;
@@ -593,6 +569,7 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                     >
                       {hasLogo && (
                         <button
+                          type="button"
                           onClick={e => handleDeleteLogo(roaster, e)}
                           disabled={isUploading}
                           className="rounded p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-red-500 disabled:opacity-50 dark:hover:bg-neutral-700"
@@ -603,6 +580,7 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                       )}
 
                       <button
+                        type="button"
                         onClick={e => triggerFileInput(roaster, e)}
                         disabled={isUploading}
                         className="rounded px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:text-neutral-400 dark:hover:bg-neutral-700"
@@ -662,12 +640,14 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
             {/* 导入导出 */}
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={handleOpenImport}
                 className="rounded bg-neutral-100 px-3 py-2 text-xs text-neutral-600 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
               >
                 导入图标
               </button>
               <button
+                type="button"
                 onClick={handleOpenExport}
                 className="rounded bg-neutral-100 px-3 py-2 text-xs text-neutral-600 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
               >

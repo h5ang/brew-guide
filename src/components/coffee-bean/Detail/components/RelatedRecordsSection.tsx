@@ -124,6 +124,7 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
         <div className="flex items-center gap-2">
           {primaryRecords.length > 0 && (
             <button
+              type="button"
               onClick={() => {
                 setShowChangeRecords(false);
                 setShowGreenBeanRecords(false);
@@ -139,6 +140,7 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
           )}
           {secondaryRecords.length > 0 && (
             <button
+              type="button"
               onClick={() => {
                 setShowChangeRecords(true);
                 setShowGreenBeanRecords(false);
@@ -152,6 +154,7 @@ const RelatedRecordsSection: React.FC<RelatedRecordsSectionProps> = React.memo(
           )}
           {hasSourceGreenBean && (
             <button
+              type="button"
               onClick={() => {
                 setShowChangeRecords(false);
                 setShowGreenBeanRecords(true);

@@ -37,7 +37,9 @@ export default function PWAUpdatePrompt() {
 
     const hasRecentUpdateRetry = () => {
       const timestamp = readUpdateRetryTimestamp();
-      return timestamp !== null && Date.now() - timestamp < UPDATE_RETRY_WINDOW_MS;
+      return (
+        timestamp !== null && Date.now() - timestamp < UPDATE_RETRY_WINDOW_MS
+      );
     };
 
     const clearUpdateRetry = () => {
@@ -120,7 +122,8 @@ export default function PWAUpdatePrompt() {
         return registrationRef.current;
       }
 
-      const scopedRegistration = await navigator.serviceWorker.getRegistration('/');
+      const scopedRegistration =
+        await navigator.serviceWorker.getRegistration('/');
       if (scopedRegistration) {
         return scopedRegistration;
       }
@@ -185,10 +188,16 @@ export default function PWAUpdatePrompt() {
       void checkForUpdates();
     };
 
-    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    navigator.serviceWorker.addEventListener(
+      'controllerchange',
+      handleControllerChange
+    );
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    window.addEventListener(PWA_MANUAL_UPDATE_CHECK_EVENT, handleManualUpdateCheck);
+    window.addEventListener(
+      PWA_MANUAL_UPDATE_CHECK_EVENT,
+      handleManualUpdateCheck
+    );
 
     const intervalId = window.setInterval(() => {
       void checkForUpdates();

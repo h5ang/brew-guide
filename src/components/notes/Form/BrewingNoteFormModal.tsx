@@ -138,7 +138,9 @@ const BrewingNoteFormModal: React.FC<BrewingNoteFormModalProps> = ({
   settings,
 }) => {
   const { beans: coffeeBeans } = useCoffeeBeanData();
-  const navigationState = deriveNavigationSettings(settings?.navigationSettings);
+  const navigationState = deriveNavigationSettings(
+    settings?.navigationSettings
+  );
   const canUseCoffeeBeanModule = navigationState.visibleTabs.coffeeBean;
   const availableCoffeeBeans = canUseCoffeeBeanModule ? coffeeBeans : [];
   const setPersistedEquipment = useEquipmentStore(
@@ -152,9 +154,9 @@ const BrewingNoteFormModal: React.FC<BrewingNoteFormModalProps> = ({
   const [isExitDrawerOpen, setIsExitDrawerOpen] = useState(false);
   const hasPrefilledCoffeeBean = Boolean(
     canUseCoffeeBeanModule &&
-      (initialNote?.coffeeBean ||
-        initialNote?.beanId ||
-        initialNote?.coffeeBeanInfo?.name)
+    (initialNote?.coffeeBean ||
+      initialNote?.beanId ||
+      initialNote?.coffeeBeanInfo?.name)
   );
 
   const getInitialDraftEquipmentId = useCallback(
@@ -347,10 +349,11 @@ const BrewingNoteFormModal: React.FC<BrewingNoteFormModalProps> = ({
 
   useEffect(() => {
     if (!showForm) {
-      setIsExitDrawerOpen(false);
       didAutoAdvancePrefilledStepRef.current = false;
     }
   }, [showForm]);
+
+  const shouldShowExitDrawer = showForm && isExitDrawerOpen;
 
   useEffect(() => {
     if (!showForm || availableCoffeeBeans.length === 0 || selectedCoffeeBean) {
@@ -907,7 +910,7 @@ const BrewingNoteFormModal: React.FC<BrewingNoteFormModalProps> = ({
       )}
 
       <ActionDrawer
-        isOpen={isExitDrawerOpen}
+        isOpen={shouldShowExitDrawer}
         onClose={() => setIsExitDrawerOpen(false)}
         historyId="note-draft-exit-drawer"
       >

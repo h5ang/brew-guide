@@ -30,8 +30,8 @@ const buildInfoEnv = {
 
 const nextConfig = {
   reactStrictMode: true,
-  // 启用 React Compiler
-  reactCompiler: true,
+  // ponytail: disabled until the codebase is React Compiler clean; re-enable after fixing react-hooks-js diagnostics.
+  reactCompiler: false,
   env: buildInfoEnv,
   // 为 Capacitor 启用静态导出模式
   output: 'export',

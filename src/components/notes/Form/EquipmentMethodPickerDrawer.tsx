@@ -74,9 +74,16 @@ const EquipmentMethodPickerDrawer: React.FC<
     selectedMethodId || ''
   );
   // 保存最后选择的方案对象，用于回调
-  const [lastSelectedMethod, setLastSelectedMethod] = useState<
-    Method | undefined
-  >();
+  const [lastSelectedMethodState, setLastSelectedMethodState] = useState<{
+    equipmentId: string;
+    methodId: string;
+    method: Method | undefined;
+  } | null>(null);
+  const lastSelectedMethod =
+    lastSelectedMethodState?.equipmentId === tempEquipmentId &&
+    lastSelectedMethodState.methodId === tempMethodId
+      ? lastSelectedMethodState.method
+      : undefined;
 
   // 加载自定义数据
   useEffect(() => {
@@ -97,7 +104,6 @@ const EquipmentMethodPickerDrawer: React.FC<
       // 同步外部状态到内部
       setTempEquipmentId(selectedEquipmentId || '');
       setTempMethodId(selectedMethodId || '');
-      setLastSelectedMethod(undefined);
     }
   }, [isOpen, selectedEquipmentId, selectedMethodId]);
 
@@ -139,7 +145,7 @@ const EquipmentMethodPickerDrawer: React.FC<
       setTempEquipmentId(equipmentId);
       // 切换器具时清空方案选择
       setTempMethodId('');
-      setLastSelectedMethod(undefined);
+      setLastSelectedMethodState(null);
     },
     [triggerHaptic]
   );
@@ -158,16 +164,32 @@ const EquipmentMethodPickerDrawer: React.FC<
       const selectedMethod = allMethods.find(
         m => m.id === methodId || m.name === methodId
       );
-      setLastSelectedMethod(selectedMethod);
+      setLastSelectedMethodState({
+        equipmentId: tempEquipmentId,
+        methodId,
+        method: selectedMethod,
+      });
     },
-    [triggerHaptic, customMethodsForEquipment, commonMethodsForEquipment]
+    [
+      triggerHaptic,
+      tempEquipmentId,
+      customMethodsForEquipment,
+      commonMethodsForEquipment,
+    ]
   );
 
   // 处理方案参数变化（MethodSelector 内部编辑参数时）
-  const handleParamsChange = useCallback((method: Method) => {
-    // 更新最后选择的方案（带修改后的参数）
-    setLastSelectedMethod(method);
-  }, []);
+  const handleParamsChange = useCallback(
+    (method: Method) => {
+      // 更新最后选择的方案（带修改后的参数）
+      setLastSelectedMethodState({
+        equipmentId: tempEquipmentId,
+        methodId: tempMethodId,
+        method,
+      });
+    },
+    [tempEquipmentId, tempMethodId]
+  );
 
   // 确认选择
   const handleConfirm = useCallback(() => {

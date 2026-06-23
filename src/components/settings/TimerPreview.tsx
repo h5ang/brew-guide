@@ -355,6 +355,7 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
             {/* 控制按钮 */}
             <div className="flex shrink-0 flex-row items-center space-x-3">
               <button
+                type="button"
                 className={`${showFlowRate ? 'h-11 w-11 sm:h-12 sm:w-12' : 'h-12 w-12 sm:h-14 sm:w-14'} flex shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400`}
               >
                 <Pause
@@ -363,6 +364,7 @@ const TimerPreview: React.FC<TimerPreviewProps> = ({ settings }) => {
                 />
               </button>
               <button
+                type="button"
                 className={`${showFlowRate ? 'h-11 w-11 sm:h-12 sm:w-12' : 'h-12 w-12 sm:h-14 sm:w-14'} flex shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400`}
               >
                 <RefreshCw

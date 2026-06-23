@@ -144,9 +144,6 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   const [editingBean, setEditingBean] = useState<ExtendedCoffeeBean | null>(
     null
   );
-  const [sortOption, setSortOption] = useState<SortOption>(
-    globalCache.sortOption
-  );
   // 视图特定的排序选项
   const [inventorySortOption, setInventorySortOption] = useState<SortOption>(
     globalCache.inventorySortOption
@@ -162,6 +159,8 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
       globalCache.viewMode = view;
       saveViewModePreference(view);
     });
+  const sortOption =
+    viewMode === VIEW_OPTIONS.RANKING ? rankingSortOption : inventorySortOption;
 
   // 评分相关状态
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -240,7 +239,6 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
     }>
   >([{ label: '全部时间', filter: { type: 'all' } }]);
 
-  const [_isFirstLoad, setIsFirstLoad] = useState<boolean>(!storeInitialized);
   const unmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isLoadingRef = useRef<boolean>(false);
   const beansContainerRef = useRef<HTMLDivElement | null>(null);
@@ -426,10 +424,7 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
   // 当 beans 变化时更新 globalCache（仅用于 UI 偏好设置）
   useEffect(() => {
     globalCache.filteredBeans = filteredBeans;
-    if (beans.length > 0) {
-      setIsFirstLoad(false);
-    }
-  }, [beans, filteredBeans]);
+  }, [filteredBeans]);
 
   const [rankingBeansCount, setRankingBeansCount] = useState<number>(0);
   const [rankingEspressoCount, setRankingEspressoCount] = useState<number>(0);
@@ -697,13 +692,12 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
           newSortOption = inventorySortOption;
       }
 
-      setSortOption(newSortOption);
       globalCache.sortOption = newSortOption;
       saveSortOptionPreference(newSortOption);
       globalCache.viewMode = viewMode;
       saveViewModePreference(viewMode);
     }
-  }, [viewMode, inventorySortOption, rankingSortOption]);
+  }, [storeInitialized, viewMode, inventorySortOption, rankingSortOption]);
 
   // 当库存快照变化时同步全局缓存，避免旧的分类数据残留
   useEffect(() => {
@@ -1187,8 +1181,6 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
           currentSortOption = inventorySortOption;
       }
 
-      // 设置当前排序选项
-      setSortOption(currentSortOption);
       globalCache.sortOption = currentSortOption;
     }
   }, [isOpen, viewMode, inventorySortOption, rankingSortOption]);
@@ -1502,8 +1494,6 @@ const CoffeeBeans: React.FC<CoffeeBeansProps> = ({
 
   // 处理排序选项变更
   const handleSortChange = (option: SortOption) => {
-    setSortOption(option);
-
     // 同时更新视图特定的排序选项
     switch (viewMode) {
       case VIEW_OPTIONS.INVENTORY:

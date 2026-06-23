@@ -1,9 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import {
-  Method,
-  equipmentList,
-  CustomEquipment,
-} from '@/lib/core/config';
+import { Method, equipmentList, CustomEquipment } from '@/lib/core/config';
 import { BrewingNoteData, CoffeeBean } from '@/types/app';
 import {
   loadCustomMethods,
@@ -344,6 +340,8 @@ export function useBrewingState(initialBrewingStep?: BrewingStep) {
 
   // 初始加载自定义方案
   useEffect(() => {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
     const loadMethods = async () => {
       try {
         const methods = await loadCustomMethods();
@@ -351,11 +349,15 @@ export function useBrewingState(initialBrewingStep?: BrewingStep) {
       } catch (error) {
         console.error('加载方案失败:', error);
         // 添加重试机制，确保方案加载成功
-        setTimeout(loadMethods, 1000);
+        retryTimer = setTimeout(loadMethods, 1000);
       }
     };
 
     loadMethods();
+
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   // 简化的保存笔记函数 - 统一数据流避免竞态条件

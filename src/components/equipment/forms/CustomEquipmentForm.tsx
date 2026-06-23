@@ -39,6 +39,7 @@ import {
   SettingVerticalSelector,
   SettingCardSelector,
 } from '@/components/settings/atomic';
+import { sanitizeSvgMarkup } from '@/lib/utils/svgUtils';
 
 // 从CustomEquipment类型中提取PourAnimation类型
 type CustomPourAnimation = NonNullable<
@@ -389,18 +390,8 @@ const CustomEquipmentForm = forwardRef<
       });
     }, [customPourAnimations]);
 
-    // 初始化预览帧并设置循环定时器
+    // 设置循环定时器
     useEffect(() => {
-      // 设置初始预览帧
-      const initialPreviewFrames: Record<string, number> = {};
-
-      // 为所有动画设置预览帧
-      customPourAnimations.forEach(anim => {
-        initialPreviewFrames[anim.id] = 1;
-      });
-
-      setPreviewFrameIndexes(initialPreviewFrames);
-
       // 设置定时器循环播放预览动画
       const previewTimer = setInterval(() => {
         setPreviewFrameIndexes(prev => {
@@ -1676,9 +1667,11 @@ const CustomEquipmentForm = forwardRef<
             <div
               className="custom-cup-shape outline-only flex h-full w-full items-center justify-center"
               dangerouslySetInnerHTML={{
-                __html: activeCupReference.svg.replace(
-                  /<svg/,
-                  '<svg width="100%" height="100%"'
+                __html: sanitizeSvgMarkup(
+                  activeCupReference.svg.replace(
+                    /<svg/,
+                    '<svg width="100%" height="100%"'
+                  )
                 ),
               }}
             />
@@ -1745,9 +1738,11 @@ const CustomEquipmentForm = forwardRef<
                     <div
                       className="custom-cup-shape outline-only flex h-full w-full items-center justify-center"
                       dangerouslySetInnerHTML={{
-                        __html: svgData.replace(
-                          /<svg/,
-                          '<svg width="100%" height="100%"'
+                        __html: sanitizeSvgMarkup(
+                          svgData.replace(
+                            /<svg/,
+                            '<svg width="100%" height="100%"'
+                          )
                         ),
                       }}
                     />
@@ -1763,9 +1758,11 @@ const CustomEquipmentForm = forwardRef<
                   <div
                     className="custom-cup-shape outline-only flex h-full w-full items-center justify-center"
                     dangerouslySetInnerHTML={{
-                      __html: animation.customAnimationSvg.replace(
-                        /<svg/,
-                        '<svg width="100%" height="100%"'
+                      __html: sanitizeSvgMarkup(
+                        animation.customAnimationSvg.replace(
+                          /<svg/,
+                          '<svg width="100%" height="100%"'
+                        )
                       ),
                     }}
                   />
@@ -1873,9 +1870,11 @@ const CustomEquipmentForm = forwardRef<
                     <div
                       className="flex h-full w-full items-center justify-center"
                       dangerouslySetInnerHTML={{
-                        __html: equipment.customShapeSvg.replace(
-                          /<svg/,
-                          '<svg width="100%" height="100%"'
+                        __html: sanitizeSvgMarkup(
+                          equipment.customShapeSvg.replace(
+                            /<svg/,
+                            '<svg width="100%" height="100%"'
+                          )
                         ),
                       }}
                     />

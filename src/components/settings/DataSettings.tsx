@@ -80,6 +80,7 @@ const SelectionDropdown: React.FC<SelectionDropdownProps> = ({
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
       >
@@ -98,6 +99,7 @@ const SelectionDropdown: React.FC<SelectionDropdownProps> = ({
         <div className="mt-2 space-y-2 rounded bg-neutral-100 p-2 dark:bg-neutral-800">
           {options.map(option => (
             <button
+              type="button"
               key={option.value}
               onClick={() => onSelect(option.value)}
               className={`w-full rounded px-3 py-2 text-left text-sm transition-colors ${
@@ -673,6 +675,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
             selectedManualSyncType === 'webdav' &&
             !webdavSettings.lastConnectionSuccess && (
               <button
+                type="button"
                 onClick={() => setShowWebDAVTutorial(true)}
                 className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
               >
@@ -738,6 +741,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
             {selectedManualSyncType === 'webdav' &&
               !webdavSettings.lastConnectionSuccess && (
                 <button
+                  type="button"
                   onClick={() => setShowWebDAVTutorial(true)}
                   className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
                 >
@@ -812,6 +816,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
             // 已启用（包括原生应用和 PWA 已开启）- 显示为按钮样式
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowStorageDetails(!showStorageDetails)}
                 className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
               >
@@ -837,6 +842,7 @@ const DataSettings: React.FC<DataSettingsProps> = ({
                       存储使用详情
                     </span>
                     <button
+                      type="button"
                       onClick={handleRefreshStorage}
                       className="text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
                     >

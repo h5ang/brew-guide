@@ -149,6 +149,7 @@ export default function GlobalError({
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
+                type="button"
                 onClick={isChunkError ? handleChunkError : () => reset()}
                 className="rounded-full bg-neutral-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
               >
@@ -156,6 +157,7 @@ export default function GlobalError({
               </button>
 
               <button
+                type="button"
                 onClick={() => (window.location.href = '/')}
                 className="rounded-full bg-neutral-100 px-6 py-2.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
               >
@@ -163,6 +165,7 @@ export default function GlobalError({
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowDetails(!showDetails)}
                 className="rounded-full bg-neutral-100 px-6 py-2.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
               >
@@ -177,6 +180,7 @@ export default function GlobalError({
                     错误日志
                   </span>
                   <button
+                    type="button"
                     onClick={handleCopyError}
                     className="flex items-center gap-1 rounded-md bg-neutral-200 px-3 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
                   >

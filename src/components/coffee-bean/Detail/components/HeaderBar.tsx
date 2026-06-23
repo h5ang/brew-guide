@@ -227,6 +227,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
     <div className="pt-safe-top sticky top-0 flex items-center gap-3 bg-neutral-50 p-4 dark:bg-neutral-900">
       {/* 左侧关闭按钮 */}
       <button
+        type="button"
         onClick={onClose}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
       >
@@ -258,6 +259,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         {/* 添加模式：显示保存按钮 */}
         {isAddMode && (
           <button
+            type="button"
             onClick={() => void handleSave()}
             disabled={!canSave || isSaving}
             className={`px-3 py-1 text-xs font-medium transition-colors ${
@@ -273,6 +275,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
         {/* 查看模式：生豆显示"去烘焙"按钮 */}
         {!isAddMode && bean && isGreenBean && onRoast && (
           <button
+            type="button"
             onClick={onGoToRoast}
             className="flex h-8 items-center justify-center rounded-full bg-neutral-100 px-3 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
           >

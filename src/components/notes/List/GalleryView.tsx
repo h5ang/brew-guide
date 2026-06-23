@@ -81,7 +81,6 @@ const GalleryView: React.FC<GalleryViewProps> = ({
           );
         })}
       </div>
-
     </div>
   );
 };

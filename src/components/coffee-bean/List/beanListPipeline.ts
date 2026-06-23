@@ -153,7 +153,10 @@ const buildSearchFields = (bean: ExtendedCoffeeBean): SearchField[] => {
     { text: processTexts.join(' '), weight: 2 },
     { text: normalizeSearchText(bean.notes || ''), weight: 1 },
     { text: normalizeSearchText(bean.roastLevel || ''), weight: 1 },
-    { text: normalizeSearchText(bean.roastDate || bean.purchaseDate || ''), weight: 1 },
+    {
+      text: normalizeSearchText(bean.roastDate || bean.purchaseDate || ''),
+      weight: 1,
+    },
     { text: normalizeSearchText(bean.price || ''), weight: 1 },
     { text: normalizeSearchText(bean.beanType || ''), weight: 2 },
     { text: uniqueNormalizedValues(bean.flavor || []).join(' '), weight: 2 },
@@ -161,9 +164,7 @@ const buildSearchFields = (bean: ExtendedCoffeeBean): SearchField[] => {
     { text: normalizeSearchText(bean.capacity || ''), weight: 1 },
     { text: normalizeSearchText(bean.remaining || ''), weight: 1 },
     {
-      text: normalizeSearchText(
-        `${bean.startDay ?? ''} ${bean.endDay ?? ''}`
-      ),
+      text: normalizeSearchText(`${bean.startDay ?? ''} ${bean.endDay ?? ''}`),
       weight: 1,
     },
     { text: varietyTexts.join(' '), weight: 2 },
@@ -239,7 +240,9 @@ const sortInventoryRecords = (
       sortOption === 'remaining_days_desc');
 
   if (shouldUseTimestampSort) {
-    return [...records].sort((left, right) => right.bean.timestamp - left.bean.timestamp);
+    return [...records].sort(
+      (left, right) => right.bean.timestamp - left.bean.timestamp
+    );
   }
 
   const beanMap = new Map(records.map(record => [record.bean.id, record]));
@@ -255,9 +258,7 @@ const matchesSelectedBeanType = (
   record: BeanListRecord,
   selectedBeanType: BeanType
 ): boolean =>
-  selectedBeanType === 'all'
-    ? true
-    : record.beanType === selectedBeanType;
+  selectedBeanType === 'all' ? true : record.beanType === selectedBeanType;
 
 const matchesSelectedGroup = (
   record: BeanListRecord,
@@ -549,7 +550,9 @@ export const createBeanInventorySnapshot = (
     availableBeanGroups: getSortedCoffeeBeanGroups(
       options.coffeeBeanGroups || EMPTY_GROUPS
     ).filter(group =>
-      availableBeanCandidates.some(bean => (group.beanIds || []).includes(bean.id))
+      availableBeanCandidates.some(bean =>
+        (group.beanIds || []).includes(bean.id)
+      )
     ),
     currentStateBeanCount,
     hasEmptyBeansInCurrentState,

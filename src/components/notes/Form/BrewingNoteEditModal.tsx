@@ -25,7 +25,9 @@ const BrewingNoteEditModal: React.FC<BrewingNoteEditModalProps> = ({
   settings,
   isCopy = false, // 默认不是复制操作
 }) => {
-  const navigationState = deriveNavigationSettings(settings?.navigationSettings);
+  const navigationState = deriveNavigationSettings(
+    settings?.navigationSettings
+  );
   const canUseNotesModule = navigationState.visibleTabs.notes;
   // 快捷记录模式状态
   const [isQuickDecrementEdit, setIsQuickDecrementEdit] = useState(false);

@@ -40,9 +40,7 @@ function isTauri() {
   return typeof window !== 'undefined' && '__TAURI__' in window;
 }
 
-function resolveSafeAreaMargins(
-  margins?: SettingsOptions['safeAreaMargins']
-) {
+function resolveSafeAreaMargins(margins?: SettingsOptions['safeAreaMargins']) {
   return margins ?? DEFAULT_SAFE_AREA_MARGINS;
 }
 
@@ -95,9 +93,7 @@ function DisplaySettings({ onClose }: DisplaySettingsProps) {
   const hapticFeedback = useSettingsStore(
     state => state.settings.hapticFeedback
   );
-  const textZoomLevel = useSettingsStore(
-    state => state.settings.textZoomLevel
-  );
+  const textZoomLevel = useSettingsStore(state => state.settings.textZoomLevel);
   const safeAreaMargins = useSettingsStore(
     state => state.settings.safeAreaMargins
   );
@@ -107,8 +103,8 @@ function DisplaySettings({ onClose }: DisplaySettingsProps) {
   const updateSettings = useSettingsStore(state => state.updateSettings);
 
   const { theme, setTheme } = useTheme();
-  const [zoomLevel, setZoomLevel] = React.useState(() =>
-    textZoomLevel ?? DEFAULT_TEXT_ZOOM_LEVEL
+  const [zoomLevel, setZoomLevel] = React.useState(
+    () => textZoomLevel ?? DEFAULT_TEXT_ZOOM_LEVEL
   );
   const [isFontZoomEnabled, setIsFontZoomEnabled] = React.useState(false);
   const [isTauriEnv, setIsTauriEnv] = React.useState(false);
@@ -120,14 +116,17 @@ function DisplaySettings({ onClose }: DisplaySettingsProps) {
   const safeAreaPreviewTimeoutRef = React.useRef<number | null>(null);
   onCloseRef.current = onClose;
 
-  const handleCloseWithAnimation = React.useCallback(function closeWithAnimation() {
-    setIsVisible(false);
-    window.dispatchEvent(new CustomEvent('subSettingsClosing'));
+  const handleCloseWithAnimation = React.useCallback(
+    function closeWithAnimation() {
+      setIsVisible(false);
+      window.dispatchEvent(new CustomEvent('subSettingsClosing'));
 
-    window.setTimeout(function finishCloseAnimation() {
-      onCloseRef.current();
-    }, TRANSITION_DURATION_MS);
-  }, []);
+      window.setTimeout(function finishCloseAnimation() {
+        onCloseRef.current();
+      }, TRANSITION_DURATION_MS);
+    },
+    []
+  );
 
   useModalHistory({
     id: 'display-settings',

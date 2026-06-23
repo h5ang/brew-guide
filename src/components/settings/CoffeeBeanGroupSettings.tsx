@@ -253,17 +253,16 @@ const BeanThumbnail: React.FC<{
   bean: CoffeeBean;
   size?: 'xs' | 'sm' | 'md';
 }> = ({ bean, size = 'md' }) => {
-  const [imageError, setImageError] = React.useState(false);
+  const [failedImageSource, setFailedImageSource] = React.useState<
+    string | null
+  >(null);
   const imageSource = useCoffeeBeanImage(bean.id, {
     fallback: bean.image,
     preferThumbnail: true,
   });
+  const imageError = failedImageSource === imageSource;
   const sizeClass =
     size === 'xs' ? 'h-5 w-5' : size === 'sm' ? 'h-9 w-9' : 'h-12 w-12';
-
-  React.useEffect(() => {
-    setImageError(false);
-  }, [imageSource]);
 
   return (
     <div
@@ -277,7 +276,7 @@ const BeanThumbnail: React.FC<{
           sizes={size === 'xs' ? '20px' : size === 'sm' ? '36px' : '48px'}
           unoptimized
           className="object-cover"
-          onError={() => setImageError(true)}
+          onError={() => setFailedImageSource(imageSource)}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs font-medium text-neutral-500 dark:text-neutral-400">
@@ -521,7 +520,7 @@ const BeanPickerDrawer: React.FC<BeanPickerDrawerProps> = ({
   displaySettings,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [activeSelectedBeanId, setActiveSelectedBeanId] = React.useState<
+  const [activeSelectedBeanIdState, setActiveSelectedBeanId] = React.useState<
     string | null
   >(null);
   const [chipScrollShadow, setChipScrollShadow] = React.useState({
@@ -535,16 +534,14 @@ const BeanPickerDrawer: React.FC<BeanPickerDrawerProps> = ({
   const chipListRef = React.useRef<HTMLDivElement>(null);
   const beanListRef = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery('');
-    }
-  }, [isOpen]);
-
   const selectedIdSet = React.useMemo(
     () => new Set(selectedIds),
     [selectedIds]
   );
+  const activeSelectedBeanId =
+    activeSelectedBeanIdState && selectedIdSet.has(activeSelectedBeanIdState)
+      ? activeSelectedBeanIdState
+      : null;
 
   const beanById = React.useMemo(() => {
     const map = new Map<string, CoffeeBean>();
@@ -556,14 +553,6 @@ const BeanPickerDrawer: React.FC<BeanPickerDrawerProps> = ({
     () => getBeansByIds(selectedIds, beanById),
     [beanById, selectedIds]
   );
-
-  React.useEffect(() => {
-    if (!activeSelectedBeanId || selectedIdSet.has(activeSelectedBeanId)) {
-      return;
-    }
-
-    setActiveSelectedBeanId(null);
-  }, [activeSelectedBeanId, selectedIdSet]);
 
   const updateChipScrollShadow = React.useCallback(() => {
     const element = chipListRef.current;
@@ -582,11 +571,6 @@ const BeanPickerDrawer: React.FC<BeanPickerDrawerProps> = ({
   }, []);
 
   React.useEffect(() => {
-    if (selectedBeans.length === 0) {
-      setChipScrollShadow({ top: false, bottom: false });
-      return;
-    }
-
     const frame = requestAnimationFrame(updateChipScrollShadow);
     return () => cancelAnimationFrame(frame);
   }, [selectedBeans.length, updateChipScrollShadow]);
@@ -667,12 +651,27 @@ const BeanPickerDrawer: React.FC<BeanPickerDrawerProps> = ({
     [activeSelectedBeanId, onSelectedIdsChange, selectedIds]
   );
 
+  const resetDrawerLocalState = React.useCallback(() => {
+    setSearchQuery('');
+    setActiveSelectedBeanId(null);
+  }, []);
+
+  const handleCancel = React.useCallback(() => {
+    resetDrawerLocalState();
+    onCancel();
+  }, [onCancel, resetDrawerLocalState]);
+
+  const handleDone = React.useCallback(() => {
+    resetDrawerLocalState();
+    onDone();
+  }, [onDone, resetDrawerLocalState]);
+
   return (
     <StackedDrawer
       isOpen={isOpen}
       title="包含咖啡豆"
-      onCancel={onCancel}
-      onDone={onDone}
+      onCancel={handleCancel}
+      onDone={handleDone}
       historyId="coffee-bean-group-bean-picker-drawer"
       layer="top"
     >

@@ -89,8 +89,7 @@ export const CollapsedNavigationDockTrigger: React.FC<
   );
 };
 
-interface CollapsedNavigationDockOverlayProps
-  extends CollapsedNavigationDockProps {
+interface CollapsedNavigationDockOverlayProps extends CollapsedNavigationDockProps {
   isOverlayOpen: CollapsedNavigationDockState['isOverlayOpen'];
   overlayRef: CollapsedNavigationDockState['overlayRef'];
   openOverlay: CollapsedNavigationDockState['openOverlay'];
@@ -110,7 +109,7 @@ export const CollapsedNavigationDockOverlay: React.FC<
     isOverlayOpen && (
       <div
         ref={overlayRef}
-        className="absolute top-0 left-0 z-20 max-h-[min(420px,calc(100vh-2rem))] overflow-y-auto overflow-x-hidden border-r border-b border-neutral-200/50 bg-neutral-50 pb-4 dark:border-neutral-800/50 dark:bg-neutral-900"
+        className="absolute top-0 left-0 z-20 max-h-[min(420px,calc(100vh-2rem))] overflow-x-hidden overflow-y-auto border-r border-b border-neutral-200/50 bg-neutral-50 pb-4 dark:border-neutral-800/50 dark:bg-neutral-900"
         onPointerEnter={openOverlay}
         onPointerLeave={closeOverlay}
       >

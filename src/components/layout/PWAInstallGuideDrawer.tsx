@@ -43,19 +43,16 @@ const PWAInstallGuideDrawer: React.FC<PWAInstallGuideDrawerProps> = ({
     >
       <ActionDrawer.Content className="mb-0! space-y-6">
         <div className="flex items-center justify-between gap-3">
-            <p className="text-2xl font-medium text-neutral-900 dark:text-neutral-100">
-              安装 iOS PWA 应用
-            </p>
-
+          <p className="text-2xl font-medium text-neutral-900 dark:text-neutral-100">
+            安装 iOS PWA 应用
+          </p>
         </div>
 
         <div className="space-y-7">
           <div className="flex">
-            <span className={stepNumberClass}>
-              1
-            </span>
+            <span className={stepNumberClass}>1</span>
             <div className="space-y-2">
-              <div className="inline-flex items-center rounded-full bg-neutral-900 -mt-1 p-3.5 dark:bg-neutral-100">
+              <div className="-mt-1 inline-flex items-center rounded-full bg-neutral-900 p-3.5 dark:bg-neutral-100">
                 <IOSShareIcon className="h-5 w-5 text-neutral-100 dark:text-neutral-800" />
               </div>
               <p className="text-sm text-neutral-600 dark:text-neutral-200">
@@ -65,13 +62,13 @@ const PWAInstallGuideDrawer: React.FC<PWAInstallGuideDrawerProps> = ({
           </div>
 
           <div className="flex">
-            <span className={stepNumberClass}>
-              2
-            </span>
+            <span className={stepNumberClass}>2</span>
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 rounded-full bg-neutral-900 -mt-1 p-3.5 text-sm font-semibold text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900">
-                <SquarePlus className="h-5 w-5 text-neutral-100 stroke-[1.5] dark:text-neutral-800" />
-                <span className="text-neutral-100 dark:text-neutral-900">添加到主屏幕</span>
+              <div className="-mt-1 inline-flex items-center gap-2 rounded-full bg-neutral-900 p-3.5 text-sm font-semibold text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900">
+                <SquarePlus className="h-5 w-5 stroke-[1.5] text-neutral-100 dark:text-neutral-800" />
+                <span className="text-neutral-100 dark:text-neutral-900">
+                  添加到主屏幕
+                </span>
               </div>
               <p className="text-sm text-neutral-600 dark:text-neutral-200">
                 从菜单中按下此按钮
@@ -80,12 +77,12 @@ const PWAInstallGuideDrawer: React.FC<PWAInstallGuideDrawerProps> = ({
           </div>
 
           <div className="flex">
-            <span className={stepNumberClass}>
-              3
-            </span>
+            <span className={stepNumberClass}>3</span>
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 h-12 rounded-full bg-neutral-900 -mt-1 p-3.5 text-sm leading-none font-semibold text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900">
-                <span className="text-neutral-100 dark:text-neutral-900 ">添加</span>
+              <div className="-mt-1 inline-flex h-12 items-center gap-2 rounded-full bg-neutral-900 p-3.5 text-sm leading-none font-semibold text-neutral-100 dark:bg-neutral-100 dark:text-neutral-900">
+                <span className="text-neutral-100 dark:text-neutral-900">
+                  添加
+                </span>
               </div>
               <p className="text-sm text-neutral-600 dark:text-neutral-200">
                 按下右上角的这个按钮

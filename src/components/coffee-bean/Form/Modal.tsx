@@ -62,14 +62,14 @@ const CoffeeBeanFormModal: React.FC<CoffeeBeanFormModalProps> = ({
   // 处理显示/隐藏动画
   useEffect(() => {
     if (showForm) {
-      setShouldRender(true);
-      setCurrentStep(1); // 重置步骤
-      const timer = setTimeout(() => setIsVisible(true), 10);
+      setShouldRender(showForm);
+      setCurrentStep(previousStep => (showForm ? 1 : previousStep)); // 重置步骤
+      const timer = setTimeout(() => setIsVisible(showForm), 10);
       return () => clearTimeout(timer);
     } else {
-      setIsVisible(false);
+      setIsVisible(showForm);
       // 不立即卸载 shouldRender，等动画完成后再卸载
-      const timer = setTimeout(() => setShouldRender(false), 400);
+      const timer = setTimeout(() => setShouldRender(showForm), 400);
       return () => clearTimeout(timer);
     }
   }, [showForm]);

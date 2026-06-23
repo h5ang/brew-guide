@@ -47,6 +47,41 @@ export const linesToSvgPath = (
   </svg>`;
 };
 
+export const sanitizeSvgMarkup = (svgString: string): string => {
+  if (
+    typeof DOMParser === 'undefined' ||
+    typeof XMLSerializer === 'undefined'
+  ) {
+    return '';
+  }
+
+  const doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+  if (doc.querySelector('parsererror')) return '';
+
+  doc
+    .querySelectorAll('script, foreignObject, iframe, object, embed')
+    .forEach(node => node.remove());
+
+  doc.querySelectorAll('*').forEach(element => {
+    Array.from(element.attributes).forEach(attribute => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+      if (
+        name.startsWith('on') ||
+        value.startsWith('javascript:') ||
+        value.startsWith('data:text/html') ||
+        ((name === 'href' || name === 'xlink:href') &&
+          (value.startsWith('javascript:') || value.startsWith('data:'))) ||
+        (name === 'style' && /(?:expression|url\s*\()/i.test(value))
+      ) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return new XMLSerializer().serializeToString(doc.documentElement);
+};
+
 /**
  * 从SVG字符串中提取路径数据
  * @param svgString SVG字符串

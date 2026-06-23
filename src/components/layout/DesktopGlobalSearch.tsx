@@ -205,8 +205,40 @@ const DesktopGlobalSearch: React.FC<DesktopGlobalSearchProps> = ({
   onSelectBean,
   onSelectNote,
 }) => {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [searchState, setSearchState] = useState(() => ({
+    enabled,
+    open: false,
+    query: '',
+  }));
+  const open =
+    enabled && searchState.enabled === enabled ? searchState.open : false;
+  const query =
+    enabled && searchState.enabled === enabled ? searchState.query : '';
+  const setOpen = useCallback(
+    (value: React.SetStateAction<boolean>) => {
+      setSearchState(current => {
+        const currentOpen = current.enabled === enabled ? current.open : false;
+        const nextOpen =
+          typeof value === 'function' ? value(currentOpen) : value;
+        return {
+          enabled,
+          open: nextOpen,
+          query: current.enabled === enabled ? current.query : '',
+        };
+      });
+    },
+    [enabled]
+  );
+  const setQuery = useCallback(
+    (value: string) => {
+      setSearchState(current => ({
+        enabled,
+        open: current.enabled === enabled ? current.open : false,
+        query: value,
+      }));
+    },
+    [enabled]
+  );
   const deferredQuery = useDeferredValue(query);
 
   const beans = useCoffeeBeanStore(state => state.beans);
@@ -229,12 +261,11 @@ const DesktopGlobalSearch: React.FC<DesktopGlobalSearchProps> = ({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [enabled]);
+  }, [enabled, setOpen]);
 
   useEffect(() => {
     if (enabled) return;
-    setOpen(false);
-    setQuery('');
+    setSearchState({ enabled, open: false, query: '' });
   }, [enabled]);
 
   useEffect(() => {
@@ -270,7 +301,7 @@ const DesktopGlobalSearch: React.FC<DesktopGlobalSearchProps> = ({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', onResize);
     };
-  }, [open]);
+  }, [open, setOpen, setQuery]);
 
   const buildBeanItem = useCallback(
     (bean: CoffeeBean, isEmpty: boolean): BeanSearchItem => {

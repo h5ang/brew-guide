@@ -24,12 +24,7 @@ import {
   getSelectedDatePreference,
 } from '@/components/notes/List/globalCache';
 
-const POPOVER_EASE_OUT: [number, number, number, number] = [
-  0.23,
-  1,
-  0.32,
-  1,
-];
+const POPOVER_EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 const POPOVER_ENTER_TRANSITION = {
   opacity: { duration: 0.16, ease: POPOVER_EASE_OUT },
   y: { duration: 0.14, ease: POPOVER_EASE_OUT },
@@ -429,6 +424,7 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
             {/* 预设值按钮 */}
             {decrementOptions.map(value => (
               <button
+                type="button"
                 key={value}
                 className="h-6 rounded-sm bg-neutral-100 px-2 text-[10px] text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
                 onClick={e => handleDecrementClick(e, value)}
@@ -440,6 +436,7 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
             {/* ALL按钮 */}
             {showAllButton && (
               <button
+                type="button"
                 className="h-6 rounded-sm bg-neutral-100 px-2 text-[10px] text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
                 onClick={handleAllClick}
               >
@@ -478,6 +475,7 @@ const RemainingEditor: React.FC<RemainingEditorProps> = ({
                   }}
                 />
                 <button
+                  type="button"
                   className="flex h-full w-6 items-center justify-center bg-neutral-200 text-[10px] text-neutral-800 transition-colors hover:bg-neutral-300 disabled:opacity-40 dark:bg-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-500"
                   disabled={
                     !customValue ||

@@ -411,7 +411,15 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   const [isVisible, setIsVisible] = useState(false);
 
   // 标题可见性状态
-  const [isTitleVisible, setIsTitleVisible] = useState(true);
+  const [titleVisibilityState, setTitleVisibilityState] = useState({
+    key: '',
+    isVisible: true,
+  });
+  const isTitleVisible =
+    !isOpen ||
+    !isVisible ||
+    titleVisibilityState.key !== imageViewKey ||
+    titleVisibilityState.isVisible;
 
   // 备注编辑状态
   const notesRef = useRef<HTMLDivElement>(null);
@@ -446,14 +454,14 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   // 处理显示/隐藏动画
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true);
+      setShouldRender(isOpen);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setIsVisible(true);
         });
       });
     } else {
-      setIsVisible(false);
+      setIsVisible(isOpen);
       const timer = setTimeout(() => {
         setShouldRender(false);
       }, 350);
@@ -536,7 +544,6 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   // 监测标题可见性
   useEffect(() => {
     if (!isOpen || !isVisible) {
-      setIsTitleVisible(true);
       return;
     }
 
@@ -550,11 +557,14 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
 
       const rect = titleElement.getBoundingClientRect();
       const isVisible = rect.top >= 60;
-      setIsTitleVisible(isVisible);
+      setTitleVisibilityState({ key: imageViewKey, isVisible });
 
       observer = new IntersectionObserver(
         ([entry]) => {
-          setIsTitleVisible(entry.isIntersecting);
+          setTitleVisibilityState({
+            key: imageViewKey,
+            isVisible: entry.isIntersecting,
+          });
         },
         {
           threshold: 0,
@@ -571,7 +581,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
         observer.disconnect();
       }
     };
-  }, [isOpen, isVisible]);
+  }, [imageViewKey, isOpen, isVisible]);
 
   // 使用统一的历史栈管理
   useModalHistory({
@@ -744,6 +754,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
         <div className="pt-safe-top sticky top-0 flex items-center gap-3 bg-neutral-50 p-4 dark:bg-neutral-900">
           {/* 左侧关闭按钮 */}
           <button
+            type="button"
             onClick={handleClose}
             className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
           >
@@ -781,6 +792,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
               {/* 编辑按钮 */}
               {onEdit && (
                 <button
+                  type="button"
                   onClick={handleEditClick}
                   className="flex size-8 items-center justify-center rounded-full bg-neutral-100 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                 >
@@ -958,6 +970,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                   {/* 右侧箭头 - 有多图时显示 */}
                   {hasMultiImages && (
                     <button
+                      type="button"
                       onClick={e => {
                         e.stopPropagation();
                         setMultiImageView({
@@ -996,6 +1009,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                   <div className="relative bg-neutral-200/30 px-6 py-3 dark:bg-neutral-800/40">
                     {/* 左侧箭头 - 返回默认视图 */}
                     <button
+                      type="button"
                       onClick={e => {
                         e.stopPropagation();
                         setMultiImageView({
@@ -1027,9 +1041,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                             onClick={e => {
                               if (!multiImageErrors.has(index)) {
                                 const galleryElement =
-                                  e.currentTarget.closest(
-                                    '[data-note-images]'
-                                  );
+                                  e.currentTarget.closest('[data-note-images]');
                                 const sourceElements = galleryElement
                                   ? Array.from(
                                       galleryElement.querySelectorAll<HTMLElement>(
@@ -1189,6 +1201,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                           <InfoRow label="评分">
                             {validTasteRatings.length > 4 ? (
                               <button
+                                type="button"
                                 onClick={() => setShowRatingRadar(true)}
                                 className="-mt-0.5 flex cursor-pointer flex-wrap items-center gap-1 text-left"
                               >

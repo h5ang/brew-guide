@@ -1970,19 +1970,27 @@ const CombinedStatsView: React.FC<CombinedStatsViewProps> = ({
 
   // 当只有一年数据时，自动从按年统计切换到按月统计
   useEffect(() => {
-    if (dateGroupingMode === 'year' && availableDates.length <= 1) {
-      handleDateGroupingModeChange('month');
+    const nextDateGroupingMode =
+      dateGroupingMode === 'year' && availableDates.length <= 1
+        ? 'month'
+        : dateGroupingMode;
+
+    if (nextDateGroupingMode !== dateGroupingMode) {
+      handleDateGroupingModeChange(nextDateGroupingMode);
     }
   }, [dateGroupingMode, availableDates.length, handleDateGroupingModeChange]);
 
   // 验证 selectedDate 是否在可用日期列表中，如果不在则重置
   useEffect(() => {
-    if (
+    const nextSelectedDate =
       selectedDate !== null &&
       availableDates.length > 0 &&
       !availableDates.includes(selectedDate)
-    ) {
-      handleSelectedDateChange(null);
+        ? null
+        : selectedDate;
+
+    if (nextSelectedDate !== selectedDate) {
+      handleSelectedDateChange(nextSelectedDate);
     }
   }, [availableDates, selectedDate, handleSelectedDateChange]);
 
@@ -2073,27 +2081,19 @@ const StatsView: React.FC<StatsViewProps> = ({
     saveStatsBeanStatePreference(state);
   }, []);
 
-  // 如果只有一种类型的豆子，自动切换到该类型
-  // 如果生豆库被禁用，强制切换回熟豆
-  useEffect(() => {
+  const effectiveBeanStateType = useMemo<StatsBeanStateType>(() => {
     if (!enableGreenBeanInventory && beanStateType === 'green') {
-      handleBeanStateChange('roasted');
-    } else if (hasGreenBeans && !hasRoastedBeans && beanStateType !== 'green') {
-      handleBeanStateChange('green');
-    } else if (
-      hasRoastedBeans &&
-      !hasGreenBeans &&
-      beanStateType !== 'roasted'
-    ) {
-      handleBeanStateChange('roasted');
+      return 'roasted';
     }
-  }, [
-    hasGreenBeans,
-    hasRoastedBeans,
-    beanStateType,
-    handleBeanStateChange,
-    enableGreenBeanInventory,
-  ]);
+    if (hasGreenBeans && !hasRoastedBeans && beanStateType !== 'green') {
+      return 'green';
+    }
+    if (hasRoastedBeans && !hasGreenBeans && beanStateType !== 'roasted') {
+      return 'roasted';
+    }
+
+    return beanStateType;
+  }, [hasGreenBeans, hasRoastedBeans, beanStateType, enableGreenBeanInventory]);
 
   // 空状态
   if (beans.length === 0) {
@@ -2134,7 +2134,7 @@ const StatsView: React.FC<StatsViewProps> = ({
     <CombinedStatsView
       beans={beans}
       showEmptyBeans={showEmptyBeans}
-      beanStateType={beanStateType}
+      beanStateType={effectiveBeanStateType}
       onBeanStateTypeChange={handleBeanStateChange}
       navigationToggleControl={navigationToggleControl}
       navigationSwipeControl={navigationSwipeControl}

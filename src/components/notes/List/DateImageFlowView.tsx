@@ -186,7 +186,6 @@ const DateImageFlowView: React.FC<DateImageFlowViewProps> = ({
           </div>
         </div>
       ))}
-
     </div>
   );
 };

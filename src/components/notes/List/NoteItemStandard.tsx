@@ -119,7 +119,9 @@ const NoteItemStandard: React.FC<NoteItemProps> = ({
       .filter(Boolean)
       .join(' · ');
 
-    return [coffeeText, normalizedParams.ratio, combinedTexture].filter(Boolean);
+    return [coffeeText, normalizedParams.ratio, combinedTexture].filter(
+      Boolean
+    );
   }, [isEspresso, normalizedParams, note.totalTime]);
 
   // 处理笔记点击事件
@@ -203,11 +205,11 @@ const NoteItemStandard: React.FC<NoteItemProps> = ({
                       equipmentName &&
                       note.method &&
                       note.method.trim() !== '' && (
-                      <>
-                        <span>{equipmentName}</span>
-                        <span>·</span>
-                      </>
-                    )}
+                        <>
+                          <span>{equipmentName}</span>
+                          <span>·</span>
+                        </>
+                      )}
                     {paramTexts.map((text, index) => (
                       <React.Fragment key={`${text}-${index}`}>
                         <span>{text}</span>

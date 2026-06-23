@@ -36,6 +36,7 @@ export const SyncHeaderButton: React.FC<SyncHeaderButtonProps> = ({
 }) => {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
     >

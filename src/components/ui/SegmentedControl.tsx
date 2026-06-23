@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useLayoutEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 export interface SegmentOption<T extends string | number | null = string> {
@@ -34,7 +34,7 @@ function SegmentedControl<T extends string | number | null = string>({
   const [buttonOffsets, setButtonOffsets] = useState<number[]>([]);
 
   // 测量按钮宽度和位置
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) return;
 
     const buttons = containerRef.current.querySelectorAll('button');
@@ -48,9 +48,19 @@ function SegmentedControl<T extends string | number | null = string>({
       offset += btn.offsetWidth + 4; // gap
     });
 
-    setButtonWidths(widths);
-    setButtonOffsets(offsets);
-  }, [options, equalWidth]);
+    setButtonWidths(current =>
+      current.length === widths.length &&
+      current.every((width, index) => width === widths[index])
+        ? current
+        : widths
+    );
+    setButtonOffsets(current =>
+      current.length === offsets.length &&
+      current.every((offsetValue, index) => offsetValue === offsets[index])
+        ? current
+        : offsets
+    );
+  });
 
   const selectedIndex = options.findIndex(opt => opt.value === value);
   const selectedWidth = buttonWidths[selectedIndex] || 0;
@@ -83,6 +93,7 @@ function SegmentedControl<T extends string | number | null = string>({
         const isSelected = option.value === value;
         return (
           <button
+            type="button"
             key={String(option.value)}
             className={`relative z-10 flex ${innerHeightClass} ${
               equalWidth ? 'flex-1' : 'min-w-14 shrink-0'

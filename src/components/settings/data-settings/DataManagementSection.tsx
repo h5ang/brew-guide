@@ -225,6 +225,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
 
       <div className="space-y-3">
         <button
+          type="button"
           onClick={handleExport}
           disabled={isExporting}
           className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
@@ -235,6 +236,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
 
         <div>
           <button
+            type="button"
             onClick={handleImportClick}
             className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           >
@@ -252,6 +254,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
 
         {!showConfirmReset ? (
           <button
+            type="button"
             onClick={() => setShowConfirmReset(true)}
             className="flex w-full items-center justify-between rounded bg-neutral-100 px-4 py-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
           >
@@ -265,12 +268,14 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
             </p>
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={handleReset}
                 className="flex-1 rounded bg-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600"
               >
                 确认重置
               </button>
               <button
+                type="button"
                 onClick={() => setShowConfirmReset(false)}
                 className="flex-1 rounded bg-neutral-800 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-900 dark:bg-neutral-600 dark:hover:bg-neutral-500"
               >

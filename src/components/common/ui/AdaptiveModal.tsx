@@ -130,6 +130,14 @@ export interface AdaptiveModalHandle {
   getContentRef: () => HTMLDivElement | null;
 }
 
+type AdaptiveModalMode = 'drawer' | 'fullscreen';
+
+interface ModalRenderContext {
+  isOpen: boolean;
+  mode: AdaptiveModalMode;
+  showDrawerOverlay: boolean;
+}
+
 /**
  * 统一响应式模态组件
  *
@@ -181,21 +189,35 @@ const AdaptiveModal = forwardRef<AdaptiveModalHandle, AdaptiveModalProps>(
     ref
   ) => {
     const isMediumScreen = useIsMediumScreen();
+    const modalMode: AdaptiveModalMode = isMediumScreen
+      ? 'drawer'
+      : 'fullscreen';
     const contentRef = useRef<HTMLDivElement>(null);
     const modalRef = useRef<HTMLDivElement>(null);
 
     // 动画状态管理
-    const [shouldRender, setShouldRender] = useState(false);
-    const [isVisible, setIsVisible] = useState(false);
-
-    // 遮罩层可见性（用于模式切换时的平滑过渡）
-    const [overlayVisible, setOverlayVisible] = useState(false);
+    const [renderContext, setRenderContext] = useState<ModalRenderContext>(
+      () => ({
+        isOpen,
+        mode: modalMode,
+        showDrawerOverlay,
+      })
+    );
+    const [enteredContext, setEnteredContext] = useState(() => ({
+      isOpen: false,
+    }));
+    const shouldRender = isOpen || renderContext.isOpen;
+    const isVisible = isOpen && enteredContext.isOpen;
+    const renderMode = isOpen ? modalMode : renderContext.mode;
+    const renderIsMediumScreen = renderMode === 'drawer';
+    const renderShowDrawerOverlay = isOpen
+      ? showDrawerOverlay
+      : renderContext.showDrawerOverlay;
+    const overlayVisible =
+      isVisible && renderIsMediumScreen && renderShowDrawerOverlay;
 
     // 平台检测
     const [isIOS, setIsIOS] = useState(false);
-
-    // 跟踪上一次的屏幕模式，用于检测模式切换
-    const prevMediumScreenRef = useRef(isMediumScreen);
 
     // 使用 ref 存储 onExitComplete 回调，避免在动画过程中因回调变化导致重新执行
     const onExitCompleteRef = useRef(onExitComplete);
@@ -252,52 +274,47 @@ const AdaptiveModal = forwardRef<AdaptiveModalHandle, AdaptiveModalProps>(
     // 处理显示/隐藏动画
     useEffect(() => {
       if (isOpen) {
-        setShouldRender(true);
-        // 设置遮罩层可见性（仅在抽屉模式下显示）
-        if (isMediumScreen && showDrawerOverlay) {
-          setOverlayVisible(true);
-        } else {
-          setOverlayVisible(false);
+        if (
+          !renderContext.isOpen ||
+          renderContext.mode !== modalMode ||
+          renderContext.showDrawerOverlay !== showDrawerOverlay
+        ) {
+          setRenderContext({
+            isOpen,
+            mode: modalMode,
+            showDrawerOverlay,
+          });
         }
-        const timer = setTimeout(() => setIsVisible(true), 10);
+        const timer = setTimeout(() => setEnteredContext({ isOpen }), 10);
         return () => clearTimeout(timer);
-      } else {
-        setIsVisible(false);
-        // 根据当前模式选择动画时长
-        const animationDuration = isMediumScreen
+      }
+
+      if (!renderContext.isOpen) return;
+
+      // 根据关闭时的模式选择动画时长
+      const animationDuration =
+        renderContext.mode === 'drawer'
           ? DRAWER_TRANSITION.duration
           : IOS_FULLSCREEN_TRANSITION.duration;
-        const timer = setTimeout(() => {
-          setShouldRender(false);
-          setOverlayVisible(false);
-          // 使用 ref 调用回调，确保调用的是最新的回调函数
-          onExitCompleteRef.current?.();
-        }, animationDuration);
-        return () => clearTimeout(timer);
-      }
-    }, [isOpen, isMediumScreen, showDrawerOverlay]);
-
-    // 处理模式切换时的遮罩层平滑过渡
-    useEffect(() => {
-      if (!isOpen) return;
-
-      const prevMediumScreen = prevMediumScreenRef.current;
-
-      if (prevMediumScreen !== isMediumScreen) {
-        // 模式发生切换
-        if (!prevMediumScreen && isMediumScreen) {
-          // 从全屏切换到抽屉：渐显遮罩
-          if (showDrawerOverlay) {
-            setOverlayVisible(true);
-          }
-        } else if (prevMediumScreen && !isMediumScreen) {
-          // 从抽屉切换到全屏：渐隐遮罩
-          setOverlayVisible(false);
-        }
-      }
-
-      prevMediumScreenRef.current = isMediumScreen;
-    }, [isOpen, isMediumScreen, showDrawerOverlay]);
+      const timer = setTimeout(() => {
+        setRenderContext({
+          isOpen,
+          mode: modalMode,
+          showDrawerOverlay,
+        });
+        setEnteredContext({ isOpen });
+        // 使用 ref 调用回调，确保调用的是最新的回调函数
+        onExitCompleteRef.current?.();
+      }, animationDuration);
+      return () => clearTimeout(timer);
+    }, [
+      isOpen,
+      modalMode,
+      renderContext.isOpen,
+      renderContext.mode,
+      renderContext.showDrawerOverlay,
+      showDrawerOverlay,
+    ]);
 
     // 监听输入框聚焦，确保在 iOS 上输入框可见
     useEffect(() => {
@@ -342,8 +359,8 @@ const AdaptiveModal = forwardRef<AdaptiveModalHandle, AdaptiveModalProps>(
     const renderChildren = () => {
       if (typeof children === 'function') {
         return children({
-          isMediumScreen,
-          isFullscreen: !isMediumScreen,
+          isMediumScreen: renderIsMediumScreen,
+          isFullscreen: !renderIsMediumScreen,
         });
       }
       return children;
@@ -352,16 +369,16 @@ const AdaptiveModal = forwardRef<AdaptiveModalHandle, AdaptiveModalProps>(
     if (!shouldRender) return null;
 
     // 大屏幕：底部抽屉模式
-    if (isMediumScreen) {
+    if (renderIsMediumScreen) {
       return (
         <>
           {/* 背景遮罩 */}
-          {showDrawerOverlay && (
+          {renderShowDrawerOverlay && (
             <div
               className={`fixed inset-0 z-40 bg-black/50 transition-opacity`}
               style={{
                 transitionDuration: `${OVERLAY_TRANSITION.duration}ms`,
-                opacity: overlayVisible && isVisible ? 1 : 0,
+                opacity: overlayVisible ? 1 : 0,
               }}
               onClick={handleOverlayClick}
             />

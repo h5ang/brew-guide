@@ -6,7 +6,8 @@ export type DataExportMode = JsonExportResult['mode'];
 
 export interface DataExportResult extends JsonExportResult {}
 
-const formatDatePart = (value: number): string => value.toString().padStart(2, '0');
+const formatDatePart = (value: number): string =>
+  value.toString().padStart(2, '0');
 
 export const createDataExportFileName = (date: Date = new Date()): string => {
   const year = date.getFullYear();

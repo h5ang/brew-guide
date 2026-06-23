@@ -75,7 +75,9 @@ const ChangeRecordNoteItem: React.FC<ChangeRecordNoteItemProps> = ({
       roasterFieldEnabled,
       roasterSeparator,
     }) || '未知咖啡豆';
-  const dateFormatted = note.timestamp ? formatDateAbsolute(note.timestamp) : '';
+  const dateFormatted = note.timestamp
+    ? formatDateAbsolute(note.timestamp)
+    : '';
 
   // 判断是否是烘焙记录
   const isRoastingRecord = note.source === 'roasting';

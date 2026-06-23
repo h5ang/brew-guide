@@ -40,9 +40,7 @@ const deleteBrewingNote = async (noteId: string): Promise<void> => {
   await getBrewingNoteStore().deleteNote(noteId);
 };
 
-const replaceBrewingNotes = async (
-  notes: BrewingNoteData[]
-): Promise<void> => {
+const replaceBrewingNotes = async (notes: BrewingNoteData[]): Promise<void> => {
   await db.transaction('rw', db.brewingNotes, async () => {
     await db.brewingNotes.clear();
     if (notes.length > 0) {

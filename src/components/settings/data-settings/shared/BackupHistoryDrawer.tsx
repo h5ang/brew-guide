@@ -28,6 +28,9 @@ export const BackupHistoryDrawer: React.FC<BackupHistoryDrawerProps> = ({
   const listRef = useRef<HTMLDivElement>(null);
   const [showTopShadow, setShowTopShadow] = useState(false);
   const [showBottomShadow, setShowBottomShadow] = useState(false);
+  const canShowScrollShadows = isOpen && backups.length > 3;
+  const isTopShadowVisible = canShowScrollShadows && showTopShadow;
+  const isBottomShadowVisible = canShowScrollShadows && showBottomShadow;
 
   const formatDate = (timestamp: number) =>
     new Date(timestamp).toLocaleString('zh-CN', {
@@ -47,14 +50,12 @@ export const BackupHistoryDrawer: React.FC<BackupHistoryDrawerProps> = ({
 
   // 列表变化时检测是否需要显示底部阴影
   useEffect(() => {
-    if (isOpen && backups.length > 3) {
-      // 延迟检测，等待 DOM 更新
-      setTimeout(handleScroll, 50);
-    } else {
-      setShowTopShadow(false);
-      setShowBottomShadow(false);
-    }
-  }, [isOpen, backups.length, handleScroll]);
+    if (!canShowScrollShadows) return;
+
+    // 延迟检测，等待 DOM 更新
+    const scrollTimer = setTimeout(handleScroll, 50);
+    return () => clearTimeout(scrollTimer);
+  }, [canShowScrollShadows, handleScroll]);
 
   const handleRestoreClick = (backupKey: string) => {
     setSelectedBackup(backupKey);
@@ -118,11 +119,11 @@ export const BackupHistoryDrawer: React.FC<BackupHistoryDrawerProps> = ({
                 <div className="relative">
                   {/* 顶部渐变阴影 */}
                   <div
-                    className={`fade-mask-to-b pointer-events-none absolute inset-x-0 top-0 z-10 h-4 bg-white transition-opacity duration-200 dark:bg-neutral-900 ${showTopShadow ? 'opacity-100' : 'opacity-0'}`}
+                    className={`fade-mask-to-b pointer-events-none absolute inset-x-0 top-0 z-10 h-4 bg-white transition-opacity duration-200 dark:bg-neutral-900 ${isTopShadowVisible ? 'opacity-100' : 'opacity-0'}`}
                   />
                   {/* 底部渐变阴影 */}
                   <div
-                    className={`fade-mask-to-t pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 bg-white transition-opacity duration-200 dark:bg-neutral-900 ${showBottomShadow ? 'opacity-100' : 'opacity-0'}`}
+                    className={`fade-mask-to-t pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 bg-white transition-opacity duration-200 dark:bg-neutral-900 ${isBottomShadowVisible ? 'opacity-100' : 'opacity-0'}`}
                   />
                   <div
                     ref={listRef}
@@ -143,6 +144,7 @@ export const BackupHistoryDrawer: React.FC<BackupHistoryDrawerProps> = ({
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => handleRestoreClick(backup.key)}
                           disabled={isRestoring}
                           className="flex items-center gap-1 rounded-md bg-neutral-200 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-neutral-300 disabled:opacity-50 dark:bg-neutral-700 dark:hover:bg-neutral-600"

@@ -188,7 +188,8 @@ export class RealtimeSyncService {
 
   async connect(config: RealtimeSyncConfig): Promise<boolean> {
     const sameConfig =
-      this.config?.url === config.url && this.config?.anonKey === config.anonKey;
+      this.config?.url === config.url &&
+      this.config?.anonKey === config.anonKey;
 
     if (this.state.connectionStatus === 'connected' && sameConfig) {
       return true;

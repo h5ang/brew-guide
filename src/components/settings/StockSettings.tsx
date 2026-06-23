@@ -122,11 +122,7 @@ const StockSettings: React.FC<StockSettingsProps> = ({
   if (!shouldRender) return null;
 
   return (
-    <SettingPage
-      title="库存扣除"
-      isVisible={isVisible}
-      onClose={handleClose}
-    >
+    <SettingPage title="库存扣除" isVisible={isVisible} onClose={handleClose}>
       <SettingSection title="熟豆库存扣除" className="-mt-4">
         <SettingRow
           label="启用“全部扣除”选项"
@@ -158,9 +154,10 @@ const StockSettings: React.FC<StockSettingsProps> = ({
           <div className="mb-3 flex flex-wrap gap-2">
             {decrementPresets.map(value => (
               <button
+                type="button"
                 key={value}
                 onClick={() => removeDecrementPreset(value)}
-                className="rounded cursor-pointer bg-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
+                className="cursor-pointer rounded bg-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
               >
                 -{value}g ×
               </button>
@@ -194,13 +191,14 @@ const StockSettings: React.FC<StockSettingsProps> = ({
                 className="w-16 rounded-l rounded-r-none bg-neutral-200 px-2 py-1.5 text-sm focus:ring-1 focus:ring-neutral-500 focus:outline-hidden dark:bg-neutral-700"
               />
               <button
+                type="button"
                 onClick={addDecrementPreset}
                 disabled={
                   !decrementValue ||
                   isNaN(parseFloat(decrementValue)) ||
                   parseFloat(decrementValue) <= 0
                 }
-                className="rounded-r cursor-pointer bg-neutral-700 px-2 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-20 dark:bg-neutral-600"
+                className="cursor-pointer rounded-r bg-neutral-700 px-2 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-20 dark:bg-neutral-600"
               >
                 +
               </button>

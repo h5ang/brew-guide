@@ -71,12 +71,15 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
   );
   const [overallRating, setOverallRating] = useState<number>(0);
   const [ratingNotes, setRatingNotes] = useState<string>('');
-  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+  const [deleteConfirmingBeanId, setDeleteConfirmingBeanId] = useState<
+    string | null
+  >(null);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const hasExistingRating =
     (coffeeBean?.overallRating ?? 0) > 0 ||
     Boolean(coffeeBean?.ratingNotes?.trim());
+  const isDeleteConfirming = deleteConfirmingBeanId === coffeeBean?.id;
   const beanDisplayName = coffeeBean
     ? formatBeanDisplayName(coffeeBean, {
         roasterFieldEnabled,
@@ -97,12 +100,11 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
       setBeanType(coffeeBean.beanType || 'filter');
       setOverallRating(coffeeBean.overallRating || 0);
       setRatingNotes(coffeeBean.ratingNotes || '');
-      setIsDeleteConfirming(false);
     }
   }, [coffeeBean]);
 
   const handleDrawerClose = () => {
-    setIsDeleteConfirming(false);
+    setDeleteConfirmingBeanId(null);
     onClose();
   };
 
@@ -128,7 +130,7 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
 
   const handleCancel = () => {
     if (isDeleteConfirming) {
-      setIsDeleteConfirming(false);
+      setDeleteConfirmingBeanId(null);
       return;
     }
 
@@ -263,7 +265,7 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
             {hasExistingRating && (
               <button
                 type="button"
-                onClick={() => setIsDeleteConfirming(true)}
+                onClick={() => setDeleteConfirmingBeanId(coffeeBean.id)}
                 className="mt-2 flex items-center self-start px-1 py-1 text-xs font-medium text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
               >
                 <CornerDownRight className="mr-1 h-3.5 w-3.5" />

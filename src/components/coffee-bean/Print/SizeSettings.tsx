@@ -53,6 +53,7 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
           尺寸设置
         </div>
         <button
+          type="button"
           onClick={toggleEdit}
           className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-all ${
             editMode
@@ -77,6 +78,7 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
         {presetSizes.map((size, index) => (
           <div key={size.label} className="relative">
             <button
+              type="button"
               onClick={() => !editMode && onSelectSize(size.width, size.height)}
               disabled={editMode}
               className={`rounded px-3 py-2 text-xs font-medium transition-all ${
@@ -91,6 +93,7 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
             </button>
             {editMode && (
               <button
+                type="button"
                 onClick={() => onRemoveSize(index)}
                 className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
               >
@@ -124,6 +127,7 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
               mm
             </span>
             <button
+              type="button"
               onClick={handleAdd}
               disabled={!newWidth || !newHeight}
               className="flex h-7 items-center gap-1 rounded bg-neutral-800 px-2 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-700 dark:hover:bg-neutral-600"
@@ -132,6 +136,7 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
             </button>
           </div>
           <button
+            type="button"
             onClick={onResetSizes}
             className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
           >

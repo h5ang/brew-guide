@@ -164,6 +164,7 @@ const BackupReminderModal: React.FC<BackupReminderModalProps> = ({
 
               {/* 主要操作按钮 */}
               <button
+                type="button"
                 onClick={handleBackupNow}
                 disabled={isLoading || exportStatus === 'success'}
                 className="w-full rounded-full bg-neutral-900 py-3.5 font-medium text-white transition-all duration-150 hover:bg-neutral-800 active:scale-[0.98] active:bg-neutral-700 disabled:bg-neutral-400 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:active:bg-neutral-300 dark:disabled:bg-neutral-600"
@@ -181,6 +182,7 @@ const BackupReminderModal: React.FC<BackupReminderModalProps> = ({
               {exportStatus === 'idle' && (
                 <div className="mt-3 flex items-center justify-between text-xs">
                   <button
+                    type="button"
                     onClick={handleRemindLater}
                     disabled={isLoading}
                     className="py-2 text-neutral-500 transition-colors duration-150 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"

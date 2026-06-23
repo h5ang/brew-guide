@@ -101,6 +101,27 @@ const normalizeMethodData = (
   return normalizedMethod as MethodWithStages;
 };
 
+const isValidDuration = (duration: number | undefined): boolean => {
+  if (duration === undefined) return true;
+  return Number.isInteger(duration) && duration >= 0;
+};
+
+const hasStageDuration = (duration: number | undefined): boolean => {
+  return typeof duration === 'number';
+};
+
+const isValidWater = (
+  water: string | number | undefined,
+  pourType: string | undefined
+): boolean => {
+  if (pourType === 'wait') return true;
+  if (water === undefined || water === null || water === '') return false;
+  const waterText = String(water).trim();
+  if (!waterText) return false;
+  const waterValue = parseInt(waterText.replace('g', '') || '0');
+  return Number.isInteger(waterValue) && waterValue >= 0;
+};
+
 // 使用从 types.ts 导入的类型定义
 // MethodWithStages 替代 _Method
 // Stage 替代 _Stage
@@ -1099,27 +1120,6 @@ const CustomMethodForm = React.forwardRef<
     const isCustomPreset = customEquipment.animationType === 'custom';
     const isEspresso = isEspressoMachine(customEquipment);
 
-    const isValidDuration = (duration: number | undefined): boolean => {
-      if (duration === undefined) return true;
-      return Number.isInteger(duration) && duration >= 0;
-    };
-
-    const hasStageDuration = (duration: number | undefined): boolean => {
-      return typeof duration === 'number';
-    };
-
-    const isValidWater = (
-      water: string | number | undefined,
-      pourType: string | undefined
-    ): boolean => {
-      if (pourType === 'wait') return true;
-      if (water === undefined || water === null || water === '') return false;
-      const waterText = String(water).trim();
-      if (!waterText) return false;
-      const waterValue = parseInt(waterText.replace('g', '') || '0');
-      return Number.isInteger(waterValue) && waterValue >= 0;
-    };
-
     const isStepValid = () => {
       switch (currentStep) {
         case 'name':
@@ -1219,7 +1219,7 @@ const CustomMethodForm = React.forwardRef<
 
     const stepValid = isStepValid();
 
-    const getValidationErrorMessage = (): string | null => {
+    const getValidationErrorMessage = useCallback((): string | null => {
       switch (currentStep) {
         case 'name':
           if (!method.name.trim()) return '请输入方案名称';
@@ -1323,7 +1323,14 @@ const CustomMethodForm = React.forwardRef<
         default:
           return null;
       }
-    };
+    }, [
+      currentStep,
+      customEquipment.hasValve,
+      isCustomPreset,
+      isEspresso,
+      method.name,
+      method.params,
+    ]);
 
     const handlePrimaryAction = useCallback(() => {
       if (!stepValid) {

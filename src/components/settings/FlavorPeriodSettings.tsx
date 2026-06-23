@@ -300,6 +300,7 @@ const FlavorPeriodSettings: React.FC<FlavorPeriodSettingsProps> = ({
                 <div key={roaster} className="flex w-full flex-col">
                   {/* Header */}
                   <button
+                    type="button"
                     onClick={() => toggleExpand(roaster)}
                     className="relative flex w-full items-center justify-between py-3.5 pr-3.5 pl-3.5"
                   >

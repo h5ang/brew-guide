@@ -113,6 +113,7 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
             </div>
             {migrationCompleted && (
               <button
+                type="button"
                 onClick={onClose}
                 className="p-1 text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-300"
               >
@@ -155,6 +156,7 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
                 <div className="space-y-3">
                   {/* 备份按钮 */}
                   <button
+                    type="button"
                     onClick={handleBackup}
                     disabled={isBackingUp}
                     className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
@@ -175,6 +177,7 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
 
                   {/* 迁移按钮 */}
                   <button
+                    type="button"
                     onClick={handleMigration}
                     disabled={!backupCompleted || isMigrating}
                     className={`flex w-full items-center justify-center space-x-2 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
@@ -189,6 +192,7 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
 
                   {/* 跳过按钮 */}
                   <button
+                    type="button"
                     onClick={handleSkip}
                     className="w-full px-4 py-2 text-sm text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
                   >
@@ -216,6 +220,7 @@ const DataMigrationModal: React.FC<DataMigrationModalProps> = ({
                   现在您可以享受更好的分类显示和数据统计功能。
                 </p>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                 >

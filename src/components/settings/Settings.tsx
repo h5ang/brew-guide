@@ -214,7 +214,7 @@ const Settings: React.FC<SettingsProps> = ({
   // 处理显示/隐藏动画
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true);
+      setShouldRender(isOpen);
       // 使用 requestAnimationFrame 确保 DOM 已渲染，比 setTimeout 更快更流畅
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -222,7 +222,7 @@ const Settings: React.FC<SettingsProps> = ({
         });
       });
     } else {
-      setIsVisible(false);
+      setIsVisible(isOpen);
       // 等待动画完成后移除DOM
       const timer = setTimeout(() => setShouldRender(false), 350);
       return () => clearTimeout(timer);
@@ -444,6 +444,7 @@ const Settings: React.FC<SettingsProps> = ({
   const headerContent = (
     <div className="pt-safe-top relative z-20 flex items-center justify-between px-6">
       <button
+        type="button"
         onClick={handleClose}
         className="flex flex-5 cursor-pointer items-center rounded-full text-neutral-700 dark:text-neutral-300"
       >
@@ -461,6 +462,7 @@ const Settings: React.FC<SettingsProps> = ({
         >
           {/* 上传按钮 - 从右侧滑入 */}
           <button
+            type="button"
             onClick={() => {
               setShowSyncMenu(false);
               // 延迟执行同步，等待菜单收回动画完成
@@ -478,6 +480,7 @@ const Settings: React.FC<SettingsProps> = ({
           </button>
           {/* 下载按钮 - 从右侧滑入 */}
           <button
+            type="button"
             onClick={() => {
               setShowSyncMenu(false);
               // 延迟执行同步，等待菜单收回动画完成
@@ -495,6 +498,7 @@ const Settings: React.FC<SettingsProps> = ({
           </button>
           {/* 云图标/叉号/加载动画切换按钮 */}
           <button
+            type="button"
             onClick={() => !isSyncing && setShowSyncMenu(!showSyncMenu)}
             disabled={isSyncing}
             className={`flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition-all hover:bg-neutral-200 active:scale-95 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 ${isSyncing ? 'cursor-default' : ''}`}

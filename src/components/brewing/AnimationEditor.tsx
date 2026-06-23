@@ -85,6 +85,7 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useMemo,
   useCallback,
   forwardRef,
   useImperativeHandle,
@@ -92,6 +93,7 @@ import React, {
 import DrawingCanvas, { DrawingCanvasRef } from '../common/ui/DrawingCanvas';
 import hapticsUtils from '@/lib/ui/haptics';
 import Image from 'next/image';
+import { sanitizeSvgMarkup } from '@/lib/utils/svgUtils';
 
 // 定义单帧数据结构
 export interface AnimationFrame {
@@ -146,9 +148,6 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
     const [referenceSrc, setReferenceSrc] = useState<string | null>(
       referenceImages.length > 0 ? referenceImages[0].url : null
     );
-    // 修改：存储合并后的前面帧SVG作为底图
-    const [previousFramesSvg, setPreviousFramesSvg] = useState<string>('');
-
     // 计算当前帧
     const currentFrame = frames[currentFrameIndex];
 
@@ -158,7 +157,14 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
     // 合并指定帧范围的SVG
     const mergePreviousFrames = useCallback(
       (endIndex: number) => {
-        if (endIndex <= 0 || frames.length === 0) return '';
+        if (
+          endIndex <= 0 ||
+          frames.length === 0 ||
+          typeof document === 'undefined' ||
+          typeof DOMParser === 'undefined' ||
+          typeof XMLSerializer === 'undefined'
+        )
+          return '';
 
         // 创建一个全新的SVG文档，避免累积偏移问题
         const newSvg = document.createElementNS(
@@ -240,6 +246,11 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
       [frames, width, height]
     );
 
+    const previousFramesSvg = useMemo(
+      () => mergePreviousFrames(currentFrameIndex),
+      [currentFrameIndex, mergePreviousFrames]
+    );
+
     // 保存当前帧内容
     const saveCurrentFrame = useCallback(() => {
       if (
@@ -273,11 +284,6 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
         // 先保存当前帧的内容
         saveCurrentFrame();
 
-        // 更新前面帧的合并SVG
-        const mergedSvg = mergePreviousFrames(index);
-        // 切换帧
-        setPreviousFramesSvg(mergedSvg);
-
         // 切换到新帧
         setCurrentFrameIndex(index);
 
@@ -298,7 +304,7 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
 
         hapticsUtils.light();
       },
-      [frames, saveCurrentFrame, mergePreviousFrames]
+      [frames, saveCurrentFrame]
     );
 
     // 添加新帧
@@ -323,11 +329,6 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
         // 在帧数组更新的同时更新当前帧索引，确保它们是同步的
         const newIndex = newFrames.length - 1;
 
-        // 更新前面帧的合并SVG
-        const mergedSvg = mergePreviousFrames(newIndex);
-        // 添加新帧
-        setPreviousFramesSvg(mergedSvg);
-
         // 更新当前帧索引
         setCurrentFrameIndex(newIndex);
 
@@ -338,7 +339,7 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
       if (canvasRef.current) {
         canvasRef.current.clear();
       }
-    }, [frames, maxFrames, saveCurrentFrame, mergePreviousFrames]);
+    }, [frames, maxFrames, saveCurrentFrame]);
 
     // 删除当前帧
     const deleteCurrentFrame = useCallback(() => {
@@ -493,29 +494,12 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
           // 循环播放
           const nextIndex = (prev + 1) % frames.length;
           return nextIndex;
-          // 底图更新将在专门的useEffect中处理
+          // 底图会根据当前帧索引派生
         });
       }, 800); // 每帧800ms，同步与预览速度
 
       return () => clearInterval(interval);
     }, [isPlaying, frames.length]);
-
-    // 添加一个专门用于更新底图的useEffect
-    useEffect(() => {
-      // 只有在有多个帧，且当前帧索引大于0时才需要设置底图
-      if (frames.length > 1 && currentFrameIndex > 0) {
-        // 更新底图
-
-        // 合并当前帧之前的所有帧作为底图
-        const mergedPreviousSvg = mergePreviousFrames(currentFrameIndex);
-        // 合并前帧SVG
-        setPreviousFramesSvg(mergedPreviousSvg);
-      } else if (currentFrameIndex === 0) {
-        // 第一帧不需要底图
-        // 第一帧，清空底图
-        setPreviousFramesSvg('');
-      }
-    }, [currentFrameIndex, frames, mergePreviousFrames]);
 
     // 处理键盘快捷键
     useEffect(() => {
@@ -582,9 +566,11 @@ const AnimationEditor = forwardRef<AnimationEditorRef, AnimationEditorProps>(
                     <div
                       className="h-full w-full"
                       dangerouslySetInnerHTML={{
-                        __html: frame.svgData.replace(
-                          /<svg/,
-                          `<svg width="${thumbnailSize}" height="${thumbnailSize}"`
+                        __html: sanitizeSvgMarkup(
+                          frame.svgData.replace(
+                            /<svg/,
+                            `<svg width="${thumbnailSize}" height="${thumbnailSize}"`
+                          )
                         ),
                       }}
                     />

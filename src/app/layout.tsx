@@ -35,6 +35,44 @@ const SEO_TITLE =
 const SEO_DESCRIPTION =
   'Brew Guide 是面向手冲与精品咖啡爱好者的一站式咖啡工具，提供分阶段冲煮计时、注水可视化引导、咖啡豆库存与烘焙信息管理、风味评分与品鉴记录、冲煮历史回顾与统计分析、器具与方案自定义，并支持离线使用、数据导入导出与 Web/iOS/Android/桌面多端同步，帮助你稳定复现一杯咖啡风味，优化萃取参数与冲煮体验。';
 
+const encodeJsonForHtml = (value: unknown) =>
+  JSON.stringify(value).replace(/[<>&]/g, char => {
+    switch (char) {
+      case '<':
+        return '\\u003c';
+      case '>':
+        return '\\u003e';
+      case '&':
+        return '\\u0026';
+      default:
+        return char;
+    }
+  });
+
+const STRUCTURED_DATA_JSON = encodeJsonForHtml({
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Brew Guide',
+  applicationCategory: 'LifestyleApplication',
+  operatingSystem: 'Web, iOS, Android',
+  description: SEO_DESCRIPTION,
+  url: 'https://coffee.chu3.top/',
+  author: {
+    '@type': 'Person',
+    name: 'Chu3',
+  },
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'CNY',
+  },
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '5',
+    ratingCount: '1',
+  },
+});
+
 // SEO constants
 export const metadata: Metadata = {
   metadataBase: new URL('https://coffee.chu3.top/'),
@@ -181,29 +219,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              name: 'Brew Guide',
-              applicationCategory: 'LifestyleApplication',
-              operatingSystem: 'Web, iOS, Android',
-              description: SEO_DESCRIPTION,
-              url: 'https://coffee.chu3.top/',
-              author: {
-                '@type': 'Person',
-                name: 'Chu3',
-              },
-              offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'CNY',
-              },
-              aggregateRating: {
-                '@type': 'AggregateRating',
-                ratingValue: '5',
-                ratingCount: '1',
-              },
-            }),
+            __html: STRUCTURED_DATA_JSON,
           }}
         />
         <meta name="application-name" content="Brew Guide" />

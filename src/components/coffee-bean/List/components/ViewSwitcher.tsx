@@ -105,6 +105,7 @@ const TabButton: React.FC<TabButtonProps> = ({
   layoutId = 'tab-underline',
 }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`relative pb-1.5 text-xs font-medium whitespace-nowrap ${
       isActive
@@ -142,6 +143,7 @@ const FilterButton: React.FC<FilterButtonProps> = ({
   disabled = false,
 }) => (
   <button
+    type="button"
     onClick={onClick}
     disabled={disabled}
     className={`px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
@@ -926,6 +928,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
 
                       {/* 筛选图标按钮 */}
                       <button
+                        type="button"
                         ref={filterToggleButtonRef}
                         onClick={handleFilterToggle}
                         className="mr-1 flex items-center pb-1.5 text-xs font-medium text-neutral-400 dark:text-neutral-600"
@@ -1013,6 +1016,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                       {/* 竖直分割线 */}
                       <div className="mr-3 mb-1.5 h-3 w-px bg-neutral-200 dark:bg-neutral-800"></div>
                       <button
+                        type="button"
                         onClick={handleSearchClick}
                         className="flex items-center pb-1.5 text-xs font-medium whitespace-nowrap text-neutral-600 dark:text-neutral-400"
                       >
@@ -1040,6 +1044,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                       />
                     </div>
                     <button
+                      type="button"
                       onClick={handleCloseSearch}
                       className="-m-2 ml-1 flex items-center p-2 text-neutral-500 dark:text-neutral-400"
                     >
@@ -1065,6 +1070,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                         </div>
                         {searchHistory.map((item, index) => (
                           <button
+                            type="button"
                             key={index}
                             onClick={() => handleHistoryClick(item)}
                             className="shrink-0 bg-neutral-200/30 px-2 py-1 text-xs font-medium whitespace-nowrap text-neutral-400 transition-colors dark:bg-neutral-800/50 dark:text-neutral-400"
@@ -1192,6 +1198,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
 
                     {/* 筛选图标按钮 */}
                     <button
+                      type="button"
                       ref={filterToggleButtonRef}
                       onClick={handleFilterToggle}
                       className="mr-1 flex items-center pb-1.5 text-xs font-medium text-neutral-400 dark:text-neutral-600"
@@ -1341,6 +1348,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                     {/* 竖直分割线 */}
                     <div className="mr-3 mb-1.5 h-3 w-px bg-neutral-200 dark:bg-neutral-800"></div>
                     <button
+                      type="button"
                       onClick={handleSearchClick}
                       className="flex items-center pb-1.5 text-xs font-medium whitespace-nowrap text-neutral-600 dark:text-neutral-400"
                     >
@@ -1367,6 +1375,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                     />
                   </div>
                   <button
+                    type="button"
                     onClick={handleCloseSearch}
                     className="-m-2 ml-1 flex items-center p-2 text-neutral-500 dark:text-neutral-400"
                   >
@@ -1392,6 +1401,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
                       </div>
                       {searchHistory.map((item, index) => (
                         <button
+                          type="button"
                           key={index}
                           onClick={() => handleHistoryClick(item)}
                           className={newLocal}

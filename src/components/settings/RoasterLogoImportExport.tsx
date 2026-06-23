@@ -113,6 +113,7 @@ const RoasterImportItem: React.FC<{
 
     {/* 跳过按钮 */}
     <button
+      type="button"
       onClick={() => onToggleSkip(config.roasterName)}
       className="shrink-0 text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
     >

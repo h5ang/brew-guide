@@ -95,6 +95,7 @@ const BrewingTimerSettings: React.FC<BrewingTimerSettingsProps> = ({
                 计时器设置
               </h3>
               <button
+                type="button"
                 onClick={onClose}
                 className="rounded-full p-1 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
               >

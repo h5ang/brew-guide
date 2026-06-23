@@ -322,6 +322,7 @@ const CoffeeBeanRanking: React.FC<CoffeeBeanRankingProps> = ({
           <div className="flex justify-between border-b border-neutral-200/50 px-3 dark:border-neutral-800">
             <div className="flex">
               <button
+                type="button"
                 className={`relative px-3 pb-1.5 text-xs ${beanType === 'all' ? 'text-neutral-800 dark:text-neutral-100' : 'text-neutral-600 dark:text-neutral-400'}`}
                 onClick={() => setBeanType('all')}
               >
@@ -335,6 +336,7 @@ const CoffeeBeanRanking: React.FC<CoffeeBeanRankingProps> = ({
                 )}
               </button>
               <button
+                type="button"
                 className={`relative px-3 pb-1.5 text-xs ${beanType === 'espresso' ? 'text-neutral-800 dark:text-neutral-100' : 'text-neutral-600 dark:text-neutral-400'}`}
                 onClick={() => setBeanType('espresso')}
               >
@@ -348,6 +350,7 @@ const CoffeeBeanRanking: React.FC<CoffeeBeanRankingProps> = ({
                 )}
               </button>
               <button
+                type="button"
                 className={`relative px-3 pb-1.5 text-xs ${beanType === 'filter' ? 'text-neutral-800 dark:text-neutral-100' : 'text-neutral-600 dark:text-neutral-400'}`}
                 onClick={() => setBeanType('filter')}
               >
@@ -467,7 +470,10 @@ const CoffeeBeanRanking: React.FC<CoffeeBeanRankingProps> = ({
             onClick={toggleShowUnrated}
           >
             <div className="grow border-t border-neutral-200/50 dark:border-neutral-800/50"></div>
-            <button className="mx-3 flex items-center justify-center text-[10px] text-neutral-600 dark:text-neutral-400">
+            <button
+              type="button"
+              className="mx-3 flex items-center justify-center text-[10px] text-neutral-600 dark:text-neutral-400"
+            >
               {isSearching &&
               filteredUnratedBeans.length !== unratedBeans.length
                 ? `${filteredUnratedBeans.length}/${unratedBeans.length}款未评分咖啡豆`
@@ -547,6 +553,7 @@ const CoffeeBeanRanking: React.FC<CoffeeBeanRankingProps> = ({
 
                     {/* 添加评分按钮 */}
                     <button
+                      type="button"
                       onClick={() => handleRateBeanClick(bean as CoffeeBean)}
                       className="text-xs text-neutral-800 hover:opacity-80 dark:text-neutral-100"
                     >

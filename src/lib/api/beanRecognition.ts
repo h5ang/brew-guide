@@ -148,7 +148,6 @@ async function recognizeBeanImageWithCustomAPI(
 // 识别咖啡豆图片（非流式版本）
 export async function recognizeBeanImage(
   imageFile: File,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onProgress?: (chunk: string) => void,
   customConfig?: CustomBeanRecognitionConfig
 ): Promise<unknown> {
@@ -307,9 +306,7 @@ export async function testCustomBeanRecognitionConfig(
     return { endpoint, model, durationMs };
   } catch (error) {
     if (isTimeoutError(error)) {
-      throw new Error(
-        '测试超时：请检查网络、API 网关可用性，或稍后重试'
-      );
+      throw new Error('测试超时：请检查网络、API 网关可用性，或稍后重试');
     }
     if (error instanceof Error) {
       throw new Error(normalizeRecognitionErrorMessage(error.message));

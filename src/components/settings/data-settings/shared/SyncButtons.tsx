@@ -101,18 +101,13 @@ export const SyncButtons: React.FC<SyncButtonsProps> = ({
     onDownload();
   };
 
-  useEffect(() => {
-    if (!isSyncing) {
-      setSyncDirection(null);
-    }
-  }, [isSyncing]);
-
   if (!enabled || !isConnected) {
     return null;
   }
 
-  const isUploading = isSyncing && syncDirection === 'upload';
-  const isDownloading = isSyncing && syncDirection === 'download';
+  const activeSyncDirection = isSyncing ? syncDirection : null;
+  const isUploading = activeSyncDirection === 'upload';
+  const isDownloading = activeSyncDirection === 'download';
   const isDisabled = isSyncing || isLoadingBackups;
 
   const buttonClass =
@@ -121,6 +116,7 @@ export const SyncButtons: React.FC<SyncButtonsProps> = ({
   return (
     <div className="flex gap-2">
       <button
+        type="button"
         onClick={handleUpload}
         disabled={isDisabled}
         className={buttonClass}
@@ -139,6 +135,7 @@ export const SyncButtons: React.FC<SyncButtonsProps> = ({
       </button>
 
       <button
+        type="button"
         onClick={handleDownload}
         disabled={isDisabled}
         className={buttonClass}
@@ -160,6 +157,7 @@ export const SyncButtons: React.FC<SyncButtonsProps> = ({
 
       {onShowBackups && (
         <button
+          type="button"
           onClick={onShowBackups}
           disabled={isDisabled}
           className={buttonClass}

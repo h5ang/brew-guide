@@ -47,10 +47,15 @@ const SuggestionDropdown = React.forwardRef<
     ref
   ) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [scrollTop, setScrollTop] = useState(0);
+    const [scrollState, setScrollState] = useState(() => ({
+      suggestions,
+      scrollTop: 0,
+    }));
     const [removedSuggestions, setRemovedSuggestions] = useState<Set<string>>(
       () => new Set()
     );
+    const scrollTop =
+      scrollState.suggestions === suggestions ? scrollState.scrollTop : 0;
     const visibleSuggestionValues = useMemo(
       () =>
         suggestions.filter(suggestion => !removedSuggestions.has(suggestion)),
@@ -83,7 +88,6 @@ const SuggestionDropdown = React.forwardRef<
     useImperativeHandle(ref, () => scrollRef.current as HTMLDivElement, []);
 
     useEffect(() => {
-      setScrollTop(0);
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
       }
@@ -95,7 +99,12 @@ const SuggestionDropdown = React.forwardRef<
         ref={scrollRef}
         data-vaul-no-drag
         onTouchStart={onTouchStart}
-        onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
+        onScroll={event =>
+          setScrollState({
+            suggestions,
+            scrollTop: event.currentTarget.scrollTop,
+          })
+        }
         style={{
           ...style,
           maxHeight: `min(var(${SUGGESTION_DROPDOWN_AVAILABLE_HEIGHT_VAR}, ${DROPDOWN_MAX_HEIGHT}px), ${DROPDOWN_MAX_HEIGHT}px)`,

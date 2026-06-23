@@ -181,9 +181,10 @@ const GreenBeanSettings: React.FC<GreenBeanSettingsProps> = ({
               <div className="mb-3 flex flex-wrap gap-2">
                 {greenBeanRoastPresets.map(value => (
                   <button
+                    type="button"
                     key={value}
                     onClick={() => removeGreenBeanRoastPreset(value)}
-                    className="rounded cursor-pointer bg-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
+                    className="cursor-pointer rounded bg-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
                   >
                     -{value}g ×
                   </button>
@@ -223,13 +224,14 @@ const GreenBeanSettings: React.FC<GreenBeanSettingsProps> = ({
                     className="w-16 rounded-l rounded-r-none bg-neutral-200 px-2 py-1.5 text-sm focus:ring-1 focus:ring-neutral-500 focus:outline-hidden dark:bg-neutral-700"
                   />
                   <button
+                    type="button"
                     onClick={addGreenBeanRoastPreset}
                     disabled={
                       !greenBeanRoastValue ||
                       isNaN(parseFloat(greenBeanRoastValue)) ||
                       parseFloat(greenBeanRoastValue) <= 0
                     }
-                    className="rounded-r cursor-pointer bg-neutral-700 px-2 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-20 dark:bg-neutral-600"
+                    className="cursor-pointer rounded-r bg-neutral-700 px-2 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-20 dark:bg-neutral-600"
                   >
                     +
                   </button>

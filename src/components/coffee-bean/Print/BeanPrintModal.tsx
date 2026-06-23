@@ -93,6 +93,7 @@ const BeanPrintModal: React.FC<BeanPrintModalProps> = ({
             }`}
           >
             <button
+              type="button"
               onClick={handleClose}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
             >
@@ -102,6 +103,7 @@ const BeanPrintModal: React.FC<BeanPrintModalProps> = ({
               打印标签
             </h2>
             <button
+              type="button"
               onClick={handleSaveImage}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 hover:bg-neutral-700 dark:bg-neutral-700 dark:hover:bg-neutral-600"
               title="保存图片"
@@ -171,12 +173,14 @@ const BeanPrintModal: React.FC<BeanPrintModalProps> = ({
                 </p>
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={() => setShowResetConfirm(false)}
                     className="flex-1 rounded-lg bg-neutral-100 py-2 text-sm font-medium hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700"
                   >
                     取消
                   </button>
                   <button
+                    type="button"
                     onClick={confirmReset}
                     className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600"
                   >

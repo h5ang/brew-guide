@@ -189,6 +189,7 @@ const GrindSizeDrawer: React.FC<GrindSizeDrawerProps> = ({
             {/* 磨豆机名称按钮 */}
             {grinders.length > 1 ? (
               <button
+                type="button"
                 onClick={() => setShowGrinderSelector(!showGrinderSelector)}
                 className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors active:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:active:bg-neutral-700"
               >
@@ -221,6 +222,7 @@ const GrindSizeDrawer: React.FC<GrindSizeDrawerProps> = ({
                     .filter(g => g.id !== selectedGrinderId)
                     .map(grinder => (
                       <button
+                        type="button"
                         key={grinder.id}
                         onClick={() => handleSelectGrinder(grinder)}
                         className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors active:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:active:bg-neutral-700"

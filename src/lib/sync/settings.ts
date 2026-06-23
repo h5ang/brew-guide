@@ -73,7 +73,10 @@ export function normalizeSyncSettings<T extends Partial<SettingsOptions>>(
     ? getResolvedActiveSyncType(settings)
     : inferLegacyActiveSyncType(settings);
 
-  const supabaseBackupProvider = hasOwnProperty(settings, 'supabaseBackupProvider')
+  const supabaseBackupProvider = hasOwnProperty(
+    settings,
+    'supabaseBackupProvider'
+  )
     ? getSupabaseBackupProvider(settings)
     : activeSyncType === 'supabase'
       ? inferLegacySupabaseBackupProvider(settings)

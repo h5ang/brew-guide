@@ -129,6 +129,7 @@ const TabButton: React.FC<TabButtonProps> = ({
   layoutId = 'stats-tab-underline',
 }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`relative pb-1.5 text-xs font-medium whitespace-nowrap ${
       isActive
@@ -165,6 +166,7 @@ const FilterButton: React.FC<FilterButtonProps> = ({
   disabled = false,
 }) => (
   <button
+    type="button"
     onClick={onClick}
     disabled={disabled}
     className={`px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
@@ -317,6 +319,7 @@ const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
               </div>
             )}
             <button
+              type="button"
               onClick={() => {
                 const availableModes = getAvailableGroupingModes(
                   availableDates,
@@ -336,6 +339,7 @@ const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
                   ，
                 </span>
                 <button
+                  type="button"
                   onClick={() =>
                     onBeanStateTypeChange(
                       beanStateType === 'roasted' ? 'green' : 'roasted'
@@ -371,6 +375,7 @@ const StatsFilterBar: React.FC<StatsFilterBarProps> = ({
 
               {/* 筛选图标按钮 */}
               <button
+                type="button"
                 onClick={handleFilterToggle}
                 className="mr-1 flex items-center pb-1.5 text-xs font-medium text-neutral-400 dark:text-neutral-600"
               >

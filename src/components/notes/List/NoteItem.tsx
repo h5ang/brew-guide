@@ -89,7 +89,9 @@ const NoteItem: React.FC<NoteItemProps> = ({
   );
 
   // 图片错误状态
-  const [imageError, setImageError] = useState(false);
+  const [failedImageSource, setFailedImageSource] = useState<string | null>(
+    null
+  );
   const [noteImageError, setNoteImageError] = useState(false);
 
   // 评分雷达图抽屉状态
@@ -166,15 +168,12 @@ const NoteItem: React.FC<NoteItemProps> = ({
     return roasterName && roasterName !== '未知烘焙商' ? roasterName : null;
   }, [beanImage, beanInfo, roasterSettings]);
   const roasterLogo = useRoasterLogo(roasterLogoName);
-
-  useEffect(() => {
-    setImageError(false);
-  }, [beanImage, roasterLogo]);
+  const imageSource = beanImage || roasterLogo;
+  const imageError = failedImageSource === imageSource;
 
   const handleBeanImageClick = React.useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       event.stopPropagation();
-      const imageSource = beanImage || roasterLogo;
       if (!imageSource || imageError) {
         return;
       }
@@ -211,7 +210,7 @@ const NoteItem: React.FC<NoteItemProps> = ({
         });
       })();
     },
-    [beanImage, beanInfo, beanName, imageError, roasterLogo, roasterSettings]
+    [beanImage, beanInfo, beanName, imageError, imageSource, roasterSettings]
   );
 
   const handleNoteImageClick = React.useCallback(
@@ -314,7 +313,7 @@ const NoteItem: React.FC<NoteItemProps> = ({
                 loading="lazy"
                 placeholder="blur"
                 blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                onError={() => setImageError(true)}
+                onError={() => setFailedImageSource(beanImage)}
               />
             ) : roasterLogo && !imageError ? (
               <Image
@@ -332,7 +331,7 @@ const NoteItem: React.FC<NoteItemProps> = ({
                 sizes="48px"
                 priority={false}
                 loading="lazy"
-                onError={() => setImageError(true)}
+                onError={() => setFailedImageSource(roasterLogo)}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-neutral-400 dark:text-neutral-600">

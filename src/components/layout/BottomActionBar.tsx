@@ -53,6 +53,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
                 <div className="w-4 border-t border-neutral-200/50 dark:border-neutral-800/50"></div>
               )}
               <button
+                type="button"
                 onClick={button.onClick}
                 className={`flex items-center justify-center text-xs font-medium text-neutral-600 dark:text-neutral-400 ${button.className || ''}`}
               >

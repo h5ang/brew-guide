@@ -529,17 +529,19 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
     updateSettings({ radarChartAlign: newAlign });
   };
 
-  useEffect(() => {
-    if (!isOpen) {
-      setIsAdjusting(false);
-      setIsComparing(false);
-    }
-  }, [isOpen]);
+  const handleClose = () => {
+    setIsAdjusting(false);
+    setIsComparing(false);
+    onClose();
+  };
+
+  const isAdjustingActive = isOpen && isAdjusting;
+  const isComparingActive = isOpen && isComparing;
 
   return (
     <ActionDrawer
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       historyId="rating-radar-drawer"
     >
       <div className="flex flex-col">
@@ -584,7 +586,7 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
 
       <ActionDrawer.Actions className="mt-6">
         <AnimatePresence mode="popLayout" initial={false}>
-          {!isAdjusting && !isComparing ? (
+          {!isAdjustingActive && !isComparingActive ? (
             <motion.div
               key="normal"
               className="flex w-full gap-3"
@@ -594,6 +596,7 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
               transition={{ duration: 0.2 }}
             >
               <button
+                type="button"
                 className="flex h-11 w-11 flex-none touch-none items-center justify-center rounded-full bg-neutral-100 text-neutral-600 transition-transform select-none active:scale-95 dark:bg-neutral-800 dark:text-neutral-400"
                 onClick={() => setIsAdjusting(true)}
                 onPointerDown={handleLongPressStart}
@@ -604,13 +607,13 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
                 <Expand size={18} />
               </button>
               <ActionDrawer.SecondaryButton
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1"
               >
                 关闭
               </ActionDrawer.SecondaryButton>
             </motion.div>
-          ) : isComparing ? (
+          ) : isComparingActive ? (
             <motion.div
               key="comparing"
               className="flex w-full flex-col gap-3"
@@ -634,6 +637,7 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
                   className="flex-1 overflow-x-auto"
                 />
                 <button
+                  type="button"
                   className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition-transform active:scale-95 dark:bg-neutral-800 dark:text-neutral-300"
                   onClick={() => setIsComparing(false)}
                 >
@@ -690,6 +694,7 @@ const RatingRadarDrawer: React.FC<RatingRadarDrawerProps> = ({
                 />
 
                 <button
+                  type="button"
                   className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-neutral-100 text-neutral-700 transition-transform active:scale-95 dark:bg-neutral-800 dark:text-neutral-300"
                   onClick={() => setIsAdjusting(false)}
                 >

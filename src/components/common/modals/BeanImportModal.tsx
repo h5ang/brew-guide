@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import ActionDrawer from '@/components/common/ui/ActionDrawer';
 import { showToast } from '@/components/common/feedback/LightToast';
@@ -216,23 +216,19 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
     onClose: goBackToMain,
   });
 
-  // 重置状态（当弹窗关闭或重新打开时）
-  useEffect(() => {
-    if (showForm) {
-      setClipboardStatus('idle');
-      setCurrentStep('main');
-      setJsonInputValue('');
-      setIsRecognizing(false);
-      setIsMultiRecognizing(false);
-      if (recognizingImageUrl) {
-        URL.revokeObjectURL(recognizingImageUrl);
-        setRecognizingImageUrl(null);
-      }
-      // 清理多图选择
-      selectedImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
-      setSelectedImages([]);
+  const resetImportState = useCallback(() => {
+    setClipboardStatus('idle');
+    setCurrentStep('main');
+    setJsonInputValue('');
+    setIsRecognizing(false);
+    setIsMultiRecognizing(false);
+    if (recognizingImageUrl) {
+      URL.revokeObjectURL(recognizingImageUrl);
+      setRecognizingImageUrl(null);
     }
-  }, [showForm]); // eslint-disable-line react-hooks/exhaustive-deps
+    selectedImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+    setSelectedImages([]);
+  }, [recognizingImageUrl, selectedImages]);
 
   // 确保字段为字符串类型
   const ensureStringFields = useCallback((item: ImportedBean): ImportedBean => {
@@ -734,6 +730,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
           </span>
           添加咖啡豆，也可将图片和
           <button
+            type="button"
             onClick={handleCopyPrompt}
             className="mx-0.5 text-neutral-800 underline decoration-neutral-400 underline-offset-2 hover:opacity-80 dark:text-neutral-200"
           >
@@ -905,6 +902,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
               {/* 删除按钮 - 仅待处理时显示 */}
               {!isMultiRecognizing && img.status === 'pending' && (
                 <button
+                  type="button"
                   onClick={() => handleRemoveImage(img.id)}
                   className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900/60 text-white backdrop-blur-sm transition-all hover:bg-neutral-900/80 dark:bg-white/60 dark:text-neutral-900 dark:hover:bg-white/80"
                 >
@@ -1001,6 +999,7 @@ const BeanImportModal: React.FC<BeanImportModalProps> = ({
       <ActionDrawer
         isOpen={showForm}
         onClose={handleClose}
+        onExitComplete={resetImportState}
         historyId="bean-import"
       >
         <ActionDrawer.Switcher activeKey={currentStep}>

@@ -224,8 +224,12 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
   settings,
 }) => {
   // 动画状态管理
-  const [shouldRender, setShouldRender] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [renderContext, setRenderContext] = useState(() => ({ isOpen }));
+  const [enteredContext, setEnteredContext] = useState(() => ({
+    isOpen: false,
+  }));
+  const shouldRender = isOpen || renderContext.isOpen;
+  const isVisible = isOpen && enteredContext.isOpen;
 
   // 同步顶部安全区颜色
   useThemeColor({ useOverlay: true, enabled: isOpen });
@@ -245,15 +249,21 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
   // 处理显示/隐藏动画
   useEffect(() => {
     if (isOpen) {
-      setShouldRender(true);
-      const timer = setTimeout(() => setIsVisible(true), 10);
-      return () => clearTimeout(timer);
-    } else {
-      setIsVisible(false);
-      const timer = setTimeout(() => setShouldRender(false), 350);
+      if (!renderContext.isOpen) {
+        setRenderContext({ isOpen });
+      }
+      const timer = setTimeout(() => setEnteredContext({ isOpen }), 10);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+
+    if (!renderContext.isOpen) return;
+
+    const timer = setTimeout(() => {
+      setRenderContext({ isOpen });
+      setEnteredContext({ isOpen });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isOpen, renderContext.isOpen]);
 
   // 同步基础器具列表到本地状态，添加操作状态
   React.useEffect(() => {
@@ -419,6 +429,7 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
               器具列表
             </h3>
             <button
+              type="button"
               onClick={handleAddEquipment}
               className="flex items-center justify-center rounded-full bg-neutral-100 px-3 py-1 transition-all duration-150 active:scale-95 active:opacity-80 dark:bg-neutral-800"
             >
@@ -455,6 +466,7 @@ const EquipmentManagementDrawer: React.FC<EquipmentManagementDrawerProps> = ({
                   暂无自定义器具
                 </p>
                 <button
+                  type="button"
                   onClick={handleAddEquipment}
                   className="text-xs text-neutral-600 transition-colors duration-150 hover:text-neutral-800 hover:underline dark:text-neutral-400 dark:hover:text-neutral-200"
                 >

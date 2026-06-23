@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  Method,
-  CustomEquipment,
-  Stage,
-} from '@/lib/core/config';
+import { Method, CustomEquipment, Stage } from '@/lib/core/config';
 import { Content } from './useBrewingState';
 import type { SettingsOptions } from '@/lib/core/db';
 import { loadCustomMethodsForEquipment } from '@/lib/stores/customMethodStore';
