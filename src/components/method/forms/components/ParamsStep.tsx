@@ -36,7 +36,7 @@ interface ParamsStepProps {
   customEquipment?: CustomEquipment;
   /** 磨豆机同步默认开关状态 */
   grinderDefaultSyncEnabled?: boolean;
-  /** 无冲泡步骤的方案不显示萃取时间。 */
+  /** 是否显示意式萃取时间。 */
   showExtractionTime?: boolean;
 }
 

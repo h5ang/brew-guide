@@ -130,6 +130,8 @@ export const normalizeBrewingNoteParams = (
     ratio: normalizeOptionalText(params.ratio),
     grindSize: normalizeOptionalText(params.grindSize),
     temp: normalizeOptionalText(params.temp),
+    extractionTime: params.extractionTime,
+    liquidWeight: normalizeOptionalText(params.liquidWeight),
   };
 
   return Object.values(normalized).some(Boolean) ? normalized : undefined;

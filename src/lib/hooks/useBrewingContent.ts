@@ -11,6 +11,7 @@ import {
   getCommonMethodsForEquipment,
   hasBrewingStages,
 } from '@/lib/brewing/methodAvailability';
+import { getEspressoParamItems } from '@/lib/brewing/methodDisplay';
 
 // 格式化时间工具函数
 export const formatTime = (seconds: number, compact: boolean = false) => {
@@ -112,6 +113,13 @@ export function useBrewingContent({
           selectedEquipment,
           customEquipments
         );
+        const isEspressoEquipment =
+          selectedEquipment === 'Espresso' ||
+          customEquipments.some(
+            equipment =>
+              equipment.id === selectedEquipment &&
+              equipment.animationType === 'espresso'
+          );
 
         const buildMethodStep = (
           method: Method,
@@ -122,6 +130,17 @@ export function useBrewingContent({
           } = {}
         ) => {
           const hasStages = hasBrewingStages(method);
+
+          if (isEspressoEquipment) {
+            return {
+              title: method.name,
+              methodId: method.id,
+              ...options,
+              items: getEspressoParamItems(method),
+              note: '',
+              isNoStageMethod: !hasStages,
+            };
+          }
 
           if (!hasStages) {
             return {

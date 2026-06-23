@@ -98,6 +98,22 @@ const normalizeMethodData = (
     }
   }
 
+  if (isEspressoMachine(customEquipment) && normalizedMethod.params) {
+    const extractionStage = normalizedMethod.params.stages?.find(
+      stage => stage.pourType === 'extraction'
+    );
+    normalizedMethod.params.extractionTime =
+      normalizedMethod.params.extractionTime ??
+      extractionStage?.duration ??
+      extractionStage?.time ??
+      25;
+    normalizedMethod.params.liquidWeight =
+      normalizedMethod.params.liquidWeight ??
+      (extractionStage?.water
+        ? `${String(extractionStage.water).replace('g', '')}g`
+        : normalizedMethod.params.water);
+  }
+
   return normalizedMethod as MethodWithStages;
 };
 
@@ -243,6 +259,8 @@ const CustomMethodForm = React.forwardRef<
             ratio: '1:2',
             grindSize: '细',
             temp: '93°C',
+            extractionTime: 25,
+            liquidWeight: '36g',
             stages: enableStageEditing
               ? [
                   {
@@ -382,38 +400,43 @@ const CustomMethodForm = React.forwardRef<
 
     // ===== 事件处理函数 =====
 
-    const syncEspressoParamsFromStages = (
-      params: MethodWithStages['params'],
-      stages: Stage[]
-    ): MethodWithStages['params'] => {
-      if (!isEspressoMachine(customEquipment)) {
-        return { ...params, stages };
-      }
+    const syncEspressoParamsFromStages = useCallback(
+      (
+        params: MethodWithStages['params'],
+        stages: Stage[]
+      ): MethodWithStages['params'] => {
+        if (!isEspressoMachine(customEquipment)) {
+          return { ...params, stages };
+        }
 
-      const extractionStage = stages.find(
-        stage => stage.pourType === 'extraction'
-      );
-      const liquidValue = extractionStage?.water
-        ? parseInt(String(extractionStage.water).replace('g', '') || '0')
-        : 0;
+        const extractionStage = stages.find(
+          stage => stage.pourType === 'extraction'
+        );
+        const liquidValue = extractionStage?.water
+          ? parseInt(String(extractionStage.water).replace('g', '') || '0')
+          : 0;
 
-      if (!extractionStage || liquidValue <= 0) {
-        return { ...params, stages };
-      }
+        if (!extractionStage || liquidValue <= 0) {
+          return { ...params, stages };
+        }
 
-      const coffee = parseFloat(params.coffee.replace('g', ''));
-      const ratio = liquidValue / coffee;
+        const coffee = parseFloat(params.coffee.replace('g', ''));
+        const ratio = liquidValue / coffee;
 
-      return {
-        ...params,
-        stages,
-        water: String(extractionStage.water),
-        ratio:
-          coffee > 0
-            ? `1:${Number.isInteger(ratio) ? ratio.toString() : ratio.toFixed(1)}`
-            : params.ratio,
-      };
-    };
+        return {
+          ...params,
+          stages,
+          water: String(extractionStage.water),
+          liquidWeight: `${String(extractionStage.water).replace('g', '')}g`,
+          extractionTime: extractionStage.duration ?? extractionStage.time,
+          ratio:
+            coffee > 0
+              ? `1:${Number.isInteger(ratio) ? ratio.toString() : ratio.toFixed(1)}`
+              : params.ratio,
+        };
+      },
+      [customEquipment]
+    );
 
     const handleStagesChange = (stages: Stage[]) => {
       setMethod(prev => ({
@@ -633,6 +656,13 @@ const CustomMethodForm = React.forwardRef<
           JSON.stringify(method)
         ) as MethodWithStages;
 
+        if (isEspressoMachine(customEquipment)) {
+          finalMethod.params = syncEspressoParamsFromStages(
+            finalMethod.params,
+            finalMethod.params.stages
+          );
+        }
+
         if (skipStages || (!enableStageEditing && !initialMethod)) {
           finalMethod.params.stages = [];
         }
@@ -714,7 +744,14 @@ const CustomMethodForm = React.forwardRef<
           alert('保存方案失败，请重试');
         }
       },
-      [customEquipment, enableStageEditing, initialMethod, method, onSave]
+      [
+        customEquipment,
+        enableStageEditing,
+        initialMethod,
+        method,
+        onSave,
+        syncEspressoParamsFromStages,
+      ]
     );
 
     const handleCoffeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -792,6 +829,9 @@ const CustomMethodForm = React.forwardRef<
           ...method.params,
           coffee: `${coffee}g`,
           water: totalWater, // 更新总水量
+          liquidWeight: isEspressoMachine(customEquipment)
+            ? totalWater
+            : method.params.liquidWeight,
           stages: newStages, // 更新步骤
         },
       });
@@ -872,6 +912,9 @@ const CustomMethodForm = React.forwardRef<
           ...method.params,
           ratio: `1:${ratio}`,
           water: totalWater, // 更新总水量
+          liquidWeight: isEspressoMachine(customEquipment)
+            ? totalWater
+            : method.params.liquidWeight,
           stages: newStages, // 更新步骤
         },
       });
@@ -890,22 +933,20 @@ const CustomMethodForm = React.forwardRef<
 
     // 意式机特有 - 处理萃取时间变更
     const handleExtractionTimeChange = (time: number) => {
-      if (
-        !isEspressoMachine(customEquipment) ||
-        method.params.stages.length === 0
-      )
-        return;
+      if (!isEspressoMachine(customEquipment)) return;
 
       // 更新第一个萃取步骤的时间（使用 duration 字段）
-      const newStages = [...method.params.stages];
-      const firstStage = { ...newStages[0] };
-      firstStage.duration = time;
-      newStages[0] = firstStage;
+      const newStages = method.params.stages.map((stage, index) =>
+        stage.pourType === 'extraction' || index === 0
+          ? { ...stage, duration: time }
+          : stage
+      );
 
       setMethod({
         ...method,
         params: {
           ...method.params,
+          extractionTime: time,
           stages: newStages,
         },
       });
@@ -963,6 +1004,7 @@ const CustomMethodForm = React.forwardRef<
         params: {
           ...method.params,
           water: liquidWeight, // 更新总水量与萃取液重同步
+          liquidWeight,
           ratio: newRatio, // 更新水粉比
           stages: newStages,
         },
@@ -1046,11 +1088,13 @@ const CustomMethodForm = React.forwardRef<
                 temp: method.params.temp,
                 // 添加意式机特有参数（使用 duration 字段）
                 extractionTime: isEspressoMachine(customEquipment)
-                  ? (method.params.stages[0]?.duration ??
+                  ? (method.params.extractionTime ??
+                    method.params.stages[0]?.duration ??
                     method.params.stages[0]?.time)
                   : undefined,
                 liquidWeight: isEspressoMachine(customEquipment)
-                  ? method.params.stages[0]?.water
+                  ? (method.params.liquidWeight ??
+                    method.params.stages[0]?.water)
                   : undefined,
               }}
               onCoffeeChange={handleCoffeeChange}
@@ -1065,9 +1109,7 @@ const CustomMethodForm = React.forwardRef<
                 })
               }
               onTempChange={handleTempChange}
-              showExtractionTime={
-                enableStageEditing && method.params.stages.length > 0
-              }
+              showExtractionTime={isEspressoMachine(customEquipment)}
               // 添加意式机特有参数处理函数
               onExtractionTimeChange={
                 isEspressoMachine(customEquipment)

@@ -55,6 +55,8 @@ export interface MethodParams {
   ratio: string;
   grindSize: string;
   temp: string;
+  extractionTime?: number;
+  liquidWeight?: string;
   stages: Stage[];
 }
 
@@ -66,7 +68,16 @@ export interface Method {
 }
 
 export type BrewingNoteParams = Partial<
-  Pick<MethodParams, 'coffee' | 'water' | 'ratio' | 'grindSize' | 'temp'>
+  Pick<
+    MethodParams,
+    | 'coffee'
+    | 'water'
+    | 'ratio'
+    | 'grindSize'
+    | 'temp'
+    | 'extractionTime'
+    | 'liquidWeight'
+  >
 >;
 
 export interface BrewingMethods {

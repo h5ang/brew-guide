@@ -4,7 +4,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Method } from '@/lib/core/config';
 import GrindSizeInput from '@/components/ui/GrindSizeInput';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
-import { deriveNavigationSettings } from '@/lib/navigation/navigationSettings';
+import {
+  getEspressoExtractionTime,
+  getEspressoLiquidWeight,
+  getEspressoParamRows,
+} from '@/lib/brewing/methodDisplay';
 
 interface MethodSelectorProps {
   selectedEquipment: string;
@@ -69,12 +73,17 @@ const calculateWater = (coffee: string, ratio: string): string => {
 };
 
 // 从 Method 提取编辑值
-const extractEditingValues = (method: Method): EditingValues => ({
+const extractEditingValues = (
+  method: Method,
+  isEspresso = false
+): EditingValues => ({
   coffee: extractNumber(method.params.coffee),
   ratio: extractRatioNumber(method.params.ratio),
   grindSize: method.params.grindSize || '',
   water: extractNumber(method.params.water),
-  time: method.params.stages?.[0]?.duration?.toString() ?? '',
+  time: isEspresso
+    ? (getEspressoExtractionTime(method)?.toString() ?? '')
+    : (method.params.stages?.[0]?.duration?.toString() ?? ''),
   temp: extractNumber(method.params.temp || ''),
 });
 
@@ -111,11 +120,6 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
   const methodParamOverrides = useSettingsStore(
     state => state.settings.methodParamOverrides
   );
-  const navigationSettings = useSettingsStore(
-    state => state.settings.navigationSettings
-  );
-  const canUseBrewingModule =
-    deriveNavigationSettings(navigationSettings).visibleTabs.brewing;
 
   const findMethod = useCallback(
     (methodId: string): Method | undefined =>
@@ -193,7 +197,10 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
         ratio: extractRatioNumber(initialParams.ratio || ''),
         grindSize: initialParams.grindSize || '',
         water: extractNumber(initialParams.water || ''),
-        time: initialParams.stages?.[0]?.duration?.toString() ?? '',
+        time:
+          initialParams.extractionTime?.toString() ??
+          initialParams.stages?.[0]?.duration?.toString() ??
+          '',
         temp: extractNumber(initialParams.temp || ''),
       });
 
@@ -226,14 +233,14 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
         water: extractNumber(override.water ?? method.params.water),
         time:
           override.extractionTime?.toString() ??
-          method.params.stages?.[0]?.duration?.toString() ??
+          getEspressoExtractionTime(method)?.toString() ??
           '',
         temp: extractNumber(override.temp ?? method.params.temp ?? ''),
       });
     } else {
       // 无覆盖，使用原始值
       // 如果有空占位符的 coffee，优先使用它
-      const defaultValues = extractEditingValues(method);
+      const defaultValues = extractEditingValues(method, isEspresso);
       setEditingValues({
         ...defaultValues,
         coffee: extractNumber(placeholderCoffee ?? method.params.coffee),
@@ -255,6 +262,12 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
             ratio: override.ratio ?? method.params.ratio,
             grindSize: override.grindSize ?? method.params.grindSize,
             temp: override.temp ?? method.params.temp,
+            ...(isEspresso
+              ? {
+                  extractionTime: getEspressoExtractionTime(method, override),
+                  liquidWeight: getEspressoLiquidWeight(method, override),
+                }
+              : {}),
             // 如果有覆盖的萃取时长，更新 stages
             stages:
               override.extractionTime !== undefined
@@ -269,6 +282,12 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
           params: {
             ...method.params,
             coffee: effectiveCoffee,
+            ...(isEspresso
+              ? {
+                  extractionTime: getEspressoExtractionTime(method),
+                  liquidWeight: getEspressoLiquidWeight(method),
+                }
+              : {}),
           },
         };
     onParamsChange(effectiveMethod);
@@ -279,6 +298,7 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     getOverride,
     onParamsChange,
     initialParams,
+    isEspresso,
     isEmptyPlaceholder,
     extractCoffeeFromPlaceholder,
   ]);
@@ -345,10 +365,10 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     async (method: Method) => {
       const methodId = method.id || method.name;
       await clearMethodParamOverride(selectedEquipment, methodId);
-      setEditingValues(extractEditingValues(method));
+      setEditingValues(extractEditingValues(method, isEspresso));
       onParamsChange(method);
     },
-    [selectedEquipment, clearMethodParamOverride, onParamsChange]
+    [selectedEquipment, clearMethodParamOverride, isEspresso, onParamsChange]
   );
 
   // 参数更新 - 简单直接，不做过多干涉
@@ -378,6 +398,12 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
           ratio: newValues.ratio ? `1:${newValues.ratio}` : '',
           grindSize: newValues.grindSize,
           temp: newValues.temp ? `${newValues.temp}°C` : '',
+          extractionTime:
+            isEspresso && newValues.time
+              ? parseFloat(newValues.time) || 0
+              : method.params.extractionTime,
+          liquidWeight:
+            isEspresso && newValues.water ? `${newValues.water}g` : undefined,
           stages: method.params.stages?.map((s, i) => ({
             ...s,
             duration:
@@ -397,8 +423,8 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
         grindSize: updatedMethod.params.grindSize,
         temp: updatedMethod.params.temp,
         extractionTime:
-          isEspresso && updatedMethod.params.stages?.[0]?.duration
-            ? updatedMethod.params.stages[0].duration
+          isEspresso && updatedMethod.params.extractionTime !== undefined
+            ? updatedMethod.params.extractionTime
             : undefined,
       });
 
@@ -452,7 +478,7 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
 
   // 渲染参数显示
   const renderDisplay = (label: string, value: string) => (
-    <div className="flex items-center">
+    <div key={label} className="flex items-center">
       <span className="w-14 text-xs font-medium">{label}:</span>
       <span className="text-xs font-medium">{value || '-'}</span>
     </div>
@@ -464,7 +490,6 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
     const isSelected =
       selectedMethod === methodId || selectedMethod === method.name;
     const override = getOverride(methodId);
-    const hasStages = method.params.stages.length > 0;
 
     // 显示参数：优先使用覆盖值（包括空字符串）
     const displayParams = override
@@ -514,19 +539,15 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
 
           {!isSelected ? (
             <div className="mt-1.5 space-y-0.5 text-neutral-500 dark:text-neutral-400">
-              {renderDisplay('咖啡粉', displayParams.coffee)}
               {isEspresso ? (
                 <>
-                  {renderDisplay('研磨度', displayParams.grindSize)}
-                  {hasStages &&
-                    renderDisplay(
-                      '萃取时长',
-                      `${override?.extractionTime ?? method.params.stages[0]?.duration ?? 0}s`
-                    )}
-                  {renderDisplay('液重', displayParams.water)}
+                  {getEspressoParamRows(method, override).map(row =>
+                    renderDisplay(row.label, row.value)
+                  )}
                 </>
               ) : (
                 <>
+                  {renderDisplay('咖啡粉', displayParams.coffee)}
                   {renderDisplay('粉水比', displayParams.ratio)}
                   {renderDisplay('研磨度', displayParams.grindSize)}
                   {renderDisplay('水温', displayParams.temp || '-')}
@@ -561,13 +582,12 @@ const MethodSelector: React.FC<MethodSelectorProps> = ({
                         dropdownPlacement="right"
                       />
                     </div>
-                    {hasStages &&
-                      renderInput(
-                        '萃取时长',
-                        editingValues?.time ?? '',
-                        v => updateParam('time', v),
-                        's'
-                      )}
+                    {renderInput(
+                      '萃取时长',
+                      editingValues?.time ?? '',
+                      v => updateParam('time', v),
+                      's'
+                    )}
                     {renderInput(
                       '液重',
                       editingValues?.water ?? '',
