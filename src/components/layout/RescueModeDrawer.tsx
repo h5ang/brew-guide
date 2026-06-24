@@ -36,11 +36,18 @@ const snapshotRows = (
   ['图片', snapshot.beanImages + snapshot.noteImages],
 ];
 
-const RescueInfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({
-  label,
-  value,
-}) => (
-  <div className="flex items-center justify-between border-b border-neutral-200/50 py-1 dark:border-neutral-800/60">
+const RescueInfoRow: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  withBorder?: boolean;
+}> = ({ label, value, withBorder = true }) => (
+  <div
+    className={`flex items-center justify-between py-1.5 ${
+      withBorder
+        ? 'border-b border-neutral-200/50 dark:border-neutral-800/60'
+        : ''
+    }`}
+  >
     <span className="text-neutral-500 dark:text-neutral-400">{label}</span>
     <span className="font-medium text-neutral-900 dark:text-neutral-100">
       {value}
@@ -188,43 +195,48 @@ const RescueModeDrawer: React.FC = () => {
       historyId="rescue-mode"
     >
       <ActionDrawer.Content>
-        <div className="space-y-4 text-sm">
+        <div className="space-y-3 text-sm">
           <div className="space-y-1">
             <p className="font-medium text-neutral-900 dark:text-neutral-100">
               抢救模式
             </p>
             <p className="leading-5 text-neutral-500 dark:text-neutral-400">
-              打开时只读取计数。关闭图片可降低导出内存。
+              页面异常时，先导出备份再刷新或重装。
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900/60">
             {isLoading || !snapshot ? (
               <p className="text-neutral-500 dark:text-neutral-400">
                 正在读取预览...
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {snapshotRows(snapshot).map(([label, value]) => (
-                    <RescueInfoRow key={label} label={label} value={value} />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {snapshotRows(snapshot).map(([label, value], index, rows) => (
+                    <RescueInfoRow
+                      key={label}
+                      label={label}
+                      value={value}
+                      withBorder={index < rows.length - 2}
+                    />
                   ))}
                 </div>
 
-                <div className="space-y-1">
-                  <RescueInfoRow
-                    label="存储占用"
-                    value={formatBytes(snapshot.storageUsage)}
-                  />
-                  {lastExportSize !== null ? (
-                    <RescueInfoRow label="导出大小" value={lastExportSize} />
-                  ) : null}
-                </div>
+                {lastExportSize !== null ? (
+                  <div className="space-y-1">
+                    <RescueInfoRow
+                      label="导出大小"
+                      value={lastExportSize}
+                      withBorder={false}
+                    />
+                  </div>
+                ) : null}
               </>
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t border-neutral-200/60 pt-3 dark:border-neutral-800/70">
+          <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <p className="font-medium text-neutral-900 dark:text-neutral-100">
                 包含图片

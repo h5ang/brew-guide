@@ -13,7 +13,6 @@ export interface RescueModeSnapshot {
   customEquipments: number;
   customMethods: number;
   grinders: number;
-  storageUsage?: number;
 }
 
 interface RescueExportData {
@@ -50,7 +49,6 @@ export async function getRescueModeSnapshot(): Promise<RescueModeSnapshot> {
     customEquipments,
     customMethods,
     grinders,
-    storageEstimate,
   ] = await Promise.all([
     db.coffeeBeans.count(),
     db.coffeeBeanImages.count(),
@@ -59,9 +57,6 @@ export async function getRescueModeSnapshot(): Promise<RescueModeSnapshot> {
     db.customEquipments.count(),
     db.customMethods.count(),
     db.grinders.count(),
-    typeof navigator !== 'undefined' && navigator.storage?.estimate
-      ? navigator.storage.estimate()
-      : Promise.resolve({} as StorageEstimate),
   ]);
 
   return {
@@ -72,7 +67,6 @@ export async function getRescueModeSnapshot(): Promise<RescueModeSnapshot> {
     customEquipments,
     customMethods,
     grinders,
-    storageUsage: storageEstimate.usage,
   };
 }
 
