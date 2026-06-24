@@ -151,6 +151,20 @@ const NoteItemStandard: React.FC<NoteItemProps> = ({
     }
   };
 
+  const handleNoteImageClick = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      if (imageError || !noteImage) return;
+
+      openImageViewer({
+        url: noteImage,
+        alt: beanName || '笔记图片',
+        sourceElement: event.currentTarget,
+      });
+    },
+    [beanName, imageError, noteImage]
+  );
+
   return (
     <div
       className={`group space-y-3 px-6 py-5 ${!isLast ? 'border-b border-neutral-200/50 dark:border-neutral-800/50' : ''} ${!isShareMode ? 'cursor-pointer' : 'cursor-pointer'} note-item`}
@@ -164,16 +178,7 @@ const NoteItemStandard: React.FC<NoteItemProps> = ({
           {noteImage && (
             <div
               className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded border border-neutral-200/50 bg-neutral-100 dark:border-neutral-800/50 dark:bg-neutral-800/20"
-              onClick={e => {
-                e.stopPropagation();
-                if (!imageError) {
-                  openImageViewer({
-                    url: noteImage,
-                    alt: beanName || '笔记图片',
-                    sourceElement: e.currentTarget,
-                  });
-                }
-              }}
+              onClick={handleNoteImageClick}
             >
               {imageError ? (
                 <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-500 dark:text-neutral-400">

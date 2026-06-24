@@ -47,7 +47,6 @@ import {
   getCoffeeBeanImageSource,
   type CoffeeBeanImageSide,
 } from '@/lib/coffee-beans/imageRepository';
-import { getBrewingNoteImages as getStoredBrewingNoteImages } from '@/lib/notes/imageRepository';
 
 // 信息行组件
 interface InfoRowProps {
@@ -263,11 +262,11 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
     [note, coffeeBeanLookup, initialBeanInfo]
   );
   const beanFrontImage = useCoffeeBeanImage(beanInfo?.id, {
-    preferThumbnail: true,
+    mode: 'original',
   });
   const beanBackImage = useCoffeeBeanImage(beanInfo?.id, {
     side: 'back',
-    preferThumbnail: true,
+    mode: 'original',
   });
 
   // 获取烘焙商相关设置
@@ -430,25 +429,13 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   const primaryNoteImage = noteImages[0];
   const hasPrimaryNoteImageError =
     noteImageError.source === primaryNoteImage && noteImageError.failed;
-  const getOriginalNoteImages = useCallback(async (): Promise<string[]> => {
-    if (!note?.id) return noteImages;
-
-    try {
-      const originalImages = await getStoredBrewingNoteImages(note.id, {
-        mode: 'original',
-      });
-      return originalImages.length > 0 ? originalImages : noteImages;
-    } catch {
-      return noteImages;
-    }
-  }, [note?.id, noteImages]);
   const openNoteImage = useCallback(
-    async (
+    (
       index: number,
       sourceElement: HTMLElement,
       sourceElements?: HTMLElement[]
     ) => {
-      const images = await getOriginalNoteImages();
+      const images = noteImages;
       const selectedImage = images[index] || noteImages[index];
       if (!selectedImage) return;
 
@@ -464,7 +451,7 @@ const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
         sourceElements,
       });
     },
-    [getOriginalNoteImages, noteImages]
+    [noteImages]
   );
   const hasBeanDisplayImageError =
     beanImageError.source === beanDisplayImage && beanImageError.failed;

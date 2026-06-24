@@ -2,19 +2,12 @@ import { db } from '@/lib/core/db';
 import type { BrewingNote } from '@/lib/core/config';
 import {
   type BrewingNoteImageRecord,
-  type BrewingNoteImageThumbnailRecord,
   mergeBrewingNoteImages,
   mergeBrewingNotesWithImages,
   splitBrewingNoteImages,
   stripBrewingNoteImages,
 } from './imageRecords';
 import { shouldSkipEmptyReplace } from '@/lib/core/safeReplace';
-import {
-  createImageThumbnailDataUrl,
-  getUsableThumbnailDataUrl,
-} from '@/lib/images/thumbnail';
-
-export type BrewingNoteImageSourceMode = 'thumbnail' | 'original';
 
 const hasImageFieldUpdate = (note: BrewingNote): boolean =>
   Object.prototype.hasOwnProperty.call(note, 'image') ||
@@ -26,51 +19,10 @@ const getRecordImages = (record: {
 }): string[] =>
   record.images?.length ? record.images : record.image ? [record.image] : [];
 
-const getThumbnailRecordImages = (
-  record: BrewingNoteImageThumbnailRecord | undefined
-): string[] => {
-  if (!record) return [];
-
-  const thumbnails = record.imageThumbnails?.length
-    ? record.imageThumbnails
-    : record.imageThumbnail
-      ? [record.imageThumbnail]
-      : [];
-
-  return thumbnails.map(getUsableThumbnailDataUrl).filter(Boolean) as string[];
-};
-
-const haveSameImages = (left: string[], right: string[]): boolean =>
-  left.length === right.length &&
-  left.every((image, index) => image === right[index]);
-
-const createBrewingNoteImageThumbnailRecord = async (
-  noteId: string,
-  images: string[],
-  updatedAt: number
-): Promise<BrewingNoteImageThumbnailRecord | undefined> => {
-  const thumbnails: string[] = [];
-
-  for (const image of images) {
-    const thumbnail = await createImageThumbnailDataUrl(image);
-    if (thumbnail) thumbnails.push(thumbnail);
-  }
-
-  if (thumbnails.length === 0) return undefined;
-
-  return {
-    noteId,
-    imageThumbnail: thumbnails[0],
-    imageThumbnails: thumbnails,
-    updatedAt,
-  };
-};
-
 export async function persistBrewingNoteImagesFromNote(
   note: BrewingNote,
-  options: { generateThumbnails?: boolean } = {}
+  _options: { generateThumbnails?: boolean } = {}
 ): Promise<BrewingNote> {
-  const { generateThumbnails = true } = options;
   const { note: strippedNote, imageRecord } = splitBrewingNoteImages(note);
 
   if (!imageRecord && !hasImageFieldUpdate(note)) {
@@ -78,35 +30,8 @@ export async function persistBrewingNoteImagesFromNote(
   }
 
   if (imageRecord) {
-    const existingRecord = await db.brewingNoteImages.get(note.id);
-    const existingThumbnailRecord = await db.brewingNoteImageThumbnails.get(
-      note.id
-    );
-    const nextImages = getRecordImages(imageRecord);
-    const existingImages = existingRecord
-      ? getRecordImages(existingRecord)
-      : [];
-    const canReuseThumbnail =
-      haveSameImages(nextImages, existingImages) && existingThumbnailRecord;
-    const thumbnailRecord = canReuseThumbnail
-      ? existingThumbnailRecord
-      : generateThumbnails
-        ? await createBrewingNoteImageThumbnailRecord(
-            note.id,
-            nextImages,
-            imageRecord.updatedAt
-          )
-        : undefined;
-
     await db.brewingNoteImages.put(imageRecord);
-    if (
-      thumbnailRecord &&
-      getThumbnailRecordImages(thumbnailRecord).length > 0
-    ) {
-      await db.brewingNoteImageThumbnails.put(thumbnailRecord);
-    } else {
-      await db.brewingNoteImageThumbnails.delete(note.id);
-    }
+    await db.brewingNoteImageThumbnails.delete(note.id);
   } else {
     await db.brewingNoteImages.delete(note.id);
     await db.brewingNoteImageThumbnails.delete(note.id);
@@ -125,32 +50,21 @@ export async function getBrewingNoteImageNoteIds(
   noteIds?: string[]
 ): Promise<string[]> {
   if (!noteIds) {
-    const keys = await db.brewingNoteImageThumbnails
-      .toCollection()
-      .primaryKeys();
+    const keys = await db.brewingNoteImages.toCollection().primaryKeys();
     return keys.map(String);
   }
 
   const uniqueNoteIds = Array.from(new Set(noteIds.filter(Boolean)));
   if (uniqueNoteIds.length === 0) return [];
 
-  const keys = await db.brewingNoteImageThumbnails
+  const keys = await db.brewingNoteImages
     .where('noteId')
     .anyOf(uniqueNoteIds)
     .primaryKeys();
   return keys.map(String);
 }
 
-export async function getBrewingNoteImages(
-  noteId: string,
-  options: { mode?: BrewingNoteImageSourceMode } = {}
-): Promise<string[]> {
-  if (options.mode !== 'original') {
-    return getThumbnailRecordImages(
-      await db.brewingNoteImageThumbnails.get(noteId)
-    );
-  }
-
+export async function getBrewingNoteImages(noteId: string): Promise<string[]> {
   const record = await getBrewingNoteImageRecord(noteId);
   return record ? getRecordImages(record) : [];
 }
@@ -204,12 +118,16 @@ export async function replaceBrewingNotesWithSplitImages(
 
   const strippedNotes: BrewingNote[] = [];
   const imageRecords: BrewingNoteImageRecord[] = [];
+  const explicitEmptyImageNoteIds: string[] = [];
+  const incomingNoteIds = notes.map(note => note.id).filter(Boolean);
 
   for (const note of notes) {
     const split = splitBrewingNoteImages(note);
     strippedNotes.push(split.note);
     if (split.imageRecord) {
       imageRecords.push(split.imageRecord);
+    } else if (hasImageFieldUpdate(note)) {
+      explicitEmptyImageNoteIds.push(note.id);
     }
   }
 
@@ -219,15 +137,32 @@ export async function replaceBrewingNotesWithSplitImages(
     db.brewingNoteImages,
     db.brewingNoteImageThumbnails,
     async () => {
+      const existingImageIds = (
+        await db.brewingNoteImages.toCollection().primaryKeys()
+      ).map(String);
+      const incomingIdSet = new Set(incomingNoteIds);
+      const staleImageIds = existingImageIds.filter(
+        noteId => !incomingIdSet.has(noteId)
+      );
+      const imageIdsToDelete = Array.from(
+        new Set([...staleImageIds, ...explicitEmptyImageNoteIds])
+      );
+
       await db.brewingNotes.clear();
-      await db.brewingNoteImages.clear();
-      await db.brewingNoteImageThumbnails.clear();
 
       if (strippedNotes.length > 0) {
         await db.brewingNotes.bulkPut(strippedNotes);
       }
 
+      if (imageIdsToDelete.length > 0) {
+        await db.brewingNoteImages.bulkDelete(imageIdsToDelete);
+        await db.brewingNoteImageThumbnails.bulkDelete(imageIdsToDelete);
+      }
+
       if (imageRecords.length > 0) {
+        await db.brewingNoteImageThumbnails.bulkDelete(
+          imageRecords.map(record => record.noteId)
+        );
         await db.brewingNoteImages.bulkPut(imageRecords);
       }
     }

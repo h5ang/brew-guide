@@ -218,7 +218,8 @@ const NoteItem: React.FC<NoteItemProps> = ({
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
 
-      const { imageUrl, imageIndex } = event.currentTarget.dataset;
+      const sourceElement = event.currentTarget;
+      const { imageUrl, imageIndex } = sourceElement.dataset;
       if (!imageUrl || !imageIndex) {
         return;
       }
@@ -237,17 +238,17 @@ const NoteItem: React.FC<NoteItemProps> = ({
         ? Array.from(
             galleryElement.querySelectorAll<HTMLElement>('[data-image-index]')
           )
-        : [event.currentTarget];
+        : [sourceElement];
 
       openImageViewer({
-        url: imageUrl,
+        url: noteImages[index] || imageUrl,
         alt: `笔记图片 ${index + 1}`,
         items: noteImages.map((url, itemIndex) => ({
           url,
           alt: `笔记图片 ${itemIndex + 1}`,
         })),
         index,
-        sourceElement: event.currentTarget,
+        sourceElement,
         sourceElements,
       });
     },
