@@ -53,6 +53,7 @@ interface NotesListViewProps {
   settings?: SettingsOptions;
   tableVisibleColumns?: NotesTableColumnKey[];
   activeNoteId?: string | null;
+  noteImageCounts?: Map<string, number>;
 }
 
 const NotesListView: React.FC<NotesListViewProps> = ({
@@ -75,6 +76,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
   settings,
   tableVisibleColumns = EMPTY_TABLE_COLUMNS,
   activeNoteId,
+  noteImageCounts,
 }) => {
   const [showQuickDecrementNotes, setShowQuickDecrementNotes] = useState(false);
 
@@ -249,6 +251,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
       <Virtuoso
         data={regularNotes}
         customScrollParent={scrollParentRef}
+        computeItemKey={(_index, note) => note.id}
         // 🔥 性能优化配置
         overscan={200}
         increaseViewportBy={{ top: 200, bottom: 200 }}
@@ -309,6 +312,7 @@ const NotesListView: React.FC<NotesListViewProps> = ({
             getValidTasteRatings={getValidTasteRatings}
             coffeeBeans={coffeeBeans}
             coffeeBeanLookup={coffeeBeanLookup}
+            storedImageCount={noteImageCounts?.get(note.id)}
           />
         )}
       />

@@ -64,6 +64,24 @@ export async function getBrewingNoteImageNoteIds(
   return keys.map(String);
 }
 
+export async function getBrewingNoteImageCounts(
+  noteIds: string[]
+): Promise<Map<string, number>> {
+  const uniqueNoteIds = Array.from(new Set(noteIds.filter(Boolean)));
+  if (uniqueNoteIds.length === 0) return new Map();
+
+  const records = await db.brewingNoteImages.bulkGet(uniqueNoteIds);
+  const counts = new Map<string, number>();
+
+  records.forEach(record => {
+    if (!record) return;
+    const count = getRecordImages(record).length;
+    if (count > 0) counts.set(record.noteId, count);
+  });
+
+  return counts;
+}
+
 export async function getBrewingNoteImages(noteId: string): Promise<string[]> {
   const record = await getBrewingNoteImageRecord(noteId);
   return record ? getRecordImages(record) : [];

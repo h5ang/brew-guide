@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => {
       nextRecords.forEach(record => records.set(String(record[key]), record));
       return Promise.resolve();
     }),
+    bulkGet: vi.fn((ids: string[]) =>
+      Promise.resolve(ids.map(id => records.get(id)))
+    ),
     delete: vi.fn((id: string) => {
       records.delete(id);
       return Promise.resolve();
@@ -64,6 +67,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('@/lib/core/db', () => ({ db: mocks.db }));
 
 import {
+  getBrewingNoteImageCounts,
   getBrewingNoteImageNoteIds,
   getBrewingNoteImages,
   replaceBrewingNotesWithSplitImages,
@@ -110,6 +114,19 @@ describe('brewing note image repository', () => {
 
     await expect(getBrewingNoteImages('note-1')).resolves.toEqual(['original']);
     expect(mocks.thumbnails.has('note-1')).toBe(false);
+  });
+
+  it('returns stored image counts for list placeholders', async () => {
+    mocks.images.set('note-1', {
+      noteId: 'note-1',
+      image: 'front',
+      images: ['front', 'back'],
+      updatedAt: 1,
+    });
+
+    await expect(
+      getBrewingNoteImageCounts(['note-1', 'missing'])
+    ).resolves.toEqual(new Map([['note-1', 2]]));
   });
 
   it('preserves stored images when replacing lightweight notes', async () => {

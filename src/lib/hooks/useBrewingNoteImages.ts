@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  getBrewingNoteImageCounts,
   getBrewingNoteImageNoteIds,
   getBrewingNoteImages,
 } from '@/lib/notes/imageRepository';
@@ -29,6 +30,34 @@ export function useBrewingNoteImageIds(noteIds: string[]): Set<string> {
   }, [idsKey]);
 
   return imageIds;
+}
+
+export function useBrewingNoteImageCounts(
+  noteIds: string[],
+  versionKey = ''
+): Map<string, number> {
+  const [imageCounts, setImageCounts] = useState<Map<string, number>>(
+    new Map()
+  );
+  const idsKey = noteIds.join('\u0001');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getBrewingNoteImageCounts(noteIds)
+      .then(counts => {
+        if (!cancelled) setImageCounts(counts);
+      })
+      .catch(() => {
+        if (!cancelled) setImageCounts(new Map());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [idsKey, versionKey]);
+
+  return imageCounts;
 }
 
 export function useBrewingNoteImages(

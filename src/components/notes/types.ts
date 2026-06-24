@@ -78,6 +78,7 @@ export interface NoteItemProps {
   // 咖啡豆列表（用于获取完整的咖啡豆信息，包括图片）
   coffeeBeans?: CoffeeBean[];
   coffeeBeanLookup?: CoffeeBeanLookup;
+  storedImageCount?: number;
 }
 
 // 筛选标签页属性

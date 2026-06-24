@@ -81,7 +81,7 @@ import {
   getNotesTableColumnConfig,
   type NotesTableColumnKey,
 } from './tableColumns';
-import { useBrewingNoteImageIds } from '@/lib/hooks/useBrewingNoteImages';
+import { useBrewingNoteImageCounts } from '@/lib/hooks/useBrewingNoteImages';
 
 const NOTES_TABLE_COLUMNS_STORAGE_KEY = 'notes-table-visible-columns';
 
@@ -350,15 +350,23 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
   // 🔥 从 Zustand Store 订阅笔记数据
   const notes = useBrewingNoteStore(state => state.notes);
   const noteIds = useMemo(() => notes.map(note => note.id), [notes]);
-  const noteImageIds = useBrewingNoteImageIds(noteIds);
+  const noteImageVersionKey = useMemo(
+    () =>
+      notes.map(note => `${note.id}:${note.updatedAt ?? ''}`).join('\u0001'),
+    [notes]
+  );
+  const noteImageCounts = useBrewingNoteImageCounts(
+    noteIds,
+    noteImageVersionKey
+  );
   const noteHasImage = useCallback(
     (note: BrewingNote) =>
       Boolean(
-        noteImageIds.has(note.id) ||
+        noteImageCounts.has(note.id) ||
         (note.image && note.image.trim() !== '') ||
         (note.images && note.images.length > 0)
       ),
-    [noteImageIds]
+    [noteImageCounts]
   );
   const loadNotes = useBrewingNoteStore(state => state.loadNotes);
   const deleteNote = useBrewingNoteStore(state => state.deleteNote);
@@ -386,6 +394,13 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
 
   // 预览容器引用
   const notesContainerRef = useRef<HTMLDivElement>(null);
+  const [notesScrollEl, setNotesScrollEl] = useState<HTMLDivElement | null>(
+    null
+  );
+  const setNotesContainerRef = useCallback((el: HTMLDivElement | null) => {
+    notesContainerRef.current = el;
+    setNotesScrollEl(el);
+  }, []);
 
   //  简化：直接用 useMemo 筛选和排序，不需要复杂的 hook
   const filteredNotes = useMemo(() => {
@@ -1220,7 +1235,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
               ? 'h-full w-full overflow-hidden'
               : 'scroll-with-bottom-bar h-full w-full overflow-y-auto'
           }
-          ref={notesContainerRef}
+          ref={setNotesContainerRef}
         >
           {/* 笔记列表视图 - 始终传递正确的笔记数据 */}
           <ListView
@@ -1241,12 +1256,13 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
             }
             viewMode={viewMode}
             isDateImageFlowMode={isDateImageFlowMode}
-            scrollParentRef={notesContainerRef.current || undefined}
+            scrollParentRef={notesScrollEl ?? undefined}
             equipmentNames={equipmentNames}
             coffeeBeans={coffeeBeans}
             settings={settings}
             tableVisibleColumns={effectiveTableVisibleColumns}
             activeNoteId={activeNoteId}
+            noteImageCounts={noteImageCounts}
           />
         </div>
       </div>
