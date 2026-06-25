@@ -1216,9 +1216,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
       }
     };
 
-    // 延迟检查，确保应用完全加载
-    const timer = setTimeout(checkReminders, 3000);
-    return () => clearTimeout(timer);
+    void checkReminders();
   }, []);
 
   useEffect(() => {
