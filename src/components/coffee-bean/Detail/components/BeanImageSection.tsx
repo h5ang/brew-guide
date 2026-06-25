@@ -178,12 +178,12 @@ const BeanImageSection: React.FC<BeanImageSectionProps> = ({
   };
   const storedFrontImage = useCoffeeBeanImage(bean?.id, {
     fallback: isAddMode ? bean?.image : undefined,
-    mode: isAddMode ? 'original' : undefined,
+    mode: 'original',
   });
   const storedBackImage = useCoffeeBeanImage(bean?.id, {
     side: 'back',
     fallback: isAddMode ? bean?.backImage : undefined,
-    mode: isAddMode ? 'original' : undefined,
+    mode: 'original',
   });
   const viewBean = useMemo(
     () =>
