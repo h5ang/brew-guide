@@ -16,6 +16,7 @@ import { useCoffeeBeanStore } from '@/lib/stores/coffeeBeanStore';
 import { ExtendedCoffeeBean } from '@/components/coffee-bean/List/types';
 import hapticsUtils from '@/lib/ui/haptics';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
+import { openImageViewer } from '@/lib/ui/imageViewer';
 import SettingPage from './atomic/SettingPage';
 import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import ConfirmDrawer from '@/components/common/ui/ConfirmDrawer';
@@ -23,6 +24,8 @@ import RoasterLogoImportExport from './RoasterLogoImportExport';
 import { renameRoasters } from '@/lib/utils/roasterRename';
 import DataAlertIcon from '@public/images/icons/ui/data-alert.svg';
 import { compressBase64Image } from '@/lib/utils/imageCapture';
+import { TempFileManager } from '@/lib/utils/tempFileManager';
+import { showToast } from '@/components/common/feedback/LightToast';
 
 interface RoasterLogoSettingsProps {
   isOpen: boolean;
@@ -241,6 +244,41 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
     }
   };
 
+  const handleLogoPreviewClick = useCallback(
+    (
+      roasterName: string,
+      logoData: string,
+      sourceElement: HTMLElement | null
+    ) => {
+      openImageViewer({
+        url: logoData,
+        alt: `${roasterName} 图标`,
+        sourceElement,
+        action: {
+          label: '保存到相册',
+          loadingLabel: '保存中...',
+          ariaLabel: `保存 ${roasterName} 图标到相册`,
+          onClick: async () => {
+            try {
+              await TempFileManager.saveImageToGallery(logoData);
+              showToast({ type: 'success', title: '已保存到相册' });
+              if (hapticFeedback) {
+                hapticsUtils.success();
+              }
+            } catch (error) {
+              console.error('Save roaster logo error:', error);
+              showToast({ type: 'error', title: '保存失败' });
+              if (hapticFeedback) {
+                hapticsUtils.error();
+              }
+            }
+          },
+        },
+      });
+    },
+    [hapticFeedback]
+  );
+
   // 打开导出抽屉
   const handleOpenExport = useCallback(() => {
     setImportExportMode('export');
@@ -455,6 +493,8 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                 const hasLogo = !!config?.logoData;
                 const logoData = config?.logoData;
                 const isUploading = uploading === roaster;
+                const logoPreviewClassName =
+                  'relative size-10 shrink-0 overflow-hidden rounded border border-neutral-200/50 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-900';
                 const draftName = draftRoasterNames[roaster] ?? roaster;
                 const normalizedDraftName = draftName.trim();
                 const hasDraftNameChange =
@@ -473,8 +513,21 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       {/* 图标预览 */}
-                      <div className="relative size-10 shrink-0 overflow-hidden rounded border border-neutral-200/50 bg-neutral-50/80 dark:border-neutral-700 dark:bg-neutral-900">
-                        {hasLogo && logoData ? (
+                      {hasLogo && logoData ? (
+                        <button
+                          type="button"
+                          onClick={event =>
+                            handleLogoPreviewClick(
+                              roaster,
+                              logoData,
+                              event.currentTarget
+                            )
+                          }
+                          disabled={isUploading}
+                          className={`${logoPreviewClassName} cursor-zoom-in p-0 transition-transform focus-visible:ring-2 focus-visible:ring-neutral-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-50 focus-visible:outline-none active:scale-[0.96] disabled:cursor-default disabled:opacity-60 disabled:active:scale-100 dark:focus-visible:ring-neutral-500/60 dark:focus-visible:ring-offset-neutral-900`}
+                          title="放大图标"
+                          aria-label={`放大 ${roaster} 的图标`}
+                        >
                           <Image
                             src={logoData}
                             alt={roaster}
@@ -483,12 +536,14 @@ const RoasterLogoSettings: React.FC<RoasterLogoSettingsProps> = ({
                             className="object-cover"
                             unoptimized
                           />
-                        ) : (
+                        </button>
+                      ) : (
+                        <div className={logoPreviewClassName}>
                           <div className="flex h-full w-full items-center justify-center text-sm font-medium text-neutral-400 dark:text-neutral-600">
                             {roaster.charAt(0)}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* 烘焙商名称 */}
                       {isEditingRoasters ? (

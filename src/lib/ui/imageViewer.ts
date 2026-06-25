@@ -8,6 +8,7 @@ export interface ImageViewerPayload {
   index?: number;
   sourceElement?: HTMLElement | null;
   sourceElements?: Array<HTMLElement | null | undefined>;
+  action?: ImageViewerAction;
 }
 
 export interface ImageViewerItem {
@@ -17,6 +18,13 @@ export interface ImageViewerItem {
   height?: number;
   thumbnailUrl?: string;
   sourceElement?: HTMLElement | null;
+}
+
+export interface ImageViewerAction {
+  label: string;
+  loadingLabel?: string;
+  ariaLabel?: string;
+  onClick: () => void | Promise<void>;
 }
 
 export const IMAGE_VIEWER_OPEN_EVENT = 'imageViewerOpen';

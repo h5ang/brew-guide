@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import PhotoSwipe, { type EventCallback, type SlideData } from 'photoswipe';
 import gsap from 'gsap';
 import { useModalHistory } from '@/lib/hooks/useModalHistory';
-import type { ImageViewerItem } from '@/lib/ui/imageViewer';
+import type { ImageViewerAction, ImageViewerItem } from '@/lib/ui/imageViewer';
 
 interface ImageViewerProps {
   id?: string;
@@ -16,6 +16,7 @@ interface ImageViewerProps {
   initialIndex?: number;
   sourceElement?: HTMLElement | null;
   sourceElements?: Array<HTMLElement | null | undefined>;
+  action?: ImageViewerAction;
   onClose: () => void;
   onExitComplete?: () => void;
 }
@@ -159,6 +160,63 @@ const isCroppedThumbnailElement = (element?: HTMLElement | null) => {
     : false;
 };
 
+const setActionElementPending = (element: HTMLElement, pending: boolean) => {
+  const idleLabel = element.dataset.label || '';
+  const loadingLabel = element.dataset.loadingLabel || idleLabel;
+
+  element.textContent = pending ? loadingLabel : idleLabel;
+  element.classList.toggle('is-loading', pending);
+  element.setAttribute('aria-busy', pending ? 'true' : 'false');
+
+  if (element instanceof HTMLButtonElement) {
+    element.disabled = pending;
+  }
+};
+
+const registerViewerAction = (
+  instance: PhotoSwipe,
+  action: ImageViewerAction
+) => {
+  let isPending = false;
+
+  instance.on('uiRegister', () => {
+    instance.ui?.registerElement({
+      name: 'brewImageViewerAction',
+      className: 'brew-image-viewer-action-button',
+      isButton: true,
+      appendTo: 'root',
+      order: 30,
+      html: action.label,
+      title: action.label,
+      ariaLabel: action.ariaLabel ?? action.label,
+      onInit: element => {
+        element.dataset.label = action.label;
+        element.dataset.loadingLabel = action.loadingLabel ?? action.label;
+      },
+      onClick: async (event, element) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (isPending) {
+          return;
+        }
+
+        isPending = true;
+        setActionElementPending(element, true);
+
+        try {
+          await action.onClick();
+        } catch (error) {
+          console.error('[ImageViewer] Action failed:', error);
+        } finally {
+          isPending = false;
+          setActionElementPending(element, false);
+        }
+      },
+    });
+  });
+};
+
 const applyDualSideImage = (
   instance: PhotoSwipe,
   side: DualSideImage
@@ -294,6 +352,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   initialIndex = 0,
   sourceElement,
   sourceElements,
+  action,
   onClose,
   onExitComplete,
 }) => {
@@ -390,7 +449,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         hideAnimationDuration: 180,
         zoomAnimationDuration: 220,
         easing: 'cubic-bezier(.25,.1,.25,1)',
-        padding: { top: 16, right: 16, bottom: 16, left: 16 },
+        padding: { top: 16, right: 16, bottom: action ? 88 : 16, left: 16 },
         loop: viewerItems.length > 2,
         arrowPrev: false,
         arrowNext: false,
@@ -415,6 +474,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         side: 'front',
         isFlipping: false,
       };
+
+      if (action) {
+        registerViewerAction(instance, action);
+      }
 
       const handleClose = () => {
         if (shouldNotifyClose) {
@@ -498,6 +561,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       }
     };
   }, [
+    action,
     alt,
     backImageUrl,
     imageUrl,

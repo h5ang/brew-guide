@@ -1292,6 +1292,7 @@ const AppModals: React.FC<AppModalsProps> = ({
           initialIndex={imageViewerData.index}
           sourceElement={imageViewerData.sourceElement}
           sourceElements={imageViewerData.sourceElements}
+          action={imageViewerData.action}
           onClose={() => setImageViewerOpen(false)}
           onExitComplete={() => setImageViewerData(null)}
         />
