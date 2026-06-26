@@ -1,22 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import ActionDrawer from '@/components/common/ui/ActionDrawer';
+import ElasticSlider from '@/components/common/ui/ElasticSlider';
 import type { FlavorDimension } from '@/lib/core/db';
-
-// 滑块样式常量
-const SLIDER_STYLES = `relative h-px w-full appearance-none bg-neutral-300 dark:bg-neutral-600 cursor-pointer touch-none
-[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none
-[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-solid
-[&::-webkit-slider-thumb]:border-neutral-300 [&::-webkit-slider-thumb]:bg-neutral-50
-[&::-webkit-slider-thumb]:shadow-none [&::-webkit-slider-thumb]:outline-none
-dark:[&::-webkit-slider-thumb]:border-neutral-600 dark:[&::-webkit-slider-thumb]:bg-neutral-900
-[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:appearance-none
-[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-solid
-[&::-moz-range-thumb]:border-neutral-300 [&::-moz-range-thumb]:bg-neutral-50
-[&::-moz-range-thumb]:shadow-none [&::-moz-range-thumb]:outline-none
-dark:[&::-moz-range-thumb]:border-neutral-600 dark:[&::-moz-range-thumb]:bg-neutral-900`;
 
 // 星星图标组件 - 移到组件外部避免重复创建
 const StarIcon = React.memo(
@@ -63,6 +51,8 @@ interface RatingDrawerProps {
   displayDimensions: FlavorDimension[];
   /** 风味评分是否开启半星精度 */
   halfStep?: boolean;
+  /** 风味评分是否开启十分位精度 */
+  tenthStep?: boolean;
   /** 咖啡豆名称（用于显示"为 XXX 评分"） */
   beanName?: string;
   /** 是否显示总体评分 */
@@ -90,6 +80,7 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
   onTasteChange,
   displayDimensions,
   halfStep = false,
+  tenthStep = false,
   beanName,
   showOverallRating = true,
   showFlavorRating = true,
@@ -102,9 +93,6 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
   const [tempTaste, setTempTaste] = useState<Record<string, number>>(taste);
   // 标记用户是否手动修改过风味评分
   const [userModifiedFlavor, setUserModifiedFlavor] = useState(false);
-  const [currentSliderValue, setCurrentSliderValue] = useState<number | null>(
-    null
-  );
 
   // 同步外部状态到内部
   useEffect(() => {
@@ -136,8 +124,9 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
 
     if (shouldSync && tempRating > 0) {
       // 将总评映射到风味评分
-      // 如果开启半星精度，保留0.5；否则向下取整
-      const syncedValue = halfStep ? tempRating : Math.floor(tempRating);
+      // 如果开启小数精度，保留小数；否则向下取整
+      const syncedValue =
+        halfStep || tenthStep ? tempRating : Math.floor(tempRating);
 
       // 更新所有风味维度的评分
       const syncedTaste: Record<string, number> = {};
@@ -154,6 +143,7 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
     userModifiedFlavor,
     displayDimensions,
     halfStep,
+    tenthStep,
   ]);
 
   // 更新风味评分
@@ -166,60 +156,17 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
     }));
   }, []);
 
-  const overallStep = 0.5;
-  const tasteStep = halfStep ? 0.5 : 1;
-
-  const overallSliderHandlers = useMemo(
-    () => ({
-      onTouchStart: (e: React.TouchEvent) => {
-        e.stopPropagation();
-        setCurrentSliderValue(tempRating);
-      },
-      onTouchMove: (e: React.TouchEvent) => {
-        if (currentSliderValue === null) return;
-        const touch = e.touches[0];
-        const target = e.currentTarget as HTMLInputElement;
-        const rect = target.getBoundingClientRect();
-        const percentage = Math.max(
-          0,
-          Math.min(1, (touch.clientX - rect.left) / rect.width)
-        );
-        const newValue =
-          Math.round((percentage * 5) / overallStep) * overallStep;
-        if (newValue !== currentSliderValue) {
-          setTempRating(newValue);
-          setCurrentSliderValue(newValue);
-        }
-      },
-      onTouchEnd: () => setCurrentSliderValue(null),
-    }),
-    [currentSliderValue, overallStep, tempRating]
-  );
-
-  const createSliderHandlers = useCallback(
-    (key: string, currentValue: number) => ({
-      onTouchStart: (e: React.TouchEvent) => {
-        e.stopPropagation();
-        setCurrentSliderValue(currentValue);
-      },
-      onTouchMove: (e: React.TouchEvent) => {
-        if (currentSliderValue === null) return;
-        const touch = e.touches[0];
-        const target = e.currentTarget as HTMLInputElement;
-        const rect = target.getBoundingClientRect();
-        const percentage = Math.max(
-          0,
-          Math.min(1, (touch.clientX - rect.left) / rect.width)
-        );
-        const newValue = Math.round((percentage * 5) / tasteStep) * tasteStep;
-        if (newValue !== currentSliderValue) {
-          updateTasteRating(key, newValue);
-          setCurrentSliderValue(newValue);
-        }
-      },
-      onTouchEnd: () => setCurrentSliderValue(null),
-    }),
-    [currentSliderValue, tasteStep, updateTasteRating]
+  const overallStep = tenthStep ? 0.1 : 0.5;
+  const tasteStep = tenthStep ? 0.1 : halfStep ? 0.5 : 1;
+  const shouldUseSlider = overallUseSlider || tenthStep;
+  const formatOverallValue = useCallback((value: number) => {
+    return value.toFixed(1);
+  }, []);
+  const formatTasteValue = useCallback(
+    (value: number) => {
+      return halfStep || tenthStep ? value.toFixed(1) : String(value);
+    },
+    [halfStep, tenthStep]
   );
 
   const handleConfirm = useCallback(() => {
@@ -230,7 +177,7 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
 
   return (
     <ActionDrawer isOpen={isOpen} onClose={onClose} historyId="rating">
-      <ActionDrawer.Content className="mb-4! max-h-[60vh] overflow-y-auto">
+      <ActionDrawer.Content className="mb-4! overflow-visible">
         <div className="space-y-3">
           {/* 总体评分 */}
           {showOverallRating && (
@@ -250,28 +197,18 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
                   )}
                 </p>
               )}
-              {overallUseSlider ? (
+              {shouldUseSlider ? (
                 <>
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium tracking-widest text-neutral-500 dark:text-neutral-400">
-                      总体评分
-                    </div>
-                    <div className="text-xs font-medium tracking-widest text-neutral-500 dark:text-neutral-400">
-                      [ {tempRating.toFixed(1)} ]
-                    </div>
-                  </div>
-                  <div className="relative py-3">
-                    <input
-                      type="range"
-                      min="0"
-                      max="5"
+                  <div data-vaul-no-drag>
+                    <ElasticSlider
+                      label="总体评分"
+                      min={0}
+                      max={5}
                       step={overallStep}
                       value={tempRating}
-                      onChange={e => setTempRating(parseFloat(e.target.value))}
-                      onTouchStart={overallSliderHandlers.onTouchStart}
-                      onTouchMove={overallSliderHandlers.onTouchMove}
-                      onTouchEnd={overallSliderHandlers.onTouchEnd}
-                      className={SLIDER_STYLES}
+                      onValueChange={setTempRating}
+                      formatValue={formatOverallValue}
+                      aria-label="总体评分"
                     />
                   </div>
                 </>
@@ -320,43 +257,28 @@ const RatingDrawer: React.FC<RatingDrawerProps> = ({
           {/* 风味评分 */}
           {showFlavorRating && displayDimensions.length > 0 && (
             <div className="flex flex-col gap-3">
-              {overallUseSlider ? (
-                <div className="mb-3 grid grid-cols-2 gap-6">
+              {shouldUseSlider ? (
+                <div className="mb-3 grid grid-cols-2 gap-3">
                   {displayDimensions.map(dimension => {
                     const value = tempTaste[dimension.id] || 0;
-                    const handlers = createSliderHandlers(dimension.id, value);
 
                     return (
-                      <div key={dimension.id} className="relative space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs font-medium tracking-widest text-neutral-500 dark:text-neutral-400">
-                            {dimension.label}
-                            {dimension.order === 999 && (
-                              <span className="ml-1 text-[10px] text-neutral-400 dark:text-neutral-500">
-                                (已删除)
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs font-medium tracking-widest text-neutral-500 dark:text-neutral-400">
-                            [ {halfStep ? value.toFixed(1) : value} ]
-                          </div>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="5"
+                      <div key={dimension.id} data-vaul-no-drag>
+                        <ElasticSlider
+                          label={
+                            dimension.order === 999
+                              ? `${dimension.label} (已删除)`
+                              : dimension.label
+                          }
+                          min={0}
+                          max={5}
                           step={tasteStep}
                           value={value}
-                          onChange={e =>
-                            updateTasteRating(
-                              dimension.id,
-                              parseFloat(e.target.value)
-                            )
+                          onValueChange={nextValue =>
+                            updateTasteRating(dimension.id, nextValue)
                           }
-                          onTouchStart={handlers.onTouchStart}
-                          onTouchMove={handlers.onTouchMove}
-                          onTouchEnd={handlers.onTouchEnd}
-                          className={SLIDER_STYLES}
+                          formatValue={formatTasteValue}
+                          aria-label={dimension.label}
                         />
                       </div>
                     );

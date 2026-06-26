@@ -1709,31 +1709,31 @@ function parseBrewingNoteText(text: string): BrewingNote | null {
 
   // 提取风味评分
   if (text.includes('风味评分:')) {
-    const acidityMatch = text.match(/酸度:\s*(\d+)\/5/);
+    const acidityMatch = text.match(/酸度:\s*(\d+(?:\.\d+)?)\/5/);
     if (acidityMatch && acidityMatch[1]) {
-      note.taste.acidity = parseInt(acidityMatch[1]);
+      note.taste.acidity = parseFloat(acidityMatch[1]);
     }
 
-    const sweetnessMatch = text.match(/甜度:\s*(\d+)\/5/);
+    const sweetnessMatch = text.match(/甜度:\s*(\d+(?:\.\d+)?)\/5/);
     if (sweetnessMatch && sweetnessMatch[1]) {
-      note.taste.sweetness = parseInt(sweetnessMatch[1]);
+      note.taste.sweetness = parseFloat(sweetnessMatch[1]);
     }
 
-    const bitternessMatch = text.match(/苦度:\s*(\d+)\/5/);
+    const bitternessMatch = text.match(/苦度:\s*(\d+(?:\.\d+)?)\/5/);
     if (bitternessMatch && bitternessMatch[1]) {
-      note.taste.bitterness = parseInt(bitternessMatch[1]);
+      note.taste.bitterness = parseFloat(bitternessMatch[1]);
     }
 
-    const bodyMatch = text.match(/醇厚度:\s*(\d+)\/5/);
+    const bodyMatch = text.match(/醇厚度:\s*(\d+(?:\.\d+)?)\/5/);
     if (bodyMatch && bodyMatch[1]) {
-      note.taste.body = parseInt(bodyMatch[1]);
+      note.taste.body = parseFloat(bodyMatch[1]);
     }
   }
 
   // 提取综合评分
-  const ratingMatch = text.match(/综合评分:\s*(\d+)\/5/);
+  const ratingMatch = text.match(/综合评分:\s*(\d+(?:\.\d+)?)\/5/);
   if (ratingMatch && ratingMatch[1]) {
-    note.rating = parseInt(ratingMatch[1]);
+    note.rating = parseFloat(ratingMatch[1]);
   }
 
   // 提取笔记

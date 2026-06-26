@@ -39,6 +39,26 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
     [updateSettings]
   );
 
+  const handleHalfStepChange = React.useCallback(
+    async (checked: boolean) => {
+      await updateSettings({
+        flavorRatingHalfStep: checked,
+        ...(checked ? { flavorRatingTenthStep: false } : {}),
+      });
+    },
+    [updateSettings]
+  );
+
+  const handleTenthStepChange = React.useCallback(
+    async (checked: boolean) => {
+      await updateSettings({
+        flavorRatingTenthStep: checked,
+        ...(checked ? { flavorRatingHalfStep: false } : {}),
+      });
+    },
+    [updateSettings]
+  );
+
   // 控制动画状态
   const [isVisible, setIsVisible] = React.useState(false);
 
@@ -143,7 +163,11 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
         {(settings.showOverallRatingInForm ?? true) && (
           <SettingRow label="使用滑块评分" isSubSetting isLast>
             <SettingToggle
-              checked={settings.overallRatingUseSlider ?? false}
+              checked={
+                (settings.overallRatingUseSlider ?? false) ||
+                (settings.flavorRatingTenthStep ?? false)
+              }
+              disabled={settings.flavorRatingTenthStep ?? false}
               onChange={checked =>
                 handleChange('overallRatingUseSlider', checked)
               }
@@ -171,10 +195,17 @@ const NoteSettings: React.FC<NoteSettingsProps> = ({
             <>
               <SettingRow label="半分制" isSubSetting>
                 <SettingToggle
-                  checked={settings.flavorRatingHalfStep ?? false}
-                  onChange={checked =>
-                    handleChange('flavorRatingHalfStep', checked)
+                  checked={
+                    (settings.flavorRatingHalfStep ?? false) &&
+                    !(settings.flavorRatingTenthStep ?? false)
                   }
+                  onChange={handleHalfStepChange}
+                />
+              </SettingRow>
+              <SettingRow label="十分位制" isSubSetting>
+                <SettingToggle
+                  checked={settings.flavorRatingTenthStep ?? false}
+                  onChange={handleTenthStepChange}
                 />
               </SettingRow>
               <SettingRow label="初始值跟随总评" isSubSetting isLast>

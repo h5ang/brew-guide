@@ -826,9 +826,11 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
         !userModifiedFlavorRatingsRef.current;
 
       if (shouldSyncFlavor && flavorDimensions.length > 0) {
-        // 将总评(0-5, step 0.5)映射到风味评分
-        // 如果开启半星精度，保留0.5；否则向下取整
-        const syncedFlavorValue = settings?.flavorRatingHalfStep
+        // 将总评(0-5)映射到风味评分
+        // 如果开启小数精度，保留小数；否则向下取整
+        const shouldPreserveFlavorDecimals =
+          settings?.flavorRatingHalfStep || settings?.flavorRatingTenthStep;
+        const syncedFlavorValue = shouldPreserveFlavorDecimals
           ? value
           : Math.floor(value);
 
@@ -1640,7 +1642,9 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
               className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-sm font-medium text-neutral-600 dark:bg-neutral-800/40 dark:text-neutral-400"
             >
               {dim.label}&nbsp;
-              {settings?.flavorRatingHalfStep ? value.toFixed(1) : value}
+              {settings?.flavorRatingHalfStep || settings?.flavorRatingTenthStep
+                ? value.toFixed(1)
+                : value}
             </span>
           );
         })}
@@ -2058,6 +2062,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
         onTasteChange={handleTasteChange}
         displayDimensions={displayDimensions}
         halfStep={settings?.flavorRatingHalfStep}
+        tenthStep={settings?.flavorRatingTenthStep}
         beanName={getCoffeeBeanDisplayName()}
         showOverallRating={true}
         showFlavorRating={settings?.showFlavorRatingInForm ?? true}
