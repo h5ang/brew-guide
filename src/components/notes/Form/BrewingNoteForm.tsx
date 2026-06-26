@@ -122,7 +122,6 @@ interface BrewingNoteFormProps {
   isCopy?: boolean; // 标记是否是复制操作
   // 快捷记录模式相关
   isQuickMode?: boolean;
-  onQuickModeChange?: (isQuick: boolean) => void;
   onDraftChange?: (draft: BrewingNoteDraftData) => void;
   syncInitialDataChanges?: boolean;
 }
@@ -195,7 +194,6 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
   settings,
   isCopy = false, // 默认不是复制操作
   isQuickMode: externalIsQuickMode,
-  onQuickModeChange,
   onDraftChange,
   syncInitialDataChanges = true,
 }) => {
@@ -787,60 +785,18 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
   // 判断是否是容量调整记录编辑模式
   const isCapacityAdjustmentEdit =
     !isAdding && initialData.source === 'capacity-adjustment';
+  const isChangeRecordEdit = isQuickDecrementEdit || isCapacityAdjustmentEdit;
 
   // 跟踪当前是否处于快捷记录模式（用于切换按钮）
   // 优先使用外部传入的状态，否则使用内部状态
-  const [internalIsQuickMode, setInternalIsQuickMode] =
-    useState(isQuickDecrementEdit);
+  const [internalIsQuickMode] = useState(isChangeRecordEdit);
   const isQuickMode =
     externalIsQuickMode !== undefined
       ? externalIsQuickMode
       : internalIsQuickMode;
 
   // 判断是否应该隐藏图片功能（仅在变动记录/快捷扣除记录的快捷模式下隐藏）
-  const shouldHideImage =
-    (isCapacityAdjustmentEdit || isQuickDecrementEdit) && isQuickMode;
-
-  // 切换模式的处理函数
-  const handleToggleQuickMode = useCallback(() => {
-    const newMode = !isQuickMode;
-    if (onQuickModeChange) {
-      onQuickModeChange(newMode);
-    } else {
-      setInternalIsQuickMode(newMode);
-    }
-  }, [isQuickMode, onQuickModeChange]);
-
-  // 暴露切换函数和状态给父组件
-  useEffect(() => {
-    if (isQuickDecrementEdit) {
-      // 通知父组件这是快捷扣除记录
-      window.dispatchEvent(
-        new CustomEvent('brewingNoteFormMounted', {
-          detail: {
-            isQuickDecrementEdit,
-            isQuickMode,
-            noteId: id,
-          },
-        })
-      );
-    }
-  }, [isQuickDecrementEdit, isQuickMode, id]);
-
-  // 监听外部的切换请求
-  useEffect(() => {
-    const handleToggleRequest = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail?.noteId === id) {
-        handleToggleQuickMode();
-      }
-    };
-
-    window.addEventListener('toggleQuickMode', handleToggleRequest);
-    return () => {
-      window.removeEventListener('toggleQuickMode', handleToggleRequest);
-    };
-  }, [id, handleToggleQuickMode]);
+  const shouldHideImage = isChangeRecordEdit && isQuickMode;
 
   // 自适应 textarea 高度
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1149,6 +1105,19 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
           ? `${parseFloat(quickDecrementAmount) || 0}g`
           : methodParams.coffee
       );
+      const getInitialCoffeeAmount = () => {
+        const quickAmount = Number(initialData.quickDecrementAmount);
+        if (
+          initialData.source === 'quick-decrement' &&
+          Number.isFinite(quickAmount)
+        ) {
+          return quickAmount;
+        }
+
+        return CapacitySyncManager.extractCoffeeAmount(
+          initialData.params?.coffee || '0g'
+        );
+      };
 
       if (isQuickDecrementOnly) {
         if (!selectedCoffeeBean) {
@@ -1246,10 +1215,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
 
             if (beanChanged) {
               // 咖啡豆发生变化，需要处理双向容量同步
-              const originalCoffeeAmount =
-                CapacitySyncManager.extractCoffeeAmount(
-                  initialData.params?.coffee || '0g'
-                );
+              const originalCoffeeAmount = getInitialCoffeeAmount();
 
               // 恢复原咖啡豆的剩余量（如果原来有关联的咖啡豆）
               if (originalBeanId && originalCoffeeAmount > 0) {
@@ -1265,9 +1231,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
               }
             } else if (originalBeanId) {
               // 咖啡豆没有变化，但可能咖啡用量发生了变化
-              const oldCoffeeAmount = CapacitySyncManager.extractCoffeeAmount(
-                initialData.params?.coffee || '0g'
-              );
+              const oldCoffeeAmount = getInitialCoffeeAmount();
               const amountDiff = currentCoffeeAmount - oldCoffeeAmount;
 
               if (Math.abs(amountDiff) > 0.01) {
@@ -1299,6 +1263,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
       const finalMethod = normalizedSelection.method;
       const finalParams = normalizeBrewingNoteParams(methodParams);
       const finalTotalTime = parseFloat(totalTimeStr);
+      const noteBeanId = finalBeanId ?? initialData.beanId;
 
       if (isQuickDecrementOnly && deductedCoffeeAmount <= 0) {
         alert('扣除失败，请重试');
@@ -1320,7 +1285,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
         finalTaste = {};
       }
 
-      const isConvertingToNormal = isQuickDecrementEdit && !isQuickMode;
+      const isConvertingToNormal = isChangeRecordEdit && !isQuickMode;
       const preservedSource = isQuickDecrementOnly
         ? 'quick-decrement'
         : isConvertingToNormal
@@ -1363,7 +1328,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
         ...(noteParams && { params: noteParams }),
         ...(finalTotalTime > 0 && { totalTime: finalTotalTime }),
         // 使用最终确定的咖啡豆ID（可能是新建的或已有的）
-        beanId: finalBeanId,
+        beanId: noteBeanId,
         ...(preservedSource && { source: preservedSource }),
         ...(preservedChangeRecord && { changeRecord: preservedChangeRecord }),
         ...(preservedSource === 'quick-decrement' && {
@@ -1379,6 +1344,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
       // 容量调整记录：同步 changeRecord 与显示的调整量
       if (
         isCapacityAdjustmentEdit &&
+        !isConvertingToNormal &&
         preservedChangeRecord?.capacityAdjustment
       ) {
         if (!noteData.params) {
@@ -1406,6 +1372,46 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
           },
         };
         noteData.params.coffee = `${amount}g`;
+
+        const previousChange =
+          preservedChangeRecord.capacityAdjustment.changeAmount;
+        if (Number.isFinite(previousChange)) {
+          const { applyCapacityAdjustmentDelta } =
+            await import('@/lib/coffee-beans/capacityAdjustment');
+
+          if (initialData.beanId !== noteBeanId) {
+            await applyCapacityAdjustmentDelta(
+              initialData.beanId,
+              -previousChange
+            );
+            await applyCapacityAdjustmentDelta(noteBeanId, signedChange);
+          } else {
+            await applyCapacityAdjustmentDelta(
+              noteBeanId,
+              signedChange - previousChange
+            );
+          }
+        }
+      }
+
+      if (isCapacityAdjustmentEdit && isConvertingToNormal) {
+        const previousChange =
+          initialData.changeRecord?.capacityAdjustment?.changeAmount;
+        if (
+          typeof previousChange === 'number' &&
+          Number.isFinite(previousChange)
+        ) {
+          const { applyCapacityAdjustmentDelta } =
+            await import('@/lib/coffee-beans/capacityAdjustment');
+          await applyCapacityAdjustmentDelta(
+            initialData.beanId,
+            -previousChange
+          );
+        }
+
+        if (noteBeanId && currentCoffeeAmount > 0) {
+          await updateBeanRemaining(noteBeanId, currentCoffeeAmount);
+        }
       }
 
       // 如果是快捷扣除记录且处于快捷模式，同步更新 params.coffee 字段
@@ -1892,8 +1898,8 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
             </div>
           )}
 
-          {/* 容量调整量 - 仅容量调整记录显示 */}
-          {isCapacityAdjustmentEdit && (
+          {/* 容量调整量 - 仅容量调整记录快捷模式显示 */}
+          {isCapacityAdjustmentEdit && isQuickMode && (
             <div className="border-b border-neutral-200/50 py-3 dark:border-neutral-800/50">
               <div className="flex items-center">
                 <span className="shrink-0 text-sm font-medium text-neutral-600 dark:text-neutral-400">
@@ -1939,8 +1945,7 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
 
           {/* 器具方案 - 编辑模式且非快捷模式时显示 */}
           {!isAdding &&
-            !isCapacityAdjustmentEdit &&
-            (!isQuickDecrementEdit || !isQuickMode) &&
+            (!isChangeRecordEdit || !isQuickMode) &&
             (initialData?.id || selectedEquipment) && (
               <FeatureListItem
                 label="器具方案"
@@ -1951,17 +1956,15 @@ const BrewingNoteForm: React.FC<BrewingNoteFormProps> = ({
             )}
 
           {/* 评分（合并风味评分和总体评分） - 非快捷模式时显示 */}
-          {showRatingSection &&
-            !isCapacityAdjustmentEdit &&
-            (!isQuickDecrementEdit || !isQuickMode) && (
-              <FeatureListItem
-                label="评分"
-                value={getOverallRatingDisplay()}
-                onClick={() => setShowRatingDrawer(true)}
-                preview={getFlavorRatingPreview()}
-                isLast={true}
-              />
-            )}
+          {showRatingSection && (!isChangeRecordEdit || !isQuickMode) && (
+            <FeatureListItem
+              label="评分"
+              value={getOverallRatingDisplay()}
+              onClick={() => setShowRatingDrawer(true)}
+              preview={getFlavorRatingPreview()}
+              isLast={true}
+            />
+          )}
         </div>
 
         {/* 保存按钮 */}

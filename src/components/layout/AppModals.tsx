@@ -47,7 +47,10 @@ import DeleteConfirmDrawer from '@/components/common/ui/DeleteConfirmDrawer';
 import ConfirmDrawer from '@/components/common/ui/ConfirmDrawer';
 import ImageViewer from '@/components/common/ui/ImageViewer';
 import type { ImageViewerPayload } from '@/lib/ui/imageViewer';
-import { createCapacityAdjustmentRecordIfNeeded } from '@/lib/coffee-beans/capacityAdjustment';
+import {
+  createCapacityAdjustmentRecordIfNeeded,
+  revertCapacityAdjustmentRecord,
+} from '@/lib/coffee-beans/capacityAdjustment';
 import RescueModeDrawer from '@/components/layout/RescueModeDrawer';
 
 interface ExtendedCoffeeBean extends CoffeeBean {
@@ -1115,57 +1118,7 @@ const AppModals: React.FC<AppModalsProps> = ({
                   }
                   return;
                 } else if (noteToDelete.source === 'capacity-adjustment') {
-                  const beanId = noteToDelete.beanId;
-                  const capacityAdjustment =
-                    noteToDelete.changeRecord?.capacityAdjustment;
-
-                  if (beanId && capacityAdjustment) {
-                    const changeAmount = capacityAdjustment.changeAmount;
-                    if (
-                      typeof changeAmount === 'number' &&
-                      !isNaN(changeAmount) &&
-                      changeAmount !== 0
-                    ) {
-                      const { getCoffeeBeanStore } =
-                        await import('@/lib/stores/coffeeBeanStore');
-                      const store = getCoffeeBeanStore();
-                      const currentBean = store.getBeanById(beanId);
-                      if (currentBean) {
-                        const currentRemaining = parseFloat(
-                          currentBean.remaining || '0'
-                        );
-                        const restoredRemaining =
-                          currentRemaining - changeAmount;
-                        let finalRemaining = Math.max(0, restoredRemaining);
-
-                        if (currentBean.capacity) {
-                          const totalCapacity = parseFloat(
-                            currentBean.capacity
-                          );
-                          if (!isNaN(totalCapacity) && totalCapacity > 0) {
-                            finalRemaining = Math.min(
-                              finalRemaining,
-                              totalCapacity
-                            );
-                          }
-                        }
-
-                        const formattedRemaining = Number.isInteger(
-                          finalRemaining
-                        )
-                          ? finalRemaining.toString()
-                          : finalRemaining.toFixed(1);
-                        await store.updateBean(beanId, {
-                          remaining: formattedRemaining,
-                        });
-                      }
-                    }
-                  } else {
-                    console.warn('无效的 beanId 或 capacityAdjustment:', {
-                      beanId,
-                      capacityAdjustment,
-                    });
-                  }
+                  await revertCapacityAdjustmentRecord(noteToDelete);
                 } else {
                   const {
                     extractCoffeeAmountFromNote,

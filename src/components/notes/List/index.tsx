@@ -82,6 +82,7 @@ import {
   type NotesTableColumnKey,
 } from './tableColumns';
 import { useBrewingNoteImageCounts } from '@/lib/hooks/useBrewingNoteImages';
+import { revertCapacityAdjustmentRecord } from '@/lib/coffee-beans/capacityAdjustment';
 
 const NOTES_TABLE_COLUMNS_STORAGE_KEY = 'notes-table-visible-columns';
 
@@ -611,48 +612,7 @@ const BrewingHistory: React.FC<BrewingHistoryProps> = ({
       // 恢复咖啡豆容量（根据笔记类型采用不同的恢复策略）
       try {
         if (noteToDelete.source === 'capacity-adjustment') {
-          // 处理容量调整记录的恢复（简化版本）
-          const beanId = noteToDelete.beanId;
-          const capacityAdjustment =
-            noteToDelete.changeRecord?.capacityAdjustment;
-
-          if (beanId && capacityAdjustment) {
-            const changeAmount = capacityAdjustment.changeAmount;
-            if (
-              typeof changeAmount === 'number' &&
-              !isNaN(changeAmount) &&
-              changeAmount !== 0
-            ) {
-              const { getCoffeeBeanStore } =
-                await import('@/lib/stores/coffeeBeanStore');
-
-              // 获取当前咖啡豆信息
-              const store = getCoffeeBeanStore();
-              const currentBean = store.getBeanById(beanId);
-              if (currentBean) {
-                const currentRemaining = parseFloat(
-                  currentBean.remaining || '0'
-                );
-                const restoredRemaining = currentRemaining - changeAmount; // 反向操作
-                let finalRemaining = Math.max(0, restoredRemaining);
-
-                // 确保不超过总容量
-                if (currentBean.capacity) {
-                  const totalCapacity = parseFloat(currentBean.capacity);
-                  if (!isNaN(totalCapacity) && totalCapacity > 0) {
-                    finalRemaining = Math.min(finalRemaining, totalCapacity);
-                  }
-                }
-
-                const formattedRemaining = Number.isInteger(finalRemaining)
-                  ? finalRemaining.toString()
-                  : finalRemaining.toFixed(1);
-                await store.updateBean(beanId, {
-                  remaining: formattedRemaining,
-                });
-              }
-            }
-          }
+          await revertCapacityAdjustmentRecord(noteToDelete);
         } else {
           // 处理快捷扣除记录和普通笔记的恢复
           const { extractCoffeeAmountFromNote, getNoteAssociatedBeanId } =

@@ -1,6 +1,10 @@
 import type { CoffeeBean } from '@/types/app';
 import type { BrewingNote } from '@/lib/core/config';
 import { useBrewingNoteStore } from '@/lib/stores/brewingNoteStore';
+import {
+  increaseBeanRemaining,
+  updateBeanRemaining,
+} from '@/lib/stores/coffeeBeanStore';
 
 const AMOUNT_REGEX = /\d+(?:\.\d+)?/;
 const NEGATIVE_AMOUNT_REGEX = /-\s*\d/;
@@ -105,4 +109,25 @@ export async function createCapacityAdjustmentRecordIfNeeded(
   }
 
   return createCapacityAdjustmentRecord(bean, originalAmount, newAmount);
+}
+
+export async function applyCapacityAdjustmentDelta(
+  beanId: string | undefined,
+  delta: number
+): Promise<CoffeeBean | null> {
+  if (!beanId || !Number.isFinite(delta)) return null;
+  if (Math.abs(delta) < MIN_CAPACITY_CHANGE) return null;
+
+  return delta > 0
+    ? increaseBeanRemaining(beanId, delta)
+    : updateBeanRemaining(beanId, Math.abs(delta));
+}
+
+export async function revertCapacityAdjustmentRecord(
+  note: Pick<BrewingNote, 'beanId' | 'changeRecord'>
+): Promise<CoffeeBean | null> {
+  const changeAmount = note.changeRecord?.capacityAdjustment?.changeAmount;
+  return typeof changeAmount === 'number' && Number.isFinite(changeAmount)
+    ? applyCapacityAdjustmentDelta(note.beanId, -changeAmount)
+    : null;
 }

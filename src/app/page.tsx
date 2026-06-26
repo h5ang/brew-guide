@@ -125,7 +125,10 @@ import {
   getConnectedManualSyncProvider,
   isPullToSyncEnabled,
 } from '@/lib/sync/settings';
-import { createCapacityAdjustmentRecordIfNeeded } from '@/lib/coffee-beans/capacityAdjustment';
+import {
+  createCapacityAdjustmentRecordIfNeeded,
+  revertCapacityAdjustmentRecord,
+} from '@/lib/coffee-beans/capacityAdjustment';
 
 // 为Window对象声明类型扩展
 declare global {
@@ -4559,59 +4562,7 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
                           } else if (
                             noteToDelete.source === 'capacity-adjustment'
                           ) {
-                            const beanId = noteToDelete.beanId;
-                            const capacityAdjustment =
-                              noteToDelete.changeRecord?.capacityAdjustment;
-
-                            if (beanId && capacityAdjustment) {
-                              const changeAmount =
-                                capacityAdjustment.changeAmount;
-                              if (
-                                typeof changeAmount === 'number' &&
-                                !isNaN(changeAmount) &&
-                                changeAmount !== 0
-                              ) {
-                                const { getCoffeeBeanStore } =
-                                  await import('@/lib/stores/coffeeBeanStore');
-                                const store = getCoffeeBeanStore();
-                                const currentBean = store.getBeanById(beanId);
-                                if (currentBean) {
-                                  const currentRemaining = parseFloat(
-                                    currentBean.remaining || '0'
-                                  );
-                                  const restoredRemaining =
-                                    currentRemaining - changeAmount;
-                                  let finalRemaining = Math.max(
-                                    0,
-                                    restoredRemaining
-                                  );
-
-                                  if (currentBean.capacity) {
-                                    const totalCapacity = parseFloat(
-                                      currentBean.capacity
-                                    );
-                                    if (
-                                      !isNaN(totalCapacity) &&
-                                      totalCapacity > 0
-                                    ) {
-                                      finalRemaining = Math.min(
-                                        finalRemaining,
-                                        totalCapacity
-                                      );
-                                    }
-                                  }
-
-                                  const formattedRemaining = Number.isInteger(
-                                    finalRemaining
-                                  )
-                                    ? finalRemaining.toString()
-                                    : finalRemaining.toFixed(1);
-                                  await store.updateBean(beanId, {
-                                    remaining: formattedRemaining,
-                                  });
-                                }
-                              }
-                            }
+                            await revertCapacityAdjustmentRecord(noteToDelete);
                           } else {
                             const {
                               extractCoffeeAmountFromNote,
