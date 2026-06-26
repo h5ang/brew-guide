@@ -12,11 +12,7 @@ import {
 } from './types';
 import { processThermalPrintIcon } from './iconProcessing';
 import { DEFAULT_ICON_PLACEMENT, normalizePrintIconPlacement } from './config';
-import {
-  PRINT_EDITOR_FIELD_LABELS,
-  getPrintFieldOrder,
-  hasPrintFieldContent,
-} from './fields';
+import { PRINT_EDITOR_FIELD_LABELS, getPrintFieldOrder } from './fields';
 import { getResolvedPrintIcon } from './utils';
 import { FieldEditorPanel } from './FieldEditorPanel';
 
@@ -71,10 +67,6 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({
     () => getResolvedPrintIcon(content, roasterIcon),
     [content, roasterIcon]
   );
-  const contentForVisibility = useMemo(
-    () => ({ ...content, icon: resolvedIcon }),
-    [content, resolvedIcon]
-  );
   const activeField =
     selectedField && availableFields.includes(selectedField)
       ? selectedField
@@ -122,35 +114,28 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({
     updateIconPlacement({ size: config.iconPlacement.size + delta });
   };
 
-  const isFieldEmpty = (field: PrintFieldKey): boolean =>
-    !hasPrintFieldContent(field, contentForVisibility, config.template);
-
   const getFieldButtonClass = (field: PrintFieldKey) => {
     const selected = activeField === field;
     const visible = config.fields[field];
-    const filledAndVisible = visible && !isFieldEmpty(field);
-    const stateClass = filledAndVisible
-      ? 'border-neutral-100 opacity-100 dark:border-neutral-800 text-neutral-700 dark:text-neutral-200'
-      : 'border-dashed border-neutral-400 opacity-60 dark:border-neutral-600 text-neutral-500 dark:text-neutral-400';
+    const stateClass = visible
+      ? 'opacity-100 text-neutral-700 dark:text-neutral-200'
+      : 'opacity-50 text-neutral-700 hover:opacity-70 dark:text-neutral-200';
     const selectedClass = selected
-      ? 'border-solid border-neutral-400 opacity-100 dark:border-neutral-500'
-      : '';
+      ? 'border-neutral-400/60 dark:border-neutral-500/60'
+      : 'border-transparent';
     return `${FIELD_BUTTON_BASE_CLASS} ${stateClass} ${selectedClass}`;
   };
 
   const activeVisible = activeField ? config.fields[activeField] : false;
-  const activeFieldEmpty = activeField ? isFieldEmpty(activeField) : true;
   const activeStatusLabel =
     activeField === 'icon' && isIconProcessing
       ? '处理中'
-      : !activeVisible
-        ? '已隐藏'
-        : activeFieldEmpty
-          ? '显示中(缺少内容)'
-          : '显示中';
+      : activeVisible
+        ? '显示中'
+        : '已隐藏';
   const activeStatusButtonClass = activeVisible
-    ? `border-neutral-100 opacity-100 text-neutral-700 dark:border-neutral-800 dark:text-neutral-200 ${SOFT_BUTTON_CLASS}`
-    : `border-dashed border-neutral-400 opacity-60 text-neutral-600 dark:border-neutral-500 dark:text-neutral-300 ${SOFT_BUTTON_CLASS}`;
+    ? `border-transparent opacity-100 text-neutral-700 dark:text-neutral-200 ${SOFT_BUTTON_CLASS}`
+    : `border-transparent opacity-60 text-neutral-700 hover:opacity-80 dark:text-neutral-200 ${SOFT_BUTTON_CLASS}`;
 
   return (
     <div className="space-y-3">

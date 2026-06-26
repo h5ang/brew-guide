@@ -81,12 +81,12 @@ export const SizeSettings: React.FC<SizeSettingsProps> = ({
               type="button"
               onClick={() => !editMode && onSelectSize(size.width, size.height)}
               disabled={editMode}
-              className={`rounded px-3 py-2 text-xs font-medium transition-all ${
+              className={`rounded-[3px] bg-neutral-100 px-3 py-2 text-xs font-medium text-neutral-700 transition-all hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 ${
                 config.width === size.width &&
                 config.height === size.height &&
                 !editMode
-                  ? 'bg-neutral-800 text-white dark:bg-neutral-700'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700'
+                  ? 'opacity-100'
+                  : 'opacity-50 hover:opacity-70'
               } ${editMode ? 'pr-7' : ''}`}
             >
               {size.label}
