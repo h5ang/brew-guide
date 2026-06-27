@@ -4,14 +4,12 @@ import React from 'react';
 import { SettingsOptions } from './Settings';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import { useModalHistory, modalHistory } from '@/lib/hooks/useModalHistory';
-import {
-  SettingPage,
-  SettingSection,
-  SettingRow,
-  SettingSelector,
-  SettingSlider,
-  SettingToggle,
-} from './atomic';
+import SettingPage from './atomic/SettingPage';
+import SettingSection from './atomic/SettingSection';
+import SettingRow from './atomic/SettingRow';
+import SettingSelector from './atomic/SettingSelector';
+import SettingSlider from './atomic/SettingSlider';
+import SettingToggle from './atomic/SettingToggle';
 
 import BeanEstimatedCupSection from './BeanEstimatedCupSection';
 import BeanPreview from './BeanPreview';
@@ -41,6 +39,13 @@ const BeanSettings: React.FC<BeanSettingsProps> = ({
       await updateSettings({ [key]: value } as any);
     },
     [updateSettings]
+  );
+
+  const handleBeanRatingTenthStepChange = React.useCallback(
+    (checked: boolean) => {
+      handleChange('beanRatingTenthStep', checked);
+    },
+    [handleChange]
   );
 
   const [isVisible, setIsVisible] = React.useState(false);
@@ -185,12 +190,20 @@ const BeanSettings: React.FC<BeanSettingsProps> = ({
             onChange={checked => handleChange('enableBeanPrint', checked)}
           />
         </SettingRow>
-        <SettingRow label="评分" isLast>
+        <SettingRow label="评分" isLast={!(settings.showBeanRating || false)}>
           <SettingToggle
             checked={settings.showBeanRating || false}
             onChange={checked => handleChange('showBeanRating', checked)}
           />
         </SettingRow>
+        {(settings.showBeanRating || false) && (
+          <SettingRow label="十分位制" isSubSetting isLast>
+            <SettingToggle
+              checked={settings.beanRatingTenthStep || false}
+              onChange={handleBeanRatingTenthStepChange}
+            />
+          </SettingRow>
+        )}
       </SettingSection>
 
       <SettingSection title="添加">

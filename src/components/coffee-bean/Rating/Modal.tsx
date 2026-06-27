@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { CornerDownRight } from 'lucide-react';
 import { CoffeeBean } from '@/types/app';
 import ActionDrawer from '@/components/common/ui/ActionDrawer';
+import ElasticSlider from '@/components/common/ui/ElasticSlider';
 import { formatBeanDisplayName } from '@/lib/utils/beanVarietyUtils';
 import { useSettingsStore } from '@/lib/stores/settingsStore';
 import DeleteIcon from '@public/images/icons/ui/delete.svg';
@@ -66,6 +67,9 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
   const roasterSeparator = useSettingsStore(
     state => state.settings.roasterSeparator
   );
+  const beanRatingTenthStep = useSettingsStore(
+    state => state.settings.beanRatingTenthStep ?? false
+  );
   const [beanType, setBeanType] = useState<'espresso' | 'filter' | 'omni'>(
     'filter'
   );
@@ -103,6 +107,10 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
     }
   }, [coffeeBean]);
 
+  const formatRatingValue = React.useCallback((value: number) => {
+    return value.toFixed(1);
+  }, []);
+
   const handleDrawerClose = () => {
     setDeleteConfirmingBeanId(null);
     onClose();
@@ -113,7 +121,9 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
 
     const ratings: Partial<CoffeeBean> = {
       beanType,
-      overallRating,
+      overallRating: beanRatingTenthStep
+        ? Number(overallRating.toFixed(1))
+        : overallRating,
       ratingNotes: ratingNotes.trim() || undefined,
     };
 
@@ -198,37 +208,52 @@ const CoffeeBeanRatingModal: React.FC<CoffeeBeanRatingModalProps> = ({
                 </span>
                 评分
               </p>
-              <div className="flex justify-between" data-vaul-no-drag>
-                {[1, 2, 3, 4, 5].map(star => {
-                  const isHalf = overallRating === star - 0.5;
-                  const isFull = star <= overallRating;
-                  return (
-                    <motion.button
-                      key={star}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() =>
-                        setOverallRating(
-                          overallRating === star ? star - 0.5 : star
-                        )
-                      }
-                      className="cursor-pointer p-2"
-                    >
-                      <StarIcon
-                        halfClass={
-                          isHalf
-                            ? 'text-neutral-200 dark:text-neutral-700'
-                            : undefined
+              {beanRatingTenthStep ? (
+                <div data-vaul-no-drag>
+                  <ElasticSlider
+                    label="评分"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    value={overallRating}
+                    onValueChange={setOverallRating}
+                    formatValue={formatRatingValue}
+                    aria-label="评分"
+                  />
+                </div>
+              ) : (
+                <div className="flex justify-between" data-vaul-no-drag>
+                  {[1, 2, 3, 4, 5].map(star => {
+                    const isHalf = overallRating === star - 0.5;
+                    const isFull = star <= overallRating;
+                    return (
+                      <motion.button
+                        key={star}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() =>
+                          setOverallRating(
+                            overallRating === star ? star - 0.5 : star
+                          )
                         }
-                        className={`h-8 w-8 ${
-                          isFull || isHalf
-                            ? 'text-amber-400'
-                            : 'text-neutral-200 dark:text-neutral-700'
-                        }`}
-                      />
-                    </motion.button>
-                  );
-                })}
-              </div>
+                        className="cursor-pointer p-2"
+                      >
+                        <StarIcon
+                          halfClass={
+                            isHalf
+                              ? 'text-neutral-200 dark:text-neutral-700'
+                              : undefined
+                          }
+                          className={`h-8 w-8 ${
+                            isFull || isHalf
+                              ? 'text-amber-400'
+                              : 'text-neutral-200 dark:text-neutral-700'
+                          }`}
+                        />
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="mt-4 mb-8 flex flex-col gap-3">
               <p className="font-medium text-neutral-500 dark:text-neutral-400">
