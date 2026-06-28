@@ -31,6 +31,7 @@ export {
   shouldAcceptRemoteChange,
   extractTimestamp,
   getLastSyncTime,
+  hydrateLastSyncTime,
   setLastSyncTime,
   isModifiedAfterSync,
 } from './conflictResolver';

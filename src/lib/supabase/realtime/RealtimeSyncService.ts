@@ -41,7 +41,7 @@ import {
   type SyncOperationResult,
 } from '../syncOperations';
 import { offlineQueue } from './offlineQueue';
-import { getLastSyncTime, setLastSyncTime } from './conflictResolver';
+import { hydrateLastSyncTime, setLastSyncTime } from './conflictResolver';
 import { InitialSyncManager } from './InitialSyncManager';
 import {
   localChangeListener,
@@ -294,9 +294,10 @@ export class RealtimeSyncService {
 
       // 后台执行初始同步
       console.log('[RealtimeSync] 连接成功，开始后台初始同步...');
+      const lastSyncTime = await hydrateLastSyncTime();
       void this.performBackgroundSync(
         config.enableOfflineQueue !== false,
-        getLastSyncTime() === 0 ? 'initial-sync' : 'background-sync'
+        lastSyncTime === 0 ? 'initial-sync' : 'background-sync'
       );
 
       return true;

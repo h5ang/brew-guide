@@ -16,21 +16,66 @@ import type { SyncableRecord, ConflictResolution, CloudRecord } from './types';
 // 本地同步时间戳存储键
 const LAST_SYNC_TIME_KEY = 'brew-guide:realtime-sync:lastSyncTime';
 
+function parseStoredSyncTime(value: string | null): number {
+  if (!value) return 0;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+async function persistLastSyncTimeBackup(value: string): Promise<void> {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    await Preferences.set({ key: LAST_SYNC_TIME_KEY, value });
+  } catch (error) {
+    console.warn('[ConflictResolver] 备份 lastSyncTime 失败:', error);
+  }
+}
+
 /**
  * 获取上次同步时间
  */
 export function getLastSyncTime(): number {
   if (typeof window === 'undefined') return 0;
   const stored = localStorage.getItem(LAST_SYNC_TIME_KEY);
-  return stored ? parseInt(stored, 10) : 0;
+  return parseStoredSyncTime(stored);
+}
+
+/**
+ * 从更稳定的 Preferences 备份恢复同步时间。
+ *
+ * Capacitor WebView 下 localStorage 偶尔会被清理；同步基准丢失会让应用
+ * 把下一轮同步当作首次同步，从而重复扫描/上传大量本地记录。
+ */
+export async function hydrateLastSyncTime(): Promise<number> {
+  const localSyncTime = getLastSyncTime();
+  if (localSyncTime > 0) return localSyncTime;
+
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    const { value } = await Preferences.get({ key: LAST_SYNC_TIME_KEY });
+    const backupSyncTime = parseStoredSyncTime(value);
+
+    if (backupSyncTime > 0 && typeof window !== 'undefined') {
+      localStorage.setItem(LAST_SYNC_TIME_KEY, String(backupSyncTime));
+    }
+
+    return backupSyncTime;
+  } catch (error) {
+    console.warn('[ConflictResolver] 恢复 lastSyncTime 失败:', error);
+    return 0;
+  }
 }
 
 /**
  * 设置上次同步时间
  */
 export function setLastSyncTime(time: number): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LAST_SYNC_TIME_KEY, String(time));
+  const value = String(time);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(LAST_SYNC_TIME_KEY, value);
+  }
+  void persistLastSyncTimeBackup(value);
 }
 
 /**
@@ -132,23 +177,11 @@ export function batchResolveConflicts<T extends SyncableRecord>(
     const localTime = extractTimestamp(local);
 
     if (!remote) {
-      // 本地有，云端没有
-      // 修复 (2025-12-24): 防止误删本地数据
-      // 之前的逻辑是：如果 localTime <= lastSyncTime，则认为是云端物理删除，从而删除本地数据。
-      // 但这会导致严重 Bug：如果用户清空了云端库（或切换了库），但本地保留了旧的 lastSyncTime，
-      // 再次同步时会导致本地数据被全部清空。
-      //
-      // 新策略：只要云端没有记录（且没有 tombstone），我们就假设它是需要上传的数据。
-      // 即使这会导致“复活”一些真正被物理删除的数据，也比误删用户数据要安全得多。
-
-      if (lastSyncTime > 0 && localTime <= lastSyncTime) {
-        console.log(
-          `[Conflict] ${local.id}: 本地旧数据(${localTime} <= ${lastSyncTime})且云端缺失 -> 重新上传 (防止误删)`
-        );
-      }
-
       merged.push(local);
-      toUpload.push(local);
+      // 已同步过的旧本地记录不因云端索引缺失而反复重传。
+      if (lastSyncTime === 0 || localTime > lastSyncTime) {
+        toUpload.push(local);
+      }
     } else if (remote.deleted_at) {
       // 云端已删除（有 deleted_at 标记）
       const deleteTime = new Date(remote.deleted_at).getTime();

@@ -27,7 +27,7 @@ import {
 } from '../syncOperations';
 import {
   batchResolveConflicts,
-  getLastSyncTime,
+  hydrateLastSyncTime,
   setLastSyncTime,
   extractTimestamp,
 } from './conflictResolver';
@@ -462,7 +462,7 @@ export class InitialSyncManager {
     if (this.aborted) return emptyStats;
 
     const startTime = Date.now();
-    const lastSyncTime = getLastSyncTime();
+    const lastSyncTime = await hydrateLastSyncTime();
 
     console.log(
       `[InitialSync] 开始同步, lastSync=${lastSyncTime ? new Date(lastSyncTime).toLocaleString() : '首次'}`
@@ -670,6 +670,10 @@ export class InitialSyncManager {
       if (remoteMetaRecords.length > 0) {
         console.log(
           `[InitialSync] ${table} 拉取到 ${remoteMetaRecords.length} 条元数据`
+        );
+      } else if (localRecords.length > 0) {
+        console.warn(
+          `[InitialSync] ${table} 本地有 ${localRecords.length} 条记录，但云端索引为 0。若不是首次同步或空云端，可能是 Supabase SELECT/RLS/Data API 配置导致客户端读不到已上传数据。`
         );
       }
 
@@ -1253,7 +1257,7 @@ export class InitialSyncManager {
         detail: '检查云端设置',
       });
 
-      const lastSyncTime = getLastSyncTime();
+      const lastSyncTime = await hydrateLastSyncTime();
 
       const remoteResult = await withTimeout(
         fetchRemoteLatestTimestamp(this.client, SYNC_TABLES.USER_SETTINGS),
