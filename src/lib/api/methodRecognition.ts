@@ -6,26 +6,16 @@ import {
 } from './shared/recognition';
 
 // 识别冲煮方案图片
-export async function recognizeMethodImage(imageFile: File): Promise<any> {
+export async function recognizeMethodImage(imageFile: File): Promise<unknown> {
   // 验证文件安全性
   validateRecognitionImageFile(imageFile);
 
-  console.log(
-    '📤 准备上传图片:',
-    imageFile.name,
-    '大小:',
-    imageFile.size,
-    'bytes'
-  );
-
   const apiUrl = `${API_CONFIG.baseURL}/api/recognize-method`;
-  console.log('📡 API 地址:', apiUrl);
 
   const formData = new FormData();
   formData.append('image', imageFile);
 
   try {
-    console.log('🔄 开始请求...');
     const response = await fetchWithTimeout(apiUrl, {
       method: 'POST',
       body: formData,
@@ -35,8 +25,6 @@ export async function recognizeMethodImage(imageFile: File): Promise<any> {
       },
       timeoutMs: API_CONFIG.timeoutMs,
     });
-
-    console.log('📥 收到响应，状态码:', response.status);
 
     if (!response.ok) {
       const rawText = await response.text().catch(() => '');
@@ -61,7 +49,6 @@ export async function recognizeMethodImage(imageFile: File): Promise<any> {
     }
 
     const result = await response.json();
-    console.log('✅ 解析响应成功:', result);
 
     if (!result.success) {
       throw new Error(result.error || '识别失败');

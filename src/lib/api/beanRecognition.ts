@@ -314,17 +314,3 @@ export async function testCustomBeanRecognitionConfig(
     throw error;
   }
 }
-
-// 健康检查
-async function checkAPIHealth(): Promise<boolean> {
-  try {
-    const response = await fetchWithTimeout(`${API_CONFIG.baseURL}/health`, {
-      method: 'GET',
-      credentials: 'include',
-      timeoutMs: 5000,
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}

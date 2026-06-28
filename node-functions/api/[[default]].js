@@ -11,6 +11,13 @@ const API_ALLOWED_HEADERS = [
 
 const API_ALLOWED_METHODS = ['GET', 'POST', 'OPTIONS'];
 
+const FIRST_PARTY_APP_ORIGINS = [
+  'https://app',
+  'tauri://localhost',
+  'http://tauri.localhost',
+  'https://tauri.localhost',
+];
+
 const IMAGE_ALLOWED_TYPES = [
   'image/jpeg',
   'image/png',
@@ -69,10 +76,15 @@ function getAllowedOriginsConfig(env) {
   } else {
     parsed = {
       allowAll: false,
-      list: value
-        .split(',')
-        .map(item => item.trim())
-        .filter(Boolean),
+      list: Array.from(
+        new Set([
+          ...value
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean),
+          ...FIRST_PARTY_APP_ORIGINS,
+        ])
+      ),
     };
   }
 
