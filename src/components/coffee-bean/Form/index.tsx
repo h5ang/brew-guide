@@ -202,12 +202,22 @@ const CoffeeBeanForm = forwardRef<CoffeeBeanFormHandle, CoffeeBeanFormProps>(
       Omit<ExtendedCoffeeBean, 'id' | 'timestamp'>
     >(() => {
       const currentSettings = useSettingsStore.getState().settings;
-      return createInitialBeanDraft({
+      const draft = createInitialBeanDraft({
         initialBean,
         initialBeanState,
         roastingSourceBeanId,
         roasterFieldEnabled: !!currentSettings.roasterFieldEnabled,
       });
+
+      if (
+        recognitionImage &&
+        currentSettings.autoFillRecognitionImage &&
+        !draft.image
+      ) {
+        return { ...draft, image: recognitionImage };
+      }
+
+      return draft;
     });
 
     // 定义额外的状态来跟踪风味标签输入
@@ -234,25 +244,6 @@ const CoffeeBeanForm = forwardRef<CoffeeBeanFormHandle, CoffeeBeanFormProps>(
 
     // 烘焙商图标仅用于显示，不存储到咖啡豆数据
     const roasterLogo = useRoasterLogo(roasterLogoName);
-
-    // 自动填充识图图片 - 在表单加载时检查设置，如果开启了自动填充且有识图图片，则自动填充
-    useEffect(() => {
-      // 只要没有图片且有识图图片就自动填充（不管是新建还是编辑）
-      // 因为识图导入后会先保存到数据库再打开表单，此时 initialBean 会有值
-      if (!bean.image && recognitionImage) {
-        // 从 settingsStore 获取设置
-        const settings = useSettingsStore.getState().settings;
-
-        // 检查是否开启了自动填充设置
-        if (settings.autoFillRecognitionImage) {
-          setBean(prev => ({
-            ...prev,
-            image: recognitionImage,
-          }));
-        }
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recognitionImage]); // 只依赖 recognitionImage，避免重复触发
 
     // 自动聚焦输入框
     useEffect(() => {

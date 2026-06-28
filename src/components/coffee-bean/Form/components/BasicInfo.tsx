@@ -444,8 +444,8 @@ const BasicInfo: React.FC<BasicInfoProps> = ({
             </>
           )}
 
-          {/* 识别图片（如果有且无自定义正面图和烘焙商图标） - 点击使用此图片作为正面 */}
-          {recognitionImage && !bean.image && !roasterLogo && (
+          {/* 识别图片（如果有且无自定义正面图） - 点击使用此图片作为正面 */}
+          {recognitionImage && !bean.image && (
             <button
               type="button"
               onClick={() => onBeanChange('image')(recognitionImage)}
