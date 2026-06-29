@@ -122,10 +122,8 @@ import {
   normalizeBrewingNoteSelection,
 } from '@/lib/notes/noteDisplay';
 import { getCommonMethodsForEquipment } from '@/lib/brewing/methodAvailability';
-import {
-  getConnectedManualSyncProvider,
-  isPullToSyncEnabled,
-} from '@/lib/sync/settings';
+import { isPullToSyncEnabled } from '@/lib/sync/settings';
+import { syncService } from '@/lib/sync/UnifiedSyncService';
 import {
   createCapacityAdjustmentRecordIfNeeded,
   revertCapacityAdjustmentRecord,
@@ -2963,69 +2961,26 @@ const PourOverRecipes = ({ initialHasBeans }: { initialHasBeans: boolean }) => {
     message?: string;
   }> => {
     try {
-      const manualProvider = getConnectedManualSyncProvider(
-        settings as SettingsOptions
+      const result = await syncService.sync(
+        settings as SettingsOptions,
+        'upload'
       );
 
-      if (manualProvider === 'none') {
-        return { success: false, message: '云同步未配置' };
-      }
-
-      let connected = false;
-      let result: {
-        success: boolean;
-        uploadedFiles?: number;
-        message?: string;
-      } | null = null;
-
-      if (manualProvider === 's3' && settings.s3Sync?.lastConnectionSuccess) {
-        const { S3SyncManager } = await import('@/lib/s3/syncManagerV2');
-        const cfg = settings.s3Sync;
-        const mgr = new S3SyncManager();
-        connected = await mgr.initialize({
-          region: cfg.region,
-          accessKeyId: cfg.accessKeyId,
-          secretAccessKey: cfg.secretAccessKey,
-          bucketName: cfg.bucketName,
-          prefix: cfg.prefix,
-          endpoint: cfg.endpoint || undefined,
-        });
-        if (connected) {
-          result = await mgr.sync({ preferredDirection: 'upload' });
-        }
-      } else if (
-        manualProvider === 'webdav' &&
-        settings.webdavSync?.lastConnectionSuccess
-      ) {
-        const { WebDAVSyncManager } = await import('@/lib/webdav/syncManager');
-        const cfg = settings.webdavSync;
-        const mgr = new WebDAVSyncManager();
-        connected = await mgr.initialize({
-          url: cfg.url,
-          username: cfg.username,
-          password: cfg.password,
-          remotePath: cfg.remotePath,
-        });
-        if (connected) {
-          result = await mgr.sync({ preferredDirection: 'upload' });
-        }
-      } else {
-        return { success: false, message: '云同步未配置' };
-      }
-
-      if (!connected || !result) {
-        return { success: false, message: '云同步连接失败' };
-      }
-
       if (result.success) {
-        const uploaded = result.uploadedFiles ?? 0;
+        const uploaded = result.uploadedCount ?? 0;
         if (uploaded > 0) {
           return { success: true, message: `已上传 ${uploaded} 项` };
         } else {
           return { success: true, message: '数据已是最新' };
         }
       } else {
-        return { success: false, message: result.message || '上传失败' };
+        return {
+          success: false,
+          message:
+            result.message === '未配置云同步服务'
+              ? '云同步未配置'
+              : result.message || '上传失败',
+        };
       }
     } catch (error) {
       console.error('下拉上传失败:', error);

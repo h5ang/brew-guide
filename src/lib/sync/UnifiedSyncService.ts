@@ -31,7 +31,8 @@ class UnifiedSyncService {
 
   async getManager(
     settings: SettingsOptions,
-    provider: CloudProvider
+    provider: CloudProvider,
+    options: { skipConnectionTest?: boolean } = {}
   ): Promise<ISyncManager | null> {
     if (provider === 'none') return null;
 
@@ -51,7 +52,11 @@ class UnifiedSyncService {
     this.cache?.manager.disconnect();
     this.cache = null;
 
-    const manager = await this.createManager(provider, config);
+    const manager = await this.createManager(
+      provider,
+      config,
+      options.skipConnectionTest === true
+    );
     if (!manager) return null;
 
     this.cache = { provider, manager, hash: configHash };
@@ -98,7 +103,8 @@ class UnifiedSyncService {
 
   private async createManager(
     provider: CloudProvider,
-    config: object
+    config: object,
+    skipConnectionTest: boolean
   ): Promise<ISyncManager | null> {
     switch (provider) {
       // Supabase 使用 RealtimeSyncService 自动同步，不再需要手动同步管理器
@@ -107,13 +113,13 @@ class UnifiedSyncService {
       case 's3': {
         const { S3SyncManager } = await import('@/lib/s3/syncManagerV2');
         const mgr = new S3SyncManager();
-        const ok = await mgr.initialize(config as never);
+        const ok = await mgr.initialize(config as never, skipConnectionTest);
         return ok ? new BaseSyncManagerAdapter('s3', mgr) : null;
       }
       case 'webdav': {
         const { WebDAVSyncManager } = await import('@/lib/webdav/syncManager');
         const mgr = new WebDAVSyncManager();
-        const ok = await mgr.initialize(config as never);
+        const ok = await mgr.initialize(config as never, skipConnectionTest);
         return ok ? new BaseSyncManagerAdapter('webdav', mgr) : null;
       }
       default:
@@ -129,7 +135,9 @@ class UnifiedSyncService {
     const provider = this.getManualProvider(settings);
     if (provider === 'none') return createFailureResult('未配置云同步服务');
 
-    const manager = await this.getManager(settings, provider);
+    const manager = await this.getManager(settings, provider, {
+      skipConnectionTest: true,
+    });
     if (!manager) return createFailureResult('同步服务初始化失败');
 
     return manager.sync({ direction, onProgress } as ISyncOptions);
