@@ -275,7 +275,9 @@ async function migrateGrindersFromLocalStorage(): Promise<Grinder[]> {
  */
 function dispatchGrinderChanged(): void {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('grinderDataChanged'));
+    window.dispatchEvent(
+      new CustomEvent('grinderDataChanged', { detail: { source: 'local' } })
+    );
   }
 }
 

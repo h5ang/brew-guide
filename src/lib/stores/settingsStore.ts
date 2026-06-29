@@ -807,7 +807,7 @@ function dispatchSettingsChanged(settings: AppSettings): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('settingsChanged', {
-        detail: { settings },
+        detail: { source: 'local', settings },
       })
     );
   }

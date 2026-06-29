@@ -49,6 +49,11 @@ export interface UpsertRecordsOptions {
   onProgress?: (uploadedCount: number, totalCount: number) => void;
 }
 
+export interface UploadSettingsDataOptions {
+  /** 内容未变化时跳过 upsert，避免制造无意义的远端更新时间 */
+  skipIfUnchanged?: boolean;
+}
+
 export interface FetchRemoteRecordsByIdsOptions {
   /** 每条记录读取完成后回调 */
   onProgress?: (downloadedCount: number, totalCount: number) => void;
@@ -158,6 +163,140 @@ export const PRESETS_KEYS = [
   'processes',
   'varieties',
 ] as const;
+
+const SETTINGS_SYNC_FINGERPRINT_KEY =
+  'brew-guide:realtime-sync:settingsFingerprint';
+
+function getLocalStorage(): Storage | null {
+  if (typeof localStorage !== 'undefined') return localStorage;
+  if (typeof window !== 'undefined') return window.localStorage;
+  return null;
+}
+
+function normalizeForStableStringify(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeForStableStringify);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const objectValue = value as Record<string, unknown>;
+  return Object.keys(objectValue)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      const normalized = normalizeForStableStringify(objectValue[key]);
+      if (normalized !== undefined) {
+        acc[key] = normalized;
+      }
+      return acc;
+    }, {});
+}
+
+function normalizeSettingsFingerprintData(
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  const normalized = normalizeForStableStringify(data) as Record<
+    string,
+    unknown
+  >;
+  const appSettings = normalized.appSettings as
+    | Record<string, unknown>
+    | undefined;
+  const supabaseSync = appSettings?.supabaseSync as
+    | Record<string, unknown>
+    | undefined;
+
+  if (appSettings && supabaseSync) {
+    const {
+      lastConnectionSuccess: _lastConnectionSuccess,
+      lastSyncTime: _lastSyncTime,
+      ...stableSupabaseSync
+    } = supabaseSync;
+    appSettings.supabaseSync = stableSupabaseSync;
+  }
+
+  return normalized;
+}
+
+export function createSettingsSyncFingerprint(
+  data: Record<string, unknown>
+): string {
+  return JSON.stringify(normalizeSettingsFingerprintData(data));
+}
+
+function getStoredSettingsSyncFingerprint(): string | null {
+  return getLocalStorage()?.getItem(SETTINGS_SYNC_FINGERPRINT_KEY) ?? null;
+}
+
+function persistSettingsSyncFingerprint(fingerprint: string): void {
+  getLocalStorage()?.setItem(SETTINGS_SYNC_FINGERPRINT_KEY, fingerprint);
+}
+
+async function collectLocalSettingsSyncData(): Promise<{
+  data: Record<string, unknown>;
+  dataSections: string[];
+}> {
+  const data: Record<string, unknown> = {};
+  const dataSections: string[] = [];
+
+  // 从 IndexedDB appSettings 表收集设置
+  const appSettingsRecord = await db.appSettings.get('main');
+  if (appSettingsRecord?.data) {
+    data.appSettings = appSettingsRecord.data as AppSettings;
+    dataSections.push('appSettings');
+  }
+
+  // 收集磨豆机数据
+  const grinders = await db.grinders.toArray();
+  if (grinders.length > 0) {
+    data.grinders = grinders;
+    dataSections.push('grinders');
+  }
+
+  // 收集自定义预设（localStorage）
+  const storage = getLocalStorage();
+  if (storage) {
+    const presets: Record<string, unknown> = {};
+    for (const k of PRESETS_KEYS) {
+      const v = storage.getItem(`${PRESETS_PREFIX}${k}`);
+      if (v) {
+        try {
+          presets[k] = JSON.parse(v);
+        } catch {
+          /* 忽略解析错误 */
+        }
+      }
+    }
+    if (Object.keys(presets).length) {
+      data.customPresets = presets;
+      dataSections.push('customPresets');
+    }
+  }
+
+  return { data, dataSections };
+}
+
+async function fetchRemoteSettingsFingerprint(
+  client: SupabaseClient
+): Promise<string | null | undefined> {
+  const { data: row, error } = await client
+    .from(SYNC_TABLES.USER_SETTINGS)
+    .select('data')
+    .eq('user_id', DEFAULT_USER_ID)
+    .eq('id', 'app_settings')
+    .maybeSingle();
+
+  if (error) {
+    if (getErrorField(error, 'code') === 'PGRST116') return null;
+    console.warn('[SyncOps] 检查远端设置指纹失败，继续执行上传:', error);
+    return undefined;
+  }
+
+  const remoteData = (row as { data?: Record<string, unknown> } | null)?.data;
+  return remoteData ? createSettingsSyncFingerprint(remoteData) : null;
+}
 
 // ============================================
 // 核心同步操作
@@ -478,80 +617,35 @@ export async function markRecordsAsDeleted(
 // ============================================
 
 /**
- * 判断本地设置是否只有"同步配置"，没有其他用户数据
- * 用于决定是否应该上传（避免用默认值覆盖云端有效数据）
- *
- * 场景：新设备首次配置 Supabase 同步时，本地只有 supabaseSync 配置，
- * 其他都是默认值。此时不应该上传，否则会覆盖云端的用户数据。
- */
-function shouldSkipUpload(settings: Partial<AppSettings>): boolean {
-  // 检查是否有实际的用户数据（不只是同步配置）
-  const hasUsername = !!settings.username;
-  const hasS3Data =
-    settings.s3Sync?.enabled === true && !!settings.s3Sync?.accessKeyId;
-  const hasWebDAVData =
-    settings.webdavSync?.enabled === true && !!settings.webdavSync?.url;
-
-  // 如果没有 username 且没有 S3/WebDAV 配置，说明这是一个"空"设备
-  // 只有 Supabase 配置（用于连接同步）不算有效数据
-  return !hasUsername && !hasS3Data && !hasWebDAVData;
-}
-
-/**
  * 上传设置数据到云端
  */
 export async function uploadSettingsData(
-  client: SupabaseClient
+  client: SupabaseClient,
+  options: UploadSettingsDataOptions = {}
 ): Promise<SyncOperationResult<number>> {
   const dataSections: string[] = [];
 
   try {
-    const data: Record<string, unknown> = {};
+    const collected = await collectLocalSettingsSyncData();
+    dataSections.push(...collected.dataSections);
+    const { data } = collected;
 
-    // 从 IndexedDB appSettings 表收集设置
-    const appSettingsRecord = await db.appSettings.get('main');
-    if (appSettingsRecord?.data) {
-      const settings = appSettingsRecord.data as AppSettings;
-
-      // 关键检查：如果本地只有同步配置，没有其他用户数据，跳过上传
-      // 这可以防止新设备首次配置时用默认值覆盖云端数据
-      if (shouldSkipUpload(settings)) {
-        return {
-          success: true,
-          data: 0,
-          affectedCount: 0,
-        };
-      }
-
-      data.appSettings = settings;
-      dataSections.push('appSettings');
-    } else {
+    if (Object.keys(data).length === 0) {
       return { success: true, data: 0, affectedCount: 0 };
     }
 
-    // 收集磨豆机数据
-    const grinders = await db.grinders.toArray();
-    if (grinders.length > 0) {
-      data.grinders = grinders;
-      dataSections.push('grinders');
-    }
+    const fingerprint = createSettingsSyncFingerprint(data);
 
-    // 收集自定义预设（localStorage）
-    if (typeof window !== 'undefined') {
-      const presets: Record<string, unknown> = {};
-      for (const k of PRESETS_KEYS) {
-        const v = localStorage.getItem(`${PRESETS_PREFIX}${k}`);
-        if (v) {
-          try {
-            presets[k] = JSON.parse(v);
-          } catch {
-            /* 忽略解析错误 */
-          }
-        }
+    if (options.skipIfUnchanged) {
+      const storedFingerprint = getStoredSettingsSyncFingerprint();
+      if (storedFingerprint === fingerprint) {
+        return { success: true, data: 0, affectedCount: 0 };
       }
-      if (Object.keys(presets).length) {
-        data.customPresets = presets;
-        dataSections.push('customPresets');
+
+      const remoteFingerprint = await fetchRemoteSettingsFingerprint(client);
+      if (remoteFingerprint === fingerprint) {
+        persistSettingsSyncFingerprint(fingerprint);
+        return { success: true, data: 0, affectedCount: 0 };
       }
     }
 
@@ -576,6 +670,7 @@ export async function uploadSettingsData(
     }
 
     const count = Object.keys(data).length;
+    persistSettingsSyncFingerprint(fingerprint);
     return { success: true, data: count, affectedCount: count };
   } catch (err) {
     return createFailure(
@@ -704,6 +799,13 @@ export async function downloadSettingsData(
       // 触发 UI 刷新
       window.dispatchEvent(
         new CustomEvent('settingsChanged', { detail: { source: 'remote' } })
+      );
+    }
+
+    const syncedLocalData = await collectLocalSettingsSyncData();
+    if (Object.keys(syncedLocalData.data).length > 0) {
+      persistSettingsSyncFingerprint(
+        createSettingsSyncFingerprint(syncedLocalData.data)
       );
     }
 

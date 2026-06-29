@@ -128,6 +128,10 @@ export class LocalChangeListener {
       const customEvent = e as CustomEvent;
       // 如果是远程同步触发的变更，忽略之
       if (customEvent.detail?.source === 'remote') return;
+      const isExplicitLocalChange =
+        customEvent.detail?.source === 'local' ||
+        Boolean(customEvent.detail?.settings);
+      if (!isExplicitLocalChange) return;
       onSettingsSync();
     };
 

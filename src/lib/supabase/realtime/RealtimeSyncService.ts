@@ -67,6 +67,7 @@ import type { Method } from '@/lib/core/config';
 const SYNC_TIMING = {
   IGNORE_OWN_CHANGE_DURATION: 5000,
   SETTINGS_DEBOUNCE: 500,
+  SETTINGS_UPLOAD_TIMEOUT: 60000,
   SUBSCRIPTION_TIMEOUT: 10000,
   SETTINGS_COOLDOWN: 3000,
   RECONNECT_BASE_DELAY: 1000,
@@ -135,6 +136,30 @@ function markSettingsDirty(): void {
 function clearSettingsDirty(): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.removeItem(SETTINGS_DIRTY_KEY);
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  errorMsg: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMsg)), ms)
+    ),
+  ]);
+}
+
+function getSettingsSyncMode(
+  phase: SupabaseSyncPhase,
+  settingsDirty: boolean
+): 'bidirectional' | 'pull-only' {
+  if (phase === 'background-sync' && !settingsDirty) {
+    return 'pull-only';
+  }
+
+  return 'bidirectional';
 }
 
 // ============================================================================
@@ -712,10 +737,7 @@ export class RealtimeSyncService {
       );
 
       try {
-        const settingsMode =
-          phase === 'background-sync' && !processQueue && !hasDirtySettings()
-            ? 'pull-only'
-            : 'bidirectional';
+        const settingsMode = getSettingsSyncMode(phase, hasDirtySettings());
         const syncManager = new InitialSyncManager(this.client!, {
           settingsMode,
         });
@@ -751,6 +773,18 @@ export class RealtimeSyncService {
   private async syncSettingsUpload(): Promise<void> {
     if (!this.client) return;
 
+    if (this.syncRunPromise) {
+      try {
+        await this.syncRunPromise;
+      } catch {
+        // 后台同步失败后仍允许本次设置上传尝试给用户一个可恢复路径。
+      }
+
+      if (!hasDirtySettings()) {
+        return;
+      }
+    }
+
     const syncStore = useSyncStatusStore.getState();
     const ownsProgress = !syncStore.supabaseSyncProgress.active;
     if (ownsProgress) {
@@ -767,7 +801,11 @@ export class RealtimeSyncService {
 
     this.isProcessingRemoteSettings = true;
     try {
-      const result = await uploadSettingsData(this.client);
+      const result = await withTimeout(
+        uploadSettingsData(this.client, { skipIfUnchanged: true }),
+        SYNC_TIMING.SETTINGS_UPLOAD_TIMEOUT,
+        '上传设置超时'
+      );
       assertSyncSuccess(result, '上传设置失败');
       clearSettingsDirty();
       if (ownsProgress) {

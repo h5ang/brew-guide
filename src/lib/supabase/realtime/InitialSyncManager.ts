@@ -1354,7 +1354,7 @@ export class InitialSyncManager {
           });
 
           const result = await withTimeout(
-            uploadSettingsData(this.client),
+            uploadSettingsData(this.client, { skipIfUnchanged: true }),
             SYNC_TIMEOUT,
             '上传设置超时'
           );
@@ -1403,7 +1403,7 @@ export class InitialSyncManager {
         });
 
         const result = await withTimeout(
-          uploadSettingsData(this.client),
+          uploadSettingsData(this.client, { skipIfUnchanged: true }),
           SYNC_TIMEOUT,
           '上传设置超时'
         );

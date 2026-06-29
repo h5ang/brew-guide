@@ -139,7 +139,7 @@ const dispatchSettingsChanged = (
 
   window.dispatchEvent(
     new CustomEvent('settingsChanged', {
-      detail: { settings },
+      detail: { source: 'local', settings },
     })
   );
 };
@@ -147,7 +147,9 @@ const dispatchSettingsChanged = (
 const dispatchGrinderChanged = () => {
   if (typeof window === 'undefined') return;
 
-  window.dispatchEvent(new CustomEvent('grinderDataChanged'));
+  window.dispatchEvent(
+    new CustomEvent('grinderDataChanged', { detail: { source: 'local' } })
+  );
 };
 
 export async function renameRoasters(
