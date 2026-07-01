@@ -5,7 +5,6 @@ import { Capacitor } from '@capacitor/core';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import PWAInstallGuideDrawer from '@/components/layout/PWAInstallGuideDrawer';
-import { isBundledNativeApp } from '@/lib/app/capacitor';
 import { APP_VERSION } from '@/lib/core/config';
 import {
   getDesktopDownloadUrl,
@@ -83,19 +82,16 @@ export default function PWAInstallBanner() {
       // ignore
     }
     if (Capacitor.isNativePlatform?.() === true) {
-      return !isBundledNativeApp() && getIsAndroid();
+      return false;
     }
     return getIsIOS() || getIsAndroid();
   });
   const [isInstallGuideOpen, setIsInstallGuideOpen] = useState(false);
   const isNative = useMemo(() => Capacitor.isNativePlatform?.() === true, []);
-  const isBundledNative = useMemo(() => isBundledNativeApp(), []);
   const isIOS = useMemo(() => getIsIOS(), []);
   const isWeChat = useMemo(() => getIsWeChat(), []);
   const isAndroid = useMemo(() => getIsAndroid(), []);
   const isDesktop = useMemo(() => getIsDesktop(), []);
-  const showOnlineNativeMigration =
-    isNative && !isBundledNative && isAndroid && !isWeChat;
   const [onboardingStatus, setOnboardingStatus] = useState<
     'unknown' | 'open' | 'closed'
   >(() => {
@@ -138,15 +134,12 @@ export default function PWAInstallBanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const visible =
-      isVisible &&
-      onboardingStatus === 'closed' &&
-      (!isNative || showOnlineNativeMigration);
+    const visible = isVisible && onboardingStatus === 'closed' && !isNative;
     (window as BrewGuideWindow).__pwaInstallBannerVisible = visible;
     window.dispatchEvent(
       new CustomEvent('pwa-install-banner', { detail: { visible } })
     );
-  }, [isVisible, onboardingStatus, isNative, showOnlineNativeMigration]);
+  }, [isVisible, onboardingStatus, isNative]);
 
   const handleDismiss = useCallback(() => {
     try {
@@ -185,27 +178,17 @@ export default function PWAInstallBanner() {
     }
   }, [deferredPrompt, isIOS]);
 
-  if (
-    (!showOnlineNativeMigration && isNative) ||
-    !isVisible ||
-    onboardingStatus !== 'closed'
-  ) {
+  if (isNative || !isVisible || onboardingStatus !== 'closed') {
     return null;
   }
 
-  const description = showOnlineNativeMigration
-    ? '长期稳定版已发布，如需离线使用可安装'
-    : isWeChat
-      ? '不建议在微信内打开，请点右上角“…”选择“在浏览器打开”'
-      : '添加到主屏，离线可用';
+  const description = isWeChat
+    ? '不建议在微信内打开，请点右上角“…”选择“在浏览器打开”'
+    : '添加到主屏，离线可用';
 
-  const showPwaInstallButton =
-    !showOnlineNativeMigration &&
-    !isWeChat &&
-    (isIOS || Boolean(deferredPrompt));
+  const showPwaInstallButton = !isWeChat && (isIOS || Boolean(deferredPrompt));
   const showDesktopDownloads = isDesktop && !isWeChat;
-  const showAndroidDownload =
-    (isAndroid || showOnlineNativeMigration) && !isWeChat;
+  const showAndroidDownload = isAndroid && !isWeChat;
   const desktopDownloadUrl = getDesktopDownloadUrl();
   const androidDownloadUrl = getOfflineAndroidDownloadUrl(APP_VERSION);
 
@@ -264,7 +247,7 @@ export default function PWAInstallBanner() {
               href={androidDownloadUrl}
               className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-800 transition hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
             >
-              {showOnlineNativeMigration ? '下载离线版' : 'Android APK'}
+              Android APK
             </a>
           )}
           <button
