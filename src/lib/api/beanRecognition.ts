@@ -5,23 +5,34 @@ import {
   validateRecognitionImageFile,
 } from './shared/recognition';
 
-export const DEFAULT_BEAN_RECOGNITION_PROMPT = `你是OCR工具，提取图片中的咖啡豆信息，直接返回JSON（单豆返回对象{}，多豆返回数组[]）。
+const BEAN_RECOGNITION_MAX_TOKENS = 1200;
 
-必填: name（豆名，如"埃塞俄比亚赏花日晒原生种"）
+export const DEFAULT_BEAN_RECOGNITION_PROMPT = `任务：从咖啡豆包装图片提取可见文字信息，返回可导入JSON。
+输出：单豆返回object，多豆返回array。只输出JSON，不输出解释、markdown或代码块。
 
-可选（图片有明确信息才填）：
-- roaster: 烘焙商/品牌名（如"西可"）
-- capacity/remaining/price: 纯数字
-- roastDate: YYYY-MM-DD (缺年份补2026)
-- roastLevel: 极浅烘焙|浅度烘焙|中浅烘焙|中度烘焙|中深烘焙|深度烘焙
-- beanType: filter|espresso|omni（≤200g/浅烘/单品→filter，≥300g/深烘/拼配→espresso，标注全能→omni，默认filter）
-- flavor: 风味数组["橘子","荔枝"]
-- startDay/endDay: 养豆期/赏味期天数
-- blendComponents: 产地/庄园/处理法/品种 [{origin:"埃塞俄比亚",estate:"赏花",process:"日晒",variety:"原生种"}]
-- notes: 处理站/海拔/批次号等补充信息（产地和庄园信息放 blendComponents，这里只放补充信息）
+允许字段：
+name 必填；roaster；capacity；remaining；price；roastDate；roastLevel；beanType；flavor；startDay；endDay；blendComponents；notes。
 
-规则：数值不带单位/不编造/不确定不填/直接返回JSON
-`;
+字段规则：
+- 未明确可见或无法可靠推断的字段直接省略，不要输出空字符串/null。
+- 图片里同一信息同时存在中文和英文时，优先输出中文；只有没有中文时才保留英文。
+- name 只写咖啡豆商品名/批次名；主标题同时出现英文名和中文名时都保留，例如 "Alo Chilaka 奇拉卡"；不要把产区、处理法、风味词放入 name。
+- roaster 输出品牌短名；中文品牌明显时优先短中文名，例如 "柯林"、"辛鹿"。
+- 生豆商、进口商、供应商不是 roaster；应写入 notes，例如 "生豆商：裂豆师"。
+- capacity/remaining/price/startDay/endDay 只输出数字，不带单位；capacity 从净含量、规格、克数提取，startDay/endDay 从赏味期、养豆天数提取。
+- roastDate 仅在图片明确出现烘焙日期/生产日期且能读出月日时填写 YYYY-MM-DD；缺年份补2026；看不清、默认01-01、非法日期都不要填。
+- roastLevel 只用：极浅烘焙/浅度烘焙/中浅烘焙/中度烘焙/中深烘焙/深度烘焙。
+- beanType 只用 filter/espresso/omni；拼配、深烘或大包装通常为 espresso；标注全能为 omni；否则默认 filter。
+- flavor 为字符串数组。
+- blendComponents 必须是“对象数组”，严禁输出字符串数组；每个对象字段只能是 origin/estate/process/variety。批次和海拔不要放入 blendComponents，但咖啡品种编号如 74158 可以放入 variety。严禁写 blenderComponents、components、blend_components。
+- 产地与处理法按图片表格或文本顺序一一配对；产地/处理法不要放入 notes。
+- notes 只放规范补充信息，例如批次、海拔、生豆商、系列；多条内容用 / 分隔；不要写物流、促销、包装技术、锁鲜技术、人物背书等广告信息。
+- 不编造，不输出上述字段以外的键。
+
+blendComponents 形状示例：
+{"blendComponents":[{"origin":"埃塞俄比亚","estate":"博纳","process":"水洗","variety":"74158"}]}
+不要这样输出：
+{"blendComponents":["埃塞俄比亚","博纳","水洗","74158"]}`;
 
 export interface CustomBeanRecognitionConfig {
   enabled: boolean;
@@ -94,7 +105,10 @@ async function recognizeBeanImageWithCustomAPI(
           },
         ],
         temperature: 0,
-        max_tokens: 2000,
+        max_tokens: BEAN_RECOGNITION_MAX_TOKENS,
+        thinking: {
+          type: 'disabled',
+        },
         response_format: { type: 'json_object' },
       }),
       timeoutMs: API_CONFIG.timeoutMs,
